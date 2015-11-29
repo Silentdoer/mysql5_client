@@ -29,7 +29,7 @@ Future main() async {
   controller.add([1, 2, 3]);
   controller.add([4, 5, 6]);
 
-  var reader = new DataReader(controller.stream);
+  var reader = new DataStreamReader(controller.stream);
   print(await reader.readByte());
   print(await reader.readBytes(4));
   print(await reader.readByte());
@@ -74,7 +74,7 @@ Future main() async {
 
   var stream2 = new Stream.fromIterable(packets);
 
-  var reader2 = new DataReader(stream2);
+  var reader2 = new DataStreamReader(stream2);
   var payloadLength = decodeFixedLengthInteger(await reader2.readBytes(3));
   print("payloadLength: $payloadLength");
   var sequenceId = await reader2.readByte();

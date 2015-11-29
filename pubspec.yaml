@@ -9,6 +9,7 @@ environment:
 
 dependencies:
   crypto: ^0.9.1
+  stack_trace: any
 
 dev_dependencies:
   test: '>=0.12.0 <0.13.0'

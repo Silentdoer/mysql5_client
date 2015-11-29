@@ -7,6 +7,7 @@ import "dart:async";
 import "dart:math";
 import "dart:io";
 
+import "package:stack_trace/stack_trace.dart";
 import 'package:mysql_client/mysql_client.dart';
 
 // sudo ngrep -x -q -d lo0 '' 'port 3306'
@@ -31,13 +32,17 @@ var clientConnectAttributes = {
 };
 
 Future main() async {
+  await run();
+}
+
+Future run() async {
   clientCapabilityFlags =
       decodeFixedLengthInteger([0x0d, 0xa2, 0x00, 0x00]); // TODO sistemare
 
   var socket = await Socket.connect("localhost", 3306);
   socket.setOption(SocketOption.TCP_NODELAY, true);
 
-  var reader = new DataReader(socket);
+  var reader = new DataStreamReader(socket);
 
   await readInitialHandshakePacket(reader);
 
@@ -54,22 +59,29 @@ Future main() async {
 
   print("testMySql: ${sw.elapsedMilliseconds} ms");
 
+  print("DATA_RANGE_COUNT: $DATA_RANGE_COUNT");
+  print("DATA_BUFFER_COUNT: $DATA_BUFFER_COUNT");
+  print("DATA_CHUNK_COUNT: $DATA_CHUNK_COUNT");
+  print("BUFFER_LIST_COUNT: $BUFFER_LIST_COUNT");
+  print("RANGE_LIST_COUNT: $RANGE_LIST_COUNT");
+  print("LIST1_COUNT: $LIST1_COUNT");
+
   await socket.close();
 
   socket.destroy();
 }
 
-Future readInitialHandshakePacket(DataReader reader) async {
+Future readInitialHandshakePacket(DataStreamReader reader) async {
   var loaded = 0;
 
   var payloadLength = decodeFixedLengthInteger(await reader.readBytes(3));
   print("payloadLength: $payloadLength");
 
-  var sequenceId = decodeFixedLengthInteger(await reader.readBytes(1));
+  var sequenceId = decodeFixedLengthInteger1(await reader.readByte());
   print("sequenceId: $sequenceId");
 
   // 1              [0a] protocol version
-  var protocolVersion = decodeFixedLengthInteger(await reader.readBytes(1));
+  var protocolVersion = decodeFixedLengthInteger1(await reader.readByte());
   print("$loaded: protocolVersion: $protocolVersion");
   loaded += 1;
 
@@ -101,7 +113,7 @@ Future readInitialHandshakePacket(DataReader reader) async {
   // if more data in the packet:
   if (loaded < payloadLength) {
     // 1              character set
-    var characterSet = decodeFixedLengthInteger(await reader.readBytes(1));
+    var characterSet = decodeFixedLengthInteger1(await reader.readByte());
     print("$loaded: characterSet: $characterSet");
     loaded += 1;
 
@@ -123,7 +135,7 @@ Future readInitialHandshakePacket(DataReader reader) async {
     if (serverCapabilityFlags & CLIENT_PLUGIN_AUTH != 0) {
       // 1              length of auth-plugin-data
       authPluginDataLength =
-          decodeFixedLengthInteger(await reader.readBytes(1));
+          decodeFixedLengthInteger1(await reader.readByte());
       print("$loaded: authPluginDataLength: $authPluginDataLength");
       loaded += 1;
     } else {
@@ -235,17 +247,17 @@ Future writeHandshakeResponsePacket(Socket socket) async {
   socket.add(data);
 }
 
-Future readCommandResponsePacket(DataReader reader) async {
+Future readCommandResponsePacket(DataStreamReader reader) async {
   var loaded = 0;
 
   var payloadLength = decodeFixedLengthInteger(await reader.readBytes(3));
   print("payloadLength: $payloadLength");
 
-  var sequenceId = decodeFixedLengthInteger(await reader.readBytes(1));
+  var sequenceId = decodeFixedLengthInteger1(await reader.readByte());
   print("sequenceId: $sequenceId");
 
   // int<1>	header	[00] or [fe] the OK packet header
-  var header = decodeFixedLengthInteger(await reader.readBytes(1));
+  var header = decodeFixedLengthInteger1(await reader.readByte());
   print("$loaded: header: $header");
   loaded += 1;
 
@@ -377,7 +389,7 @@ Future writeCommandQueryPacket2(Socket socket) async {
   socket.add(data);
 }
 
-Future readCommandQueryResponsePacket1(DataReader reader) async {
+Future readCommandQueryResponsePacket1(DataStreamReader reader) async {
   await readResultsetColumnCountResponsePacket(reader);
 
   await readResultsetColumnDefinitionResponsePacket(reader);
@@ -387,7 +399,7 @@ Future readCommandQueryResponsePacket1(DataReader reader) async {
   await readEOFResponsePacket(reader);
 }
 
-Future readCommandQueryResponsePacket2(DataReader reader) async {
+Future readCommandQueryResponsePacket2(DataStreamReader reader) async {
   var sw = new Stopwatch()..start();
 
   await readResultsetColumnCountResponsePacket(reader);
@@ -411,14 +423,14 @@ Future readCommandQueryResponsePacket2(DataReader reader) async {
       "readResultsetColumnDefinitionResponsePacket: ${sw.elapsedMilliseconds} ms");
 }
 
-Future readResultsetColumnCountResponsePacket(DataReader reader) async {
+Future readResultsetColumnCountResponsePacket(DataStreamReader reader) async {
   var loaded = 0;
 
   var payloadLength = decodeFixedLengthInteger(await reader.readBytes(3));
-  var sequenceId = decodeFixedLengthInteger(await reader.readBytes(1));
+  var sequenceId = decodeFixedLengthInteger1(await reader.readByte());
 
   // A packet containing a Protocol::LengthEncodedInteger column_count
-  var columnCount = decodeFixedLengthInteger(await reader.readBytes(1));
+  var columnCount = decodeFixedLengthInteger1(await reader.readByte());
   print("$loaded: columnCount: $columnCount");
   loaded += 1;
 
@@ -427,11 +439,12 @@ Future readResultsetColumnCountResponsePacket(DataReader reader) async {
   }
 }
 
-Future readResultsetColumnDefinitionResponsePacket(DataReader reader) async {
+Future readResultsetColumnDefinitionResponsePacket(
+    DataStreamReader reader) async {
   var loaded = 0;
 
   var payloadLength = decodeFixedLengthInteger(await reader.readBytes(3));
-  var sequenceId = decodeFixedLengthInteger(await reader.readBytes(1));
+  var sequenceId = decodeFixedLengthInteger1(await reader.readByte());
 
   // lenenc_str     catalog
   var catalogFirstByte = await reader.readByte();
@@ -516,7 +529,7 @@ Future readResultsetColumnDefinitionResponsePacket(DataReader reader) async {
   loaded += 4;
 
   // 1              type
-  var type = decodeFixedLengthInteger(await reader.readBytes(1));
+  var type = decodeFixedLengthInteger1(await reader.readByte());
   loaded += 1;
 
   // 2              flags
@@ -524,7 +537,7 @@ Future readResultsetColumnDefinitionResponsePacket(DataReader reader) async {
   loaded += 2;
 
   // 1              decimals
-  var decimals = decodeFixedLengthInteger(await reader.readBytes(1));
+  var decimals = decodeFixedLengthInteger1(await reader.readByte());
   loaded += 1;
 
   // 2              filler [00] [00]
@@ -536,7 +549,7 @@ Future readResultsetColumnDefinitionResponsePacket(DataReader reader) async {
   }
 }
 
-Future<bool> readResultsetRowResponsePacket(DataReader reader) async {
+Future<bool> readResultsetRowResponsePacket(DataStreamReader reader) async {
   var eof = false;
   var loaded = 0;
 
@@ -561,7 +574,8 @@ Future<bool> readResultsetRowResponsePacket(DataReader reader) async {
           loaded += 2;
         }
       } else {
-        var columnBytesLength = getDecodingLengthEncodedIntegerBytesLength(columnFirstByte);
+        var columnBytesLength =
+            getDecodingLengthEncodedIntegerBytesLength(columnFirstByte);
         var columnLength = columnBytesLength > 1
             ? decodeLengthEncodedInteger(
                 await reader.readBytes(columnBytesLength - 1))
@@ -583,13 +597,13 @@ Future<bool> readResultsetRowResponsePacket(DataReader reader) async {
   return eof;
 }
 
-Future<bool> readResultsetRowResponsePacket2(DataReader reader) async {
+Future<bool> readResultsetRowResponsePacket2(DataStreamReader reader) async {
   var eof = false;
   var loaded = 0;
 
-  var payloadLength = await reader.processBytes(3, (range) {
-    return range.data[range.start];
-  });
+  var buffer = await reader.readFixedLengthBuffer(3);
+
+  var payloadLength = buffer.singleRange.data[buffer.singleRange.start];
 
   await reader.skipByte();
 
@@ -621,13 +635,13 @@ Future<bool> readResultsetRowResponsePacket2(DataReader reader) async {
   return eof;
 }
 
-Future readResponsePacket(DataReader reader) async {
+Future readResponsePacket(DataStreamReader reader) async {
   var loaded = 0;
 
   var payloadLength = decodeFixedLengthInteger(await reader.readBytes(3));
   print("payloadLength: $payloadLength");
 
-  var sequenceId = decodeFixedLengthInteger(await reader.readBytes(1));
+  var sequenceId = decodeFixedLengthInteger1(await reader.readByte());
   print("sequenceId: $sequenceId");
 
   // TODO solo per test iniziale
@@ -643,14 +657,14 @@ Future readResponsePacket(DataReader reader) async {
   }
 }
 
-Future readEOFResponsePacket(DataReader reader) async {
+Future readEOFResponsePacket(DataStreamReader reader) async {
   var loaded = 0;
 
   var payloadLength = decodeFixedLengthInteger(await reader.readBytes(3));
-  var sequenceId = decodeFixedLengthInteger(await reader.readBytes(1));
+  var sequenceId = decodeFixedLengthInteger1(await reader.readByte());
 
   // int<1>	header	[00] or [fe] the OK packet header
-  var header = decodeFixedLengthInteger(await reader.readBytes(1));
+  var header = decodeFixedLengthInteger1(await reader.readByte());
   loaded += 1;
 
   if (header != 0xfe) {

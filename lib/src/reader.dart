@@ -27,7 +27,6 @@ const List<int> _EMPTY_DATA = const [];
 const List<DataRange> _EMPTY_RANGE_LIST = const [];
 final DataBuffer _EMPTY_BUFFER = new DataBuffer();
 
-// TODO conteggi sul DataStreamReader
 // TODO creare un pool di DataRange, DataBuffer
 // TODO iteratori su reader per il recupero dei dati non tutti in una volta
 class DataBuffer {
@@ -197,13 +196,21 @@ class DataStreamReader {
   }
 
   Future<int> readFixedLengthInteger(int length) async {
-    var buffer = await this.readFixedLengthBuffer(length);
-    return buffer.toInt();
+    if (length == 1) {
+      return await this.readByte();
+    } else {
+      var buffer = await this.readFixedLengthBuffer(length);
+      return buffer.toInt();
+    }
   }
 
   Future<String> readFixedLengthString(int length) async {
-    var buffer = await this.readFixedLengthBuffer(length);
-    return buffer.toString();
+    if (length == 1) {
+      return new String.fromCharCode(await this.readByte());
+    } else {
+      var buffer = await this.readFixedLengthBuffer(length);
+      return buffer.toString();
+    }
   }
 
   Future<String> readFixedLengthUTF8String(int length) async {

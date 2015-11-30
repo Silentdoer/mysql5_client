@@ -553,9 +553,14 @@ Future<bool> readResultsetRowResponsePacket(DataStreamReader reader) async {
   var eof = false;
   var loaded = 0;
 
-  var payloadLength = decodeFixedLengthInteger(await reader.readBytes(3));
+  // var payloadLength = decodeFixedLengthInteger(await reader.readBytes(3));
+  var payloadLength = await reader.readFixedLengthInteger(3);
 
-  var sequenceId = await reader.readByte();
+  // var sequenceId = await reader.readByte();
+  // TODO versione di un byte più veloce
+  var sequenceId = await reader.readFixedLengthInteger(1);
+
+  reader.resetLoadedCount();
 
   while (loaded < payloadLength) {
     var columnFirstByte = await reader.readByte();

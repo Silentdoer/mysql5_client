@@ -390,40 +390,40 @@ Future writeCommandQueryPacket2(Socket socket) async {
 }
 
 Future readCommandQueryResponsePacket1(DataStreamReader reader) async {
-  await readResultsetColumnCountResponsePacket(reader);
+  await readResultSetColumnCountResponsePacket(reader);
 
-  await readResultsetColumnDefinitionResponsePacket(reader);
+  await readResultSetColumnDefinitionResponsePacket(reader);
   await readEOFResponsePacket(reader);
 
-  await readResultsetRowResponsePacket(reader);
+  await readResultSetRowResponsePacket(reader);
   await readEOFResponsePacket(reader);
 }
 
 Future readCommandQueryResponsePacket2(DataStreamReader reader) async {
   var sw = new Stopwatch()..start();
 
-  await readResultsetColumnCountResponsePacket(reader);
-  print("readResultsetColumnCountResponsePacket: ${sw.elapsedMilliseconds} ms");
+  await readResultSetColumnCountResponsePacket(reader);
+  print("readResultSetColumnCountResponsePacket: ${sw.elapsedMilliseconds} ms");
 
   sw.reset();
   var columnCount = 3;
   for (var i = 0; i < columnCount; i++) {
-    await readResultsetColumnDefinitionResponsePacket(reader);
+    await readResultSetColumnDefinitionResponsePacket(reader);
   }
   await readEOFResponsePacket(reader);
   print(
-      "readResultsetColumnDefinitionResponsePacket: ${sw.elapsedMilliseconds} ms");
+      "readResultSetColumnDefinitionResponsePacket: ${sw.elapsedMilliseconds} ms");
 
   sw.reset();
   var eof = false;
   while (!eof) {
-    eof = await readResultsetRowResponsePacket(reader);
+    eof = await readResultSetRowResponsePacket(reader);
   }
   print(
-      "readResultsetColumnDefinitionResponsePacket: ${sw.elapsedMilliseconds} ms");
+      "readResultSetColumnDefinitionResponsePacket: ${sw.elapsedMilliseconds} ms");
 }
 
-Future readResultsetColumnCountResponsePacket(DataStreamReader reader) async {
+Future readResultSetColumnCountResponsePacket(DataStreamReader reader) async {
   var loaded = 0;
 
   var payloadLength = decodeFixedLengthInteger(await reader.readBytes(3));
@@ -439,7 +439,7 @@ Future readResultsetColumnCountResponsePacket(DataStreamReader reader) async {
   }
 }
 
-Future readResultsetColumnDefinitionResponsePacket(
+Future readResultSetColumnDefinitionResponsePacket(
     DataStreamReader reader) async {
   var loaded = 0;
 
@@ -549,16 +549,16 @@ Future readResultsetColumnDefinitionResponsePacket(
   }
 }
 
-Future<bool> readResultsetRowResponsePacket(DataStreamReader reader) async {
+Future<bool> readResultSetRowResponsePacket(DataStreamReader reader) async {
   var eof = false;
   var loaded = 0;
 
-  // var payloadLength = decodeFixedLengthInteger(await reader.readBytes(3));
-  var payloadLength = await reader.readFixedLengthInteger(3);
+  var payloadLength = decodeFixedLengthInteger(await reader.readBytes(3));
+  // var payloadLength = await reader.readFixedLengthInteger(3);
 
-  // var sequenceId = await reader.readByte();
+  var sequenceId = await reader.readByte();
   // TODO versione di un byte più veloce
-  var sequenceId = await reader.readFixedLengthInteger(1);
+  // var sequenceId = await reader.readFixedLengthInteger(1);
 
   reader.resetLoadedCount();
 
@@ -602,7 +602,7 @@ Future<bool> readResultsetRowResponsePacket(DataStreamReader reader) async {
   return eof;
 }
 
-Future<bool> readResultsetRowResponsePacket2(DataStreamReader reader) async {
+Future<bool> readResultSetRowResponsePacket2(DataStreamReader reader) async {
   var eof = false;
   var loaded = 0;
 

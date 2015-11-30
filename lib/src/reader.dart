@@ -264,81 +264,78 @@ class DataStreamReader {
     return buffer.toUTF8();
   }
 
-  Future skipByte() async {
-    await _readChunk((chunk) => chunk.skipSingle());
-    _loadedCount++;
-  }
-
-  Future<int> readByte() async {
-    var value = await _readChunk((chunk) => chunk.readSingle());
-    _loadedCount++;
-    return value;
-  }
-
-  Future skipBytes(int length) async {
-    await readFixedLengthBuffer(length);
-    _loadedCount += length;
-  }
-
-  Future<List<int>> readBytes(int length) async {
-    if (length > 1) {
-      var buffer = await readFixedLengthBuffer(length);
-      return buffer.data;
-    } else if (length == 1) {
-      var value = await readByte();
-      // print("Created list [1]");
-      LIST1_COUNT++;
-      return new List.filled(1, value);
-    } else {
-      return _EMPTY_DATA;
-    }
-  }
-
-  Future skipBytesUpTo(int terminator) async {
-    await readUpToBuffer(terminator);
-  }
-
-  Future<List<int>> readBytesUpTo(int terminator) async {
-    var buffer = await readUpToBuffer(terminator);
-    return buffer.data;
-  }
-
-  Future<DataBuffer> readFixedLengthBuffer(int length) async {
-    if (length > 0) {
-      var buffer = new DataBuffer();
-      var resultLength = 0;
-
-      bool isPending = true;
-      while (isPending) {
-        await _readChunk((chunk) {
-          var range = chunk.readFixedRange(length - resultLength);
-          buffer.add(range);
-          _loadedCount += range.length;
-          resultLength += range.length;
-          isPending = range._isPending;
-        });
-      }
-
-      return buffer;
-    } else {
-      return _EMPTY_BUFFER;
-    }
-  }
-
-  Future<DataBuffer> readUpToBuffer(int terminator) async {
-    var buffer = new DataBuffer();
-
-    bool isPending = true;
-    while (isPending) {
-      await _readChunk((chunk) {
-        var range = chunk.readRangeUpTo(terminator);
-        buffer.add(range);
-        _loadedCount += range.length;
-        isPending = range._isPending;
+  Future skipByte() => _readChunk((chunk) => chunk.skipSingle()).then((_) {
+        _loadedCount++;
       });
-    }
 
-    return buffer;
+  Future<int> readByte() =>
+      _readChunk((chunk) => chunk.readSingle()).then((value) {
+        _loadedCount++;
+        return value;
+      });
+
+  Future skipBytes(int length) => readFixedLengthBuffer(length).then((_) {
+        _loadedCount += length;
+      });
+
+  Future<List<int>> readBytes(int length) {
+    if (length > 1) {
+      return readFixedLengthBuffer(length).then((buffer) => buffer.data);
+    } else if (length == 1) {
+      return readByte().then((value) {
+        // print("Created list [1]");
+        LIST1_COUNT++;
+        return new List.filled(1, value);
+      });
+    } else {
+      return new Future.value(_EMPTY_DATA);
+    }
+  }
+
+  Future skipBytesUpTo(int terminator) => readUpToBuffer(terminator);
+
+  Future<List<int>> readBytesUpTo(int terminator) =>
+      readUpToBuffer(terminator).then((buffer) => buffer.data);
+
+  Future<DataBuffer> readFixedLengthBuffer(int length) {
+    if (length > 0) {
+      return _readFixedLengthBuffer(new DataBuffer(), length);
+    } else {
+      return new Future.value(_EMPTY_BUFFER);
+    }
+  }
+
+  Future<DataBuffer> readUpToBuffer(int terminator) =>
+      _readUpToBuffer(new DataBuffer(), terminator);
+
+  Future<DataBuffer> _readFixedLengthBuffer(DataBuffer buffer, int leftLength) {
+    return _readChunk((chunk) {
+      var range = chunk.readFixedRange(leftLength);
+      buffer.add(range);
+      return range;
+    }).then((range) {
+      _loadedCount += range.length;
+      if (range._isPending) {
+        return _readFixedLengthBuffer(buffer, leftLength - range.length);
+      } else {
+        return buffer;
+      }
+    });
+  }
+
+  Future<DataBuffer> _readUpToBuffer(DataBuffer buffer, int terminator) {
+    return _readChunk((chunk) {
+      var range = chunk.readRangeUpTo(terminator);
+      buffer.add(range);
+      return range;
+    }).then((range) {
+      _loadedCount += range.length;
+      if (range._isPending) {
+        return _readUpToBuffer(buffer, terminator);
+      } else {
+        return buffer;
+      }
+    });
   }
 
   void _onData(List<int> data) {
@@ -353,7 +350,50 @@ class DataStreamReader {
     }
   }
 
-  Future _readChunk(chunkReader(_DataChunk chunk)) async {
+  _readChunk(chunkReader(_DataChunk chunk)) {
+    if (_chunks.isEmpty) {
+      _dataReadyCompleter = new Completer();
+      return _dataReadyCompleter.future.then((_) {
+        var chunk = _chunks.first;
+        try {
+          return chunkReader(chunk);
+        } finally {
+          if (chunk.isEmpty) {
+            _chunks.removeFirst();
+          }
+        }
+      });
+    } else {
+      var chunk = _chunks.first;
+      try {
+        return new Future.value(chunkReader(chunk));
+      } finally {
+        if (chunk.isEmpty) {
+          _chunks.removeFirst();
+        }
+      }
+    }
+  }
+
+  Future _readChunk3(chunkReader(_DataChunk chunk)) {
+    return new Future.value().then((_) {
+      if (_chunks.isEmpty) {
+        _dataReadyCompleter = new Completer();
+        return _dataReadyCompleter.future;
+      }
+    }).then((_) {
+      var chunk = _chunks.first;
+      try {
+        return chunkReader(chunk);
+      } finally {
+        if (chunk.isEmpty) {
+          _chunks.removeFirst();
+        }
+      }
+    });
+  }
+
+  Future _readChunk2(chunkReader(_DataChunk chunk)) async {
     if (_chunks.isEmpty) {
       _dataReadyCompleter = new Completer();
       await _dataReadyCompleter.future;

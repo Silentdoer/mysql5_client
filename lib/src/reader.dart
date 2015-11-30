@@ -27,8 +27,9 @@ const List<int> _EMPTY_DATA = const [];
 const List<DataRange> _EMPTY_RANGE_LIST = const [];
 final DataBuffer _EMPTY_BUFFER = new DataBuffer();
 
+// TODO conteggi sul DataStreamReader
 // TODO creare un pool di DataRange, DataBuffer
-
+// TODO iteratori su reader per il recupero dei dati non tutti in una volta
 class DataBuffer {
   final List<DataRange> _dataRanges = new List<DataRange>();
 
@@ -182,13 +183,32 @@ class DataStreamReader {
 
   Completer _dataReadyCompleter;
 
+  int _loadedCount;
+
   DataStreamReader(this._stream) {
+    this._loadedCount = 0;
     this._stream.listen(_onData);
+  }
+
+  int get loadedCount => _loadedCount;
+
+  void resetLoadedCount() {
+    _loadedCount = 0;
   }
 
   Future<int> readFixedLengthInteger(int length) async {
     var buffer = await this.readFixedLengthBuffer(length);
     return buffer.toInt();
+  }
+
+  Future<String> readFixedLengthString(int length) async {
+    var buffer = await this.readFixedLengthBuffer(length);
+    return buffer.toString();
+  }
+
+  Future<String> readFixedLengthUTF8String(int length) async {
+    var buffer = await this.readFixedLengthBuffer(length);
+    return buffer.toUTF8();
   }
 
   Future<int> readLengthEncodedInteger() async {
@@ -215,16 +235,6 @@ class DataStreamReader {
     }
   }
 
-  Future<String> readFixedLengthString(int length) async {
-    var buffer = await this.readFixedLengthBuffer(length);
-    return buffer.toString();
-  }
-
-  Future<String> readFixedLengthUTF8String(int length) async {
-    var buffer = await this.readFixedLengthBuffer(length);
-    return buffer.toUTF8();
-  }
-
   Future<String> readLengthEncodedString() async {
     var length = await this.readLengthEncodedInteger();
     var buffer = await this.readFixedLengthBuffer(length);
@@ -247,12 +257,20 @@ class DataStreamReader {
     return buffer.toUTF8();
   }
 
-  Future skipByte() => _readChunk((chunk) => chunk.skipSingle());
+  Future skipByte() async {
+    await _readChunk((chunk) => chunk.skipSingle());
+    _loadedCount++;
+  }
 
-  Future<int> readByte() => _readChunk((chunk) => chunk.readSingle());
+  Future<int> readByte() async {
+    var value = await _readChunk((chunk) => chunk.readSingle());
+    _loadedCount++;
+    return value;
+  }
 
   Future skipBytes(int length) async {
     await readFixedLengthBuffer(length);
+    _loadedCount += length;
   }
 
   Future<List<int>> readBytes(int length) async {
@@ -288,6 +306,7 @@ class DataStreamReader {
         await _readChunk((chunk) {
           var range = chunk.readFixedRange(length - resultLength);
           buffer.add(range);
+          _loadedCount += range.length;
           resultLength += range.length;
           isPending = range._isPending;
         });
@@ -307,6 +326,7 @@ class DataStreamReader {
       await _readChunk((chunk) {
         var range = chunk.readRangeUpTo(terminator);
         buffer.add(range);
+        _loadedCount += range.length;
         isPending = range._isPending;
       });
     }

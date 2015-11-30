@@ -19,4 +19,12 @@ Future main() async {
 
   var buffer = await reader.readFixedLengthBuffer(2);
   print(buffer.singleRange.data.sublist(buffer.singleRange.start, buffer.singleRange.end));
+
+  var sw = new Stopwatch();
+  sw.start();
+  for (var i = 0; i < 4000000; i++) {
+    new DataBuffer();
+    new DataRange([]);
+  }
+  print("Elapsed in ${sw.elapsedMilliseconds} ms");
 }

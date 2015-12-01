@@ -5,4 +5,6 @@
 library mysql_client;
 
 export 'src/data_reader.dart';
+export 'src/data_writer.dart';
+export 'src/writer_buffer.dart';
 export 'src/mysql_client_base.dart';

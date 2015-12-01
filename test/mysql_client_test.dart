@@ -42,18 +42,19 @@ Future run() async {
   var socket = await Socket.connect("localhost", 3306);
   socket.setOption(SocketOption.TCP_NODELAY, true);
 
-  var reader = new DataStreamReader(socket);
+  var reader = new DataReader(socket);
+  var writer = new DataWriter(socket);
 
   await readInitialHandshakePacket(reader);
 
-  await writeHandshakeResponsePacket(socket);
+  await writeHandshakeResponsePacket(writer);
 
   await readCommandResponsePacket(reader);
 
   var sw = new Stopwatch()..start();
 
   for (var i = 0; i < 10; i++) {
-    await writeCommandQueryPacket(socket);
+    await writeCommandQueryPacket(writer);
     await readCommandQueryResponsePacket(reader);
   }
 
@@ -64,7 +65,7 @@ Future run() async {
   socket.destroy();
 }
 
-Future readInitialHandshakePacket(DataStreamReader reader) async {
+Future readInitialHandshakePacket(DataReader reader) async {
   var payloadLength = await reader.readFixedLengthInteger(3);
   print("payloadLength: $payloadLength");
 
@@ -152,29 +153,30 @@ Future readInitialHandshakePacket(DataStreamReader reader) async {
   }
 }
 
-Future writeHandshakeResponsePacket(Socket socket) async {
+Future writeHandshakeResponsePacket(DataWriter writer) async {
+  WriterBuffer buffer = new WriterBuffer();
+
   var sequenceId =
       0x01; // penso dipenda dalla sequenza a cui era arrivato il server
 
-  var data = [];
   // 4              capability flags, CLIENT_PROTOCOL_41 always set
-  data.addAll(encodeFixedLengthInteger(clientCapabilityFlags, 4));
+  buffer.writeFixedLengthInteger(clientCapabilityFlags, 4);
   // 4              max-packet size
-  data.addAll(encodeFixedLengthInteger(maxPacketSize, 4));
+  buffer.writeFixedLengthInteger(maxPacketSize, 4);
   // 1              character set
-  data.addAll(encodeFixedLengthInteger(characterSet, 1));
+  buffer.writeFixedLengthInteger(characterSet, 1);
   // string[23]     reserved (all [0])
-  data.addAll(encodeFixedFilledLengthString(0x00, 23));
+  buffer.writeFixedFilledLengthString(0x00, 23);
   // string[NUL]    username
-  data.addAll(encodeNulTerminatedString(userName, utf8Encoded: true));
+  buffer.writeNulTerminatedUTF8String(userName);
 
   // if capabilities & CLIENT_PLUGIN_AUTH_LENENC_CLIENT_DATA {
   if (serverCapabilityFlags & CLIENT_PLUGIN_AUTH_LENENC_CLIENT_DATA != 0) {
     // lenenc-int     length of auth-response
     // string[n]      auth-response
-    data.addAll(encodeLengthEncodedString(generateAuthResponse(
+    buffer.writeLengthEncodedString(generateAuthResponse(
         password, authPluginData, authPluginName,
-        utf8Encoded: true)));
+        utf8Encoded: true));
     // else if capabilities & CLIENT_SECURE_CONNECTION {
   } else if (serverCapabilityFlags & CLIENT_SECURE_CONNECTION != 0) {
     // 1              length of auth-response
@@ -190,12 +192,12 @@ Future writeHandshakeResponsePacket(Socket socket) async {
   // if capabilities & CLIENT_CONNECT_WITH_DB {
   if (serverCapabilityFlags & CLIENT_CONNECT_WITH_DB != 0) {
     // string[NUL]    database
-    data.addAll(encodeNulTerminatedString(database, utf8Encoded: true));
+    buffer.writeNulTerminatedUTF8String(database);
   }
   // if capabilities & CLIENT_PLUGIN_AUTH {
   if (serverCapabilityFlags & CLIENT_PLUGIN_AUTH != 0) {
     // string[NUL]    auth plugin name
-    data.addAll(encodeNulTerminatedString(authPluginName));
+    buffer.writeNulTerminatedUTF8String(authPluginName);
   }
   // if capabilities & CLIENT_CONNECT_ATTRS {
   if (serverCapabilityFlags & CLIENT_CONNECT_ATTRS != 0) {
@@ -203,24 +205,24 @@ Future writeHandshakeResponsePacket(Socket socket) async {
     // lenenc-str     key
     // lenenc-str     value
     // if-more data in 'length of all key-values', more keys and value pairs
-    var data2 = [];
+    var valuesBuffer = new WriterBuffer();
     clientConnectAttributes.forEach((key, value) {
-      data2.addAll(encodeLengthEncodedString(key));
-      data2.addAll(encodeLengthEncodedString(value));
+      valuesBuffer.writeLengthEncodedString(key);
+      valuesBuffer.writeLengthEncodedString(value);
     });
-    data.addAll(encodeLengthEncodedInteger(data2.length));
-    data.addAll(data2);
+    buffer.writeLengthEncodedInteger(valuesBuffer.length);
+    buffer.writeBuffer(valuesBuffer);
   }
 
-  var packetHeaderData = new List(4);
-  packetHeaderData.setAll(0, encodeFixedLengthInteger(data.length, 3));
-  packetHeaderData.setAll(3, encodeFixedLengthInteger(sequenceId, 1));
+  var headerBuffer = new WriterBuffer();
+  headerBuffer.writeFixedLengthInteger(buffer.length, 3);
+  headerBuffer.writeOneLengthInteger(sequenceId);
 
-  socket.add(packetHeaderData);
-  socket.add(data);
+  writer.write(headerBuffer.data);
+  writer.write(buffer.data);
 }
 
-Future readCommandResponsePacket(DataStreamReader reader) async {
+Future readCommandResponsePacket(DataReader reader) async {
   var payloadLength = await reader.readFixedLengthInteger(3);
   print("payloadLength: $payloadLength");
 
@@ -286,24 +288,25 @@ Future readCommandResponsePacket(DataStreamReader reader) async {
   }
 }
 
-Future writeCommandQueryPacket(Socket socket) async {
+Future writeCommandQueryPacket(DataWriter writer) async {
+  WriterBuffer buffer = new WriterBuffer();
+
   var sequenceId = 0x00;
 
-  var data = [];
   // 1              [03] COM_QUERY
-  data.addAll(encodeFixedLengthInteger(COM_QUERY, 1));
+  buffer.writeFixedLengthInteger(COM_QUERY, 1);
   // string[EOF]    the query the server shall execute
-  data.addAll(encodeString("SELECT * FROM people", utf8Encoded: true));
+  buffer.writeFixedLengthUTF8String("SELECT * FROM people");
 
-  var packetHeaderData = new List(4);
-  packetHeaderData.setAll(0, encodeFixedLengthInteger(data.length, 3));
-  packetHeaderData.setAll(3, encodeFixedLengthInteger(sequenceId, 1));
+  var headerBuffer = new WriterBuffer();
+  headerBuffer.writeFixedLengthInteger(buffer.length, 3);
+  headerBuffer.writeOneLengthInteger(sequenceId);
 
-  socket.add(packetHeaderData);
-  socket.add(data);
+  writer.write(headerBuffer.data);
+  writer.write(buffer.data);
 }
 
-Future readCommandQueryResponsePacket(DataStreamReader reader) async {
+Future readCommandQueryResponsePacket(DataReader reader) async {
   var sw = new Stopwatch()..start();
 
   await readResultSetColumnCountResponsePacket(reader);
@@ -350,7 +353,7 @@ Future readCommandQueryResponsePacket(DataStreamReader reader) async {
       "readResultSetColumnDefinitionResponsePacket: ${sw.elapsedMilliseconds} ms");
 }
 
-Future readResultSetColumnCountResponsePacket(DataStreamReader reader) async {
+Future readResultSetColumnCountResponsePacket(DataReader reader) async {
   var payloadLength = await reader.readFixedLengthInteger(3);
 
   var sequenceId = await reader.readOneLengthInteger();
@@ -361,8 +364,7 @@ Future readResultSetColumnCountResponsePacket(DataStreamReader reader) async {
   var columnCount = await reader.readOneLengthInteger();
 }
 
-Future readResultSetColumnDefinitionResponsePacket(
-    DataStreamReader reader) async {
+Future readResultSetColumnDefinitionResponsePacket(DataReader reader) async {
   var payloadLength = await reader.readFixedLengthInteger(3);
 
   var sequenceId = await reader.readOneLengthInteger();
@@ -409,7 +411,7 @@ Future readResultSetColumnDefinitionResponsePacket(
   await reader.skipBytes(2);
 }
 
-Future readResultSetRowResponsePacket(DataStreamReader reader) async {
+Future readResultSetRowResponsePacket(DataReader reader) async {
   var payloadLength = await reader.readFixedLengthInteger(3);
 
   var sequenceId = await reader.readFixedLengthInteger(1);
@@ -426,7 +428,7 @@ Future readResultSetRowResponsePacket(DataStreamReader reader) async {
   }
 }
 
-Future readEOFResponsePacket(DataStreamReader reader) async {
+Future readEOFResponsePacket(DataReader reader) async {
   var payloadLength = await reader.readFixedLengthInteger(3);
 
   var sequenceId = await reader.readOneLengthInteger();

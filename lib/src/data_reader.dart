@@ -5,25 +5,10 @@ library mysql_client.data_reader;
 
 import "dart:async";
 import "dart:collection";
-import "dart:math";
 
+import "data_commons.dart";
 import "data_chunk.dart";
 import "data_buffer.dart";
-import "data_range.dart";
-
-const int _PREFIX_NULL = 0xfb;
-const int _PREFIX_UNDEFINED = 0xff;
-
-const int _MAX_INT_1 = 0xfb;
-final int _MAX_INT_2 = pow(2, 2 * 8);
-const int _PREFIX_INT_2 = 0xfc;
-final int _MAX_INT_3 = pow(2, 3 * 8);
-const int _PREFIX_INT_3 = 0xfd;
-final int _MAX_INT_8 = pow(2, 8 * 8);
-const int _PREFIX_INT_8 = 0xfe;
-
-const List<int> _EMPTY_DATA = const [];
-const List<DataRange> _EMPTY_RANGE_LIST = const [];
 
 class UndefinedError extends Error {
   String toString() => "Undefined value";
@@ -37,7 +22,7 @@ class EOFError extends Error {
   String toString() => "EOF value";
 }
 
-class DataStreamReader {
+class DataReader {
   final Queue<DataChunk> _chunks = new Queue();
 
   final Stream<List<int>> _stream;
@@ -49,7 +34,7 @@ class DataStreamReader {
 
   final DataBuffer _dataBuffer;
 
-  DataStreamReader(this._stream) : this._dataBuffer = new DataBuffer() {
+  DataReader(this._stream) : this._dataBuffer = new DataBuffer() {
     this._loadedCount = 0;
     this._stream.listen(_onData);
   }
@@ -111,22 +96,22 @@ class DataStreamReader {
       this.readOneLengthInteger().then((firstByte) {
         var bytesLength;
         switch (firstByte) {
-          case _PREFIX_INT_2:
+          case PREFIX_INT_2:
             bytesLength = 3;
             break;
-          case _PREFIX_INT_3:
+          case PREFIX_INT_3:
             bytesLength = 4;
             break;
-          case _PREFIX_INT_8:
+          case PREFIX_INT_8:
             if (_expectedPayloadLength - _loadedCount >= 8) {
               bytesLength = 9;
             } else {
               throw new EOFError();
             }
             break;
-          case _PREFIX_NULL:
+          case PREFIX_NULL:
             throw new NullError();
-          case _PREFIX_UNDEFINED:
+          case PREFIX_UNDEFINED:
             throw new UndefinedError();
           default:
             return firstByte;

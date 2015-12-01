@@ -11,20 +11,45 @@ import 'package:mysql_client/mysql_client.dart';
 
 Future main() async {
   var controller = new StreamController<List<int>>();
-  controller.add([1, 2, 3]);
-  controller.add([4, 5, 6]);
+  controller.add([71, 72, 73]);
+  controller.add([74, 75, 76]);
+  controller.add([0x01, 70]);
+  controller.add([0xfb]);
+  controller.add([0x01, 70]);
+  controller.add([0xff]);
 
   var reader = new DataStreamReader(controller.stream);
-  print(await reader.readBytes(2));
+  // print(await reader.readBytes(2));
+  print(await reader.readBytes(1));
 
-  var buffer = await reader.readFixedLengthBuffer(2);
-  print(buffer.singleRange.data.sublist(buffer.singleRange.start, buffer.singleRange.end));
+  // print(await reader.readFixedLengthString(4));
+  print(new String.fromCharCode(73));
+  var buffer = await reader.readUpToBuffer(73);
+  print(buffer.toString());
 
-  var sw = new Stopwatch();
-  sw.start();
-  for (var i = 0; i < 4000000; i++) {
-    new DataBuffer();
-    new DataRange([]);
+  print(await reader.readBytes(3));
+
+  // print(await reader.readLengthEncodedInteger());
+  // print(await reader.readLengthEncodedInteger());
+
+  print(await reader.readLengthEncodedString());
+
+  try {
+    print(await reader.readLengthEncodedString());
+  } on NullError {
+    print("Null value");
+  } on UndefinedError {
+    print("Undefined value");
   }
-  print("Elapsed in ${sw.elapsedMilliseconds} ms");
+
+  print(await reader.readLengthEncodedString());
+
+  try {
+    print(await reader.readLengthEncodedString());
+  } on NullError {
+    print("Null value");
+  } on UndefinedError {
+    print("Undefined value");
+  }
+
 }

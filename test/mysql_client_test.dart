@@ -134,8 +134,7 @@ Future readInitialHandshakePacket(DataStreamReader reader) async {
     // if capabilities & CLIENT_PLUGIN_AUTH {
     if (serverCapabilityFlags & CLIENT_PLUGIN_AUTH != 0) {
       // 1              length of auth-plugin-data
-      authPluginDataLength =
-          decodeFixedLengthInteger1(await reader.readByte());
+      authPluginDataLength = decodeFixedLengthInteger1(await reader.readByte());
       print("$loaded: authPluginDataLength: $authPluginDataLength");
       loaded += 1;
     } else {
@@ -395,8 +394,33 @@ Future readCommandQueryResponsePacket1(DataStreamReader reader) async {
   await readResultSetColumnDefinitionResponsePacket(reader);
   await readEOFResponsePacket(reader);
 
-  await readResultSetRowResponsePacket(reader);
-  await readEOFResponsePacket(reader);
+  try {
+    while (true) {
+      await readResultSetRowResponsePacket(reader);
+    }
+  } on EOFError {
+    if (reader.isFirstByte) {
+      // EOF packet
+      // if capabilities & CLIENT_PROTOCOL_41 {
+      if (serverCapabilityFlags & CLIENT_PROTOCOL_41 != 0) {
+        // int<2>	warnings	number of warnings
+        var warnings = await reader.readFixedLengthInteger(2);
+
+        // int<2>	status_flags	Status Flags
+        var statusFlags = await reader.readFixedLengthInteger(2);
+      }
+    } else {
+      rethrow;
+    }
+  } on UndefinedError {
+    if (reader.isFirstByte) {
+      // TODO Error packet
+
+      throw new UnsupportedError("IMPLEMENT STARTED ERROR PACKET");
+    } else {
+      rethrow;
+    }
+  }
 }
 
 Future readCommandQueryResponsePacket2(DataStreamReader reader) async {
@@ -415,9 +439,32 @@ Future readCommandQueryResponsePacket2(DataStreamReader reader) async {
       "readResultSetColumnDefinitionResponsePacket: ${sw.elapsedMilliseconds} ms");
 
   sw.reset();
-  var eof = false;
-  while (!eof) {
-    eof = await readResultSetRowResponsePacket(reader);
+  try {
+    while (true) {
+      await readResultSetRowResponsePacket(reader);
+    }
+  } on EOFError {
+    if (reader.isFirstByte) {
+      // EOF packet
+      // if capabilities & CLIENT_PROTOCOL_41 {
+      if (serverCapabilityFlags & CLIENT_PROTOCOL_41 != 0) {
+        // int<2>	warnings	number of warnings
+        var warnings = await reader.readFixedLengthInteger(2);
+
+        // int<2>	status_flags	Status Flags
+        var statusFlags = await reader.readFixedLengthInteger(2);
+      }
+    } else {
+      rethrow;
+    }
+  } on UndefinedError {
+    if (reader.isFirstByte) {
+      // TODO Error packet
+
+      throw new UnsupportedError("IMPLEMENT STARTED ERROR PACKET");
+    } else {
+      rethrow;
+    }
   }
   print(
       "readResultSetColumnDefinitionResponsePacket: ${sw.elapsedMilliseconds} ms");
@@ -549,95 +596,21 @@ Future readResultSetColumnDefinitionResponsePacket(
   }
 }
 
-Future<bool> readResultSetRowResponsePacket(DataStreamReader reader) async {
-  var eof = false;
-  var loaded = 0;
-
-  // var payloadLength = decodeFixedLengthInteger(await reader.readBytes(3));
+Future readResultSetRowResponsePacket(DataStreamReader reader) async {
   var payloadLength = await reader.readFixedLengthInteger(3);
 
-  // var sequenceId = await reader.readByte();
-  // TODO versione di un byte più veloce
   var sequenceId = await reader.readFixedLengthInteger(1);
 
-  reader.resetLoadedCount();
+  reader.resetExpectedPayloadLength(payloadLength);
 
-  while (loaded < payloadLength) {
-    var columnFirstByte = await reader.readByte();
-    if (columnFirstByte != 0xfb) {
-      if (columnFirstByte == 0xfe && loaded == 0 && payloadLength < 8) {
-        eof = true;
-        loaded += 1;
-
-        // if capabilities & CLIENT_PROTOCOL_41 {
-        if (serverCapabilityFlags & CLIENT_PROTOCOL_41 != 0) {
-          // int<2>	warnings	number of warnings
-          var warnings = decodeFixedLengthInteger(await reader.readBytes(2));
-          loaded += 2;
-          // int<2>	status_flags	Status Flags
-          var statusFlags = decodeFixedLengthInteger(await reader.readBytes(2));
-          loaded += 2;
-        }
-      } else {
-        var columnBytesLength =
-            getDecodingLengthEncodedIntegerBytesLength(columnFirstByte);
-        var columnLength = columnBytesLength > 1
-            ? decodeLengthEncodedInteger(
-                await reader.readBytes(columnBytesLength - 1))
-            : columnFirstByte;
-
-        var column = decodeString(await reader.readBytes(columnLength));
-
-        loaded += columnBytesLength + columnLength;
-      }
-    } else {
-      // NULL is sent as 0xfb
+  while (reader.isAvailable) {
+    var value;
+    try {
+      value = await reader.readLengthEncodedString();
+    } on NullError {
+      value = null;
     }
   }
-
-  if (loaded != payloadLength) {
-    throw new StateError("$loaded != $payloadLength");
-  }
-
-  return eof;
-}
-
-Future<bool> readResultSetRowResponsePacket2(DataStreamReader reader) async {
-  var eof = false;
-  var loaded = 0;
-
-  var buffer = await reader.readFixedLengthBuffer(3);
-
-  var payloadLength = buffer.singleRange.data[buffer.singleRange.start];
-
-  await reader.skipByte();
-
-  while (loaded < payloadLength) {
-    var columnFirstByte = await reader.readByte();
-    if (columnFirstByte != 0xfb) {
-      if (columnFirstByte == 0xfe && loaded == 0 && payloadLength < 8) {
-        eof = true;
-        loaded += 1;
-
-        // if capabilities & CLIENT_PROTOCOL_41 {
-        if (serverCapabilityFlags & CLIENT_PROTOCOL_41 != 0) {
-          await reader.skipBytes(4);
-          loaded += 4;
-        }
-      } else {
-        await reader.skipBytes(payloadLength - loaded - 1);
-        loaded = payloadLength;
-      }
-    } else {
-      // NULL is sent as 0xfb
-    }
-  }
-
-  if (loaded != payloadLength) {
-    throw new StateError("$loaded != $payloadLength");
-  }
-
-  return eof;
 }
 
 Future readResponsePacket(DataStreamReader reader) async {

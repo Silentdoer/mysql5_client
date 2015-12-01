@@ -10,7 +10,7 @@ import "package:crypto/crypto.dart";
 
 const List<int> _EMPTY_LIST = const [];
 
-const int _MAX_INT_1 = 251;
+const int _MAX_INT_1 = 0xfb;
 final int _MAX_INT_2 = pow(2, 2 * 8);
 const int _PREFIX_INT_2 = 0xfc;
 final int _MAX_INT_3 = pow(2, 3 * 8);

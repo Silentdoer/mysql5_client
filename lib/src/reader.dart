@@ -144,15 +144,11 @@ class DataBuffer {
     throw new UnsupportedError("${data.length} length");
   }
 
-  String toString() => new String.fromCharCodes(this
-      .singleRange
-      .data
-      .sublist(this.singleRange.start, this.singleRange.end));
+  String toString() => new String.fromCharCodes(
+      this.singleRange.data, this.singleRange.start, this.singleRange.end);
 
-  String toUTF8() => UTF8.decode(this
-      .singleRange
-      .data
-      .sublist(this.singleRange.start, this.singleRange.end));
+  String toUTF8() => UTF8.decoder.convert(
+      this.singleRange.data, this.singleRange.start, this.singleRange.end);
 }
 
 class DataRange {
@@ -226,7 +222,7 @@ class DataStreamReader {
       return this.readByte();
     } else {
       return this
-          .readFixedLengthBuffer(length)
+          ._readFixedLengthBuffer(length)
           .then((buffer) => buffer.toInt());
     }
   }
@@ -236,13 +232,13 @@ class DataStreamReader {
       return this.readByte().then((value) => new String.fromCharCode(value));
     } else {
       return this
-          .readFixedLengthBuffer(length)
+          ._readFixedLengthBuffer(length)
           .then((buffer) => buffer.toString());
     }
   }
 
   Future<String> readFixedLengthUTF8String(int length) =>
-      this.readFixedLengthBuffer(length).then((buffer) => buffer.toUTF8());
+      this._readFixedLengthBuffer(length).then((buffer) => buffer.toUTF8());
 
   Future<int> readLengthEncodedInteger() => this.readByte().then((firstByte) {
         var bytesLength;
@@ -269,60 +265,50 @@ class DataStreamReader {
             return firstByte;
         }
         return this
-            .readFixedLengthBuffer(bytesLength - 1)
+            ._readFixedLengthBuffer(bytesLength - 1)
             .then((buffer) => buffer.toInt());
       });
 
   Future<String> readLengthEncodedString() => this
       .readLengthEncodedInteger()
       .then((length) =>
-          length != null ? this.readFixedLengthBuffer(length) : null)
+          length != null ? this._readFixedLengthBuffer(length) : null)
       .then((buffer) => buffer != null ? buffer.toString() : null);
 
   Future<String> readLengthEncodedUTF8String() => this
       .readLengthEncodedInteger()
       .then((length) =>
-          length != null ? this.readFixedLengthBuffer(length) : null)
+          length != null ? this._readFixedLengthBuffer(length) : null)
       .then((buffer) => buffer != null ? buffer.toUTF8() : null);
 
   Future<String> readNulTerminatedString() =>
-      this.readUpToBuffer(0x00).then((buffer) => buffer.toString());
+      this._readUpToBuffer(0x00).then((buffer) => buffer.toString());
 
   Future<String> readNulTerminatedUTF8String() =>
-      this.readUpToBuffer(0x00).then((buffer) => buffer.toUTF8());
+      this._readUpToBuffer(0x00).then((buffer) => buffer.toUTF8());
 
   Future skipByte() {
     var value = _readChunk((chunk) => chunk.skipSingle());
-    if (value is Future) {
-      return value.then((_) {
-        _loadedCount++;
-      });
-    } else {
+    return _thenFuture(value, (_) {
       _loadedCount++;
-      return new Future.value();
-    }
+    });
   }
 
   Future<int> readByte() {
     var value = _readChunk((chunk) => chunk.readSingle());
-    if (value is Future) {
-      return value.then((result) {
-        _loadedCount++;
-        return result;
-      });
-    } else {
+    return _thenFuture(value, (value) {
       _loadedCount++;
-      return new Future.value(value);
-    }
+      return value;
+    });
   }
 
-  Future skipBytes(int length) => readFixedLengthBuffer(length).then((_) {
+  Future skipBytes(int length) => _readFixedLengthBuffer(length).then((_) {
         _loadedCount += length;
       });
 
   Future<List<int>> readBytes(int length) {
     if (length > 1) {
-      return readFixedLengthBuffer(length).then((buffer) => buffer.data);
+      return _readFixedLengthBuffer(length).then((buffer) => buffer.data);
     } else if (length == 1) {
       return readByte().then((value) {
         // print("Created list [1]");
@@ -334,73 +320,55 @@ class DataStreamReader {
     }
   }
 
-  Future skipBytesUpTo(int terminator) => readUpToBuffer(terminator);
+  Future skipBytesUpTo(int terminator) => _readUpToBuffer(terminator);
 
   Future<List<int>> readBytesUpTo(int terminator) =>
-      readUpToBuffer(terminator).then((buffer) => buffer.data);
+      _readUpToBuffer(terminator).then((buffer) => buffer.data);
 
-  Future<DataBuffer> readFixedLengthBuffer(int length) {
+  Future<DataBuffer> _readFixedLengthBuffer(int length) {
     if (length > 0) {
       var buffer = new DataBuffer();
-      var value = _readFixedLengthBuffer(buffer, length);
-      if (value is Future) {
-        return value.then((_) => buffer);
-      } else {
-        return new Future.value(buffer);
-      }
+      var value = __readFixedLengthBuffer(buffer, length);
+      return _thenFuture(value, (_) => buffer);
     } else {
       return new Future.value(_EMPTY_BUFFER);
     }
   }
 
-  Future<DataBuffer> readUpToBuffer(int terminator) {
+  Future<DataBuffer> _readUpToBuffer(int terminator) {
     var buffer = new DataBuffer();
-    var value = _readUpToBuffer(buffer, terminator);
-    if (value is Future) {
-      return value.then((_) => buffer);
-    } else {
-      return new Future.value(buffer);
-    }
+    var value = __readUpToBuffer(buffer, terminator);
+    return _thenFuture(value, (_) => buffer);
   }
 
-  _readFixedLengthBuffer(DataBuffer buffer, int leftLength) {
+  __readFixedLengthBuffer(DataBuffer buffer, int leftLength) {
     var value = _readChunk((chunk) {
       buffer.add(chunk.readFixedRange(leftLength));
     });
-
-    if (value is Future) {
-      return value
-          .then((_) => _readFixedLengthBufferInternal(buffer, leftLength));
-    } else {
-      return _readFixedLengthBufferInternal(buffer, leftLength);
-    }
+    return _then(
+        value, (_) => _readFixedLengthBufferInternal(buffer, leftLength));
   }
 
   _readFixedLengthBufferInternal(DataBuffer buffer, int leftLength) {
     var range = buffer.ranges.last;
     _loadedCount += range.length;
     if (range._isPending) {
-      return _readFixedLengthBuffer(buffer, leftLength - range.length);
+      return __readFixedLengthBuffer(buffer, leftLength - range.length);
     }
   }
 
-  _readUpToBuffer(DataBuffer buffer, int terminator) {
+  __readUpToBuffer(DataBuffer buffer, int terminator) {
     var value = _readChunk((chunk) {
       buffer.add(chunk.readRangeUpTo(terminator));
     });
-
-    if (value is Future) {
-      return value.then((_) => _readUpToBufferInternal(buffer, terminator));
-    } else {
-      return _readUpToBufferInternal(buffer, terminator);
-    }
+    return _then(value, (_) => _readUpToBufferInternal(buffer, terminator));
   }
 
   _readUpToBufferInternal(DataBuffer buffer, int terminator) {
     var range = buffer.ranges.last;
     if (range._isPending) {
       _loadedCount += range.length;
-      return _readUpToBuffer(buffer, terminator);
+      return __readUpToBuffer(buffer, terminator);
     } else {
       // aggiungo il terminatore
       _loadedCount += range.length + 1;
@@ -437,6 +405,22 @@ class DataStreamReader {
         _dataReadyCompleter = null;
         completer.complete();
       }
+    }
+  }
+
+  Future<dynamic> _thenFuture(value, then(value)) {
+    if (value is Future) {
+      return value.then(then);
+    } else {
+      return new Future.value(then(value));
+    }
+  }
+
+  _then(value, then(value)) {
+    if (value is Future) {
+      return value.then(then);
+    } else {
+      return then(value);
     }
   }
 }

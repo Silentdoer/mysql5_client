@@ -23,9 +23,6 @@ Future main() async {
   print(await reader.readBytes(1));
 
   // print(await reader.readFixedLengthString(4));
-  print(new String.fromCharCode(73));
-  var buffer = await reader.readUpToBuffer(73);
-  print(buffer.toString());
 
   print(await reader.readBytes(3));
 

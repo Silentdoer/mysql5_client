@@ -43,7 +43,10 @@ class EOFError extends Error {
 }
 
 // TODO creare un pool di DataRange, DataBuffer
-// TODO iteratori su reader per il recupero dei dati non tutti in una volta
+
+// TODO gestione del clean
+// TODO gestione del pool di data range
+// TODO gestione del length = null (toString da null)
 class DataBuffer {
   final List<DataRange> _dataRanges = new List<DataRange>();
 
@@ -55,7 +58,23 @@ class DataBuffer {
     DATA_BUFFER_COUNT++;
   }
 
-  List<DataRange> get ranges => _dataRanges;
+  void clean() {
+    for (var range in _dataRanges) {
+      range.deinitialize();
+    }
+    _dataRanges.clear();
+
+    if (_cachedDataRange != null) {
+      if (_cachedDataRange.isInitialized) {
+        _cachedDataRange.deinitialize();
+      }
+      _cachedDataRange = null;
+    }
+    _cachedData = null;
+    _cachedLength = null;
+  }
+
+  DataRange get lastRange => _dataRanges.last;
 
   void add(DataRange dataRange) {
     _dataRanges.add(dataRange);
@@ -73,9 +92,10 @@ class DataBuffer {
 
   DataRange get singleRange {
     if (_cachedDataRange == null) {
-      if (ranges.length > 1) {
-        _cachedDataRange = new DataRange(data);
-      } else if (ranges.length == 1) {
+      if (_dataRanges.length > 1) {
+        _cachedDataRange = new DataRange();
+        _cachedDataRange.initialize(data);
+      } else if (_dataRanges.length == 1) {
         _cachedDataRange = _dataRanges[0];
       }
     }
@@ -152,12 +172,26 @@ class DataBuffer {
 }
 
 class DataRange {
-  final List<int> _data;
-  final int _start;
+  static final List<DataRange> _POOL = new List();
+
+  List<int> _data;
+  int _start;
   int _length;
   bool __isPending;
 
-  DataRange(this._data, [this._start = 0, int length]) {
+  factory DataRange() {
+    return _POOL.isNotEmpty ? _POOL.removeLast() : new DataRange._();
+  }
+
+  DataRange._() {
+    DATA_RANGE_COUNT++;
+  }
+
+  bool get isInitialized => _data != null;
+
+  void initialize(List<int> data, [int start = 0, int length]) {
+    this._data = data;
+    this._start = start;
     if (length == null) {
       length = this._data.length - this._start;
     }
@@ -168,8 +202,15 @@ class DataRange {
       this.__isPending = true;
       this._length = this._data.length - this._start;
     }
+  }
 
-    DATA_RANGE_COUNT++;
+  void deinitialize() {
+    _data = null;
+    _start = null;
+    _length = null;
+    __isPending = null;
+
+    _POOL.add(this);
   }
 
   int get start => _start;
@@ -177,18 +218,6 @@ class DataRange {
   int get length => _length;
   List<int> get data => _data;
   bool get _isPending => __isPending;
-
-  List<int> getData() {
-    // print("Created list [$_length]");
-    RANGE_LIST_COUNT++;
-    var data = new List(_length);
-    setData(data, 0);
-    return data;
-  }
-
-  void setData(List<int> data, int start) {
-    data.setRange(start, start + _length, _data, _start);
-  }
 }
 
 class DataStreamReader {
@@ -201,7 +230,9 @@ class DataStreamReader {
   int _expectedPayloadLength;
   int _loadedCount;
 
-  DataStreamReader(this._stream) {
+  final DataBuffer _dataBuffer;
+
+  DataStreamReader(this._stream) : this._dataBuffer = new DataBuffer() {
     this._loadedCount = 0;
     this._expectedPayloadLength = -1;
     this._stream.listen(_onData);
@@ -223,7 +254,7 @@ class DataStreamReader {
     } else {
       return this
           ._readFixedLengthBuffer(length)
-          .then((buffer) => buffer.toInt());
+          .then((_) => _dataBuffer.toInt());
     }
   }
 
@@ -233,12 +264,12 @@ class DataStreamReader {
     } else {
       return this
           ._readFixedLengthBuffer(length)
-          .then((buffer) => buffer.toString());
+          .then((_) => _dataBuffer.toString());
     }
   }
 
   Future<String> readFixedLengthUTF8String(int length) =>
-      this._readFixedLengthBuffer(length).then((buffer) => buffer.toUTF8());
+      this._readFixedLengthBuffer(length).then((_) => _dataBuffer.toUTF8());
 
   Future<int> readLengthEncodedInteger() => this.readByte().then((firstByte) {
         var bytesLength;
@@ -266,26 +297,26 @@ class DataStreamReader {
         }
         return this
             ._readFixedLengthBuffer(bytesLength - 1)
-            .then((buffer) => buffer.toInt());
+            .then((_) => _dataBuffer.toInt());
       });
 
   Future<String> readLengthEncodedString() => this
       .readLengthEncodedInteger()
       .then((length) =>
           length != null ? this._readFixedLengthBuffer(length) : null)
-      .then((buffer) => buffer != null ? buffer.toString() : null);
+      .then((_) => _dataBuffer.toString());
 
   Future<String> readLengthEncodedUTF8String() => this
       .readLengthEncodedInteger()
       .then((length) =>
           length != null ? this._readFixedLengthBuffer(length) : null)
-      .then((buffer) => buffer != null ? buffer.toUTF8() : null);
+      .then((_) => _dataBuffer.toUTF8());
 
   Future<String> readNulTerminatedString() =>
-      this._readUpToBuffer(0x00).then((buffer) => buffer.toString());
+      this._readUpToBuffer(0x00).then((_) => _dataBuffer.toString());
 
   Future<String> readNulTerminatedUTF8String() =>
-      this._readUpToBuffer(0x00).then((buffer) => buffer.toUTF8());
+      this._readUpToBuffer(0x00).then((_) => _dataBuffer.toUTF8());
 
   Future skipByte() {
     var value = _readChunk((chunk) => chunk.skipSingle());
@@ -308,7 +339,7 @@ class DataStreamReader {
 
   Future<List<int>> readBytes(int length) {
     if (length > 1) {
-      return _readFixedLengthBuffer(length).then((buffer) => buffer.data);
+      return _readFixedLengthBuffer(length).then((_) => _dataBuffer.data);
     } else if (length == 1) {
       return readByte().then((value) {
         // print("Created list [1]");
@@ -323,52 +354,49 @@ class DataStreamReader {
   Future skipBytesUpTo(int terminator) => _readUpToBuffer(terminator);
 
   Future<List<int>> readBytesUpTo(int terminator) =>
-      _readUpToBuffer(terminator).then((buffer) => buffer.data);
+      _readUpToBuffer(terminator).then((_) => _dataBuffer.data);
 
-  Future<DataBuffer> _readFixedLengthBuffer(int length) {
+  Future _readFixedLengthBuffer(int length) {
     if (length > 0) {
-      var buffer = new DataBuffer();
-      var value = __readFixedLengthBuffer(buffer, length);
-      return _thenFuture(value, (_) => buffer);
+      _dataBuffer.clean();
+      return _thenFuture(__readFixedLengthBuffer(length), (_) => _);
     } else {
-      return new Future.value(_EMPTY_BUFFER);
+      return new Future.value();
     }
   }
 
-  Future<DataBuffer> _readUpToBuffer(int terminator) {
-    var buffer = new DataBuffer();
-    var value = __readUpToBuffer(buffer, terminator);
-    return _thenFuture(value, (_) => buffer);
+  Future _readUpToBuffer(int terminator) {
+    _dataBuffer.clean();
+    return _thenFuture(__readUpToBuffer(terminator), (_) => _);
   }
 
-  __readFixedLengthBuffer(DataBuffer buffer, int leftLength) {
+  __readFixedLengthBuffer(int leftLength) {
     var value = _readChunk((chunk) {
-      buffer.add(chunk.readFixedRange(leftLength));
+      _dataBuffer.add(chunk.readFixedRange(leftLength));
     });
-    return _then(
-        value, (_) => _readFixedLengthBufferInternal(buffer, leftLength));
+    return _then(value, (_) => _readFixedLengthBufferInternal(leftLength));
   }
 
-  _readFixedLengthBufferInternal(DataBuffer buffer, int leftLength) {
-    var range = buffer.ranges.last;
+  _readFixedLengthBufferInternal(int leftLength) {
+    var range = _dataBuffer.lastRange;
     _loadedCount += range.length;
     if (range._isPending) {
-      return __readFixedLengthBuffer(buffer, leftLength - range.length);
+      return __readFixedLengthBuffer(leftLength - range.length);
     }
   }
 
-  __readUpToBuffer(DataBuffer buffer, int terminator) {
+  __readUpToBuffer(int terminator) {
     var value = _readChunk((chunk) {
-      buffer.add(chunk.readRangeUpTo(terminator));
+      _dataBuffer.add(chunk.readRangeUpTo(terminator));
     });
-    return _then(value, (_) => _readUpToBufferInternal(buffer, terminator));
+    return _then(value, (_) => _readUpToBufferInternal(terminator));
   }
 
-  _readUpToBufferInternal(DataBuffer buffer, int terminator) {
-    var range = buffer.ranges.last;
+  _readUpToBufferInternal(int terminator) {
+    var range = _dataBuffer.lastRange;
     if (range._isPending) {
       _loadedCount += range.length;
-      return __readUpToBuffer(buffer, terminator);
+      return __readUpToBuffer(terminator);
     } else {
       // aggiungo il terminatore
       _loadedCount += range.length + 1;
@@ -443,21 +471,22 @@ class _DataChunk {
   int readSingle() => _data[_index++];
 
   DataRange readFixedRange(int length) {
-    var readData = new DataRange(_data, _index, length);
+    var readData = new DataRange();
+    readData.initialize(_data, _index, length);
     _index += readData.length;
     return readData;
   }
 
   DataRange readRangeUpTo(int terminator) {
-    var readData;
+    var readData = new DataRange();
 
     var toIndex = _data.indexOf(terminator, _index) + 1;
 
     if (toIndex > 0) {
-      readData = new DataRange(_data, _index, toIndex - _index - 1);
+      readData.initialize(_data, _index, toIndex - _index - 1);
       _index = toIndex;
     } else {
-      readData = new DataRange(_data, _index, _data.length - _index + 1);
+      readData.initialize(_data, _index, _data.length - _index + 1);
       _index = _data.length;
     }
 

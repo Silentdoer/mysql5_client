@@ -17,7 +17,7 @@ Future run() async {
 
   var connection = new ConnectionImpl();
 
-  await connection.connect("localhost", 3306);
+  await connection.connect("localhost", 3306, "root", "mysql", "test");
 
   var sw = new Stopwatch()..start();
 

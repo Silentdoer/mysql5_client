@@ -7,7 +7,6 @@ import "dart:async";
 import "dart:math";
 import "dart:io";
 
-import "package:stack_trace/stack_trace.dart";
 import 'package:mysql_client/mysql_client.dart';
 
 // sudo ngrep -x -q -d lo0 '' 'port 3306'
@@ -154,7 +153,7 @@ Future readInitialHandshakePacket(DataReader reader) async {
 }
 
 Future writeHandshakeResponsePacket(DataWriter writer) async {
-  WriterBuffer buffer = new WriterBuffer();
+  WriterBuffer buffer = writer.createBuffer();
 
   var sequenceId =
       0x01; // penso dipenda dalla sequenza a cui era arrivato il server
@@ -205,7 +204,7 @@ Future writeHandshakeResponsePacket(DataWriter writer) async {
     // lenenc-str     key
     // lenenc-str     value
     // if-more data in 'length of all key-values', more keys and value pairs
-    var valuesBuffer = new WriterBuffer();
+    var valuesBuffer = writer.createBuffer();
     clientConnectAttributes.forEach((key, value) {
       valuesBuffer.writeLengthEncodedString(key);
       valuesBuffer.writeLengthEncodedString(value);
@@ -214,12 +213,12 @@ Future writeHandshakeResponsePacket(DataWriter writer) async {
     buffer.writeBuffer(valuesBuffer);
   }
 
-  var headerBuffer = new WriterBuffer();
+  var headerBuffer = writer.createBuffer();
   headerBuffer.writeFixedLengthInteger(buffer.length, 3);
   headerBuffer.writeOneLengthInteger(sequenceId);
 
-  writer.write(headerBuffer.data);
-  writer.write(buffer.data);
+  writer.writeBuffer(headerBuffer);
+  writer.writeBuffer(buffer);
 }
 
 Future readCommandResponsePacket(DataReader reader) async {
@@ -289,7 +288,7 @@ Future readCommandResponsePacket(DataReader reader) async {
 }
 
 Future writeCommandQueryPacket(DataWriter writer) async {
-  WriterBuffer buffer = new WriterBuffer();
+  WriterBuffer buffer = writer.createBuffer();
 
   var sequenceId = 0x00;
 
@@ -298,12 +297,12 @@ Future writeCommandQueryPacket(DataWriter writer) async {
   // string[EOF]    the query the server shall execute
   buffer.writeFixedLengthUTF8String("SELECT * FROM people");
 
-  var headerBuffer = new WriterBuffer();
+  var headerBuffer = writer.createBuffer();
   headerBuffer.writeFixedLengthInteger(buffer.length, 3);
   headerBuffer.writeOneLengthInteger(sequenceId);
 
-  writer.write(headerBuffer.data);
-  writer.write(buffer.data);
+  writer.writeBuffer(headerBuffer);
+  writer.writeBuffer(buffer);
 }
 
 Future readCommandQueryResponsePacket(DataReader reader) async {

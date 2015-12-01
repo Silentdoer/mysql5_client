@@ -8,7 +8,7 @@ import "dart:collection";
 
 import "data_commons.dart";
 import "data_chunk.dart";
-import "data_buffer.dart";
+import "reader_buffer.dart";
 
 class UndefinedError extends Error {
   String toString() => "Undefined value";
@@ -32,9 +32,9 @@ class DataReader {
   int _expectedPayloadLength;
   int _loadedCount;
 
-  final DataBuffer _dataBuffer;
+  final ReaderBuffer _dataBuffer;
 
-  DataReader(this._stream) : this._dataBuffer = new DataBuffer() {
+  DataReader(this._stream) : this._dataBuffer = new ReaderBuffer() {
     this._loadedCount = 0;
     this._stream.listen(_onData);
   }

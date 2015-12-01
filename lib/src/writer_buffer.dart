@@ -4,18 +4,54 @@
 library mysql_client.writer_buffer;
 
 import "dart:convert";
+import "dart:io";
 
 import "data_commons.dart";
 
-class WriterBuffer {
+abstract class WriterBuffer {
+
+  List<int> get _data;
+
+  int get length;
+
+  void addToSink(IOSink sink);
+
+  void writeBuffer(WriterBuffer buffer);
+
+  void writeOneLengthInteger(int value);
+
+  void writeFixedLengthInteger(int value, int length);
+
+  void writeFixedFilledLengthString(int value, int length);
+
+  void writeFixedLengthString(String value, [int length]);
+
+  void writeFixedLengthUTF8String(String value, [int length]);
+
+  void writeLengthEncodedInteger(int value);
+
+  void writeLengthEncodedString(String value);
+
+  void writeLengthEncodedUTF8String(String value);
+
+  void writeNulTerminatedString(String value);
+
+  void writeNulTerminatedUTF8String(String value);
+}
+
+class WriterBufferImpl implements WriterBuffer {
   final List<int> _data = [];
 
   int get length => _data.length;
 
-  List<int> get data => _data;
+  WriterBufferImpl();
+
+  void addToSink(IOSink sink) {
+    sink.add(_data);
+  }
 
   void writeBuffer(WriterBuffer buffer) {
-    data.addAll(buffer.data);
+    _data.addAll(buffer._data);
   }
 
   void writeOneLengthInteger(int value) {

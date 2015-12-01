@@ -7,7 +7,7 @@ import "dart:convert";
 
 import "data_range.dart";
 
-class DataBuffer {
+class ReaderBuffer {
   static const String _EMPTY_STRING = "";
 
   final List<DataRange> _dataRanges = [];
@@ -122,10 +122,10 @@ class DataBuffer {
   String toString() => this.singleRange != null
       ? new String.fromCharCodes(
           this.singleRange.data, this.singleRange.start, this.singleRange.end)
-      : DataBuffer._EMPTY_STRING;
+      : ReaderBuffer._EMPTY_STRING;
 
   String toUTF8() => this.singleRange != null
       ? UTF8.decoder.convert(
           this.singleRange.data, this.singleRange.start, this.singleRange.end)
-      : DataBuffer._EMPTY_STRING;
+      : ReaderBuffer._EMPTY_STRING;
 }

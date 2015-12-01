@@ -3,13 +3,6 @@
 
 library mysql_client.data_chunk;
 
-import "dart:async";
-import "dart:collection";
-import "dart:convert";
-import "dart:math";
-
-import "data_chunk.dart";
-import "data_buffer.dart";
 import "data_range.dart";
 
 class DataChunk {

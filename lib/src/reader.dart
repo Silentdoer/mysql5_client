@@ -299,16 +299,16 @@ class DataStreamReader {
       });
     } else {
       _loadedCount++;
-      return new Future.value(value);
+      return new Future.value();
     }
   }
 
   Future<int> readByte() {
     var value = _readChunk((chunk) => chunk.readSingle());
     if (value is Future) {
-      return value.then((_) {
+      return value.then((result) {
         _loadedCount++;
-        return value;
+        return result;
       });
     } else {
       _loadedCount++;

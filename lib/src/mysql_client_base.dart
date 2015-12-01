@@ -3,20 +3,8 @@
 
 library mysql_client.base;
 
-import "dart:math";
 import "dart:convert";
-
 import "package:crypto/crypto.dart";
-
-const List<int> _EMPTY_LIST = const [];
-
-const int _MAX_INT_1 = 0xfb;
-final int _MAX_INT_2 = pow(2, 2 * 8);
-const int _PREFIX_INT_2 = 0xfc;
-final int _MAX_INT_3 = pow(2, 3 * 8);
-const int _PREFIX_INT_3 = 0xfd;
-final int _MAX_INT_8 = pow(2, 8 * 8);
-const int _PREFIX_INT_8 = 0xfe;
 
 const int CLIENT_PLUGIN_AUTH = 0x00080000;
 const int CLIENT_SECURE_CONNECTION = 0x00008000;
@@ -63,83 +51,4 @@ String generateAuthResponse(
 
 List<int> encodeString(String value, {utf8Encoded: false}) {
   return !utf8Encoded ? value.codeUnits : UTF8.encode(value);
-}
-
-List<int> encodeFixedFilledLengthString(int value, int length) {
-  return new List.filled(length, value);
-}
-
-List<int> encodeNulTerminatedString(String value, {utf8Encoded: false}) {
-  var data = new List(value.length + 1);
-
-  data.setAll(0, encodeString(value, utf8Encoded: utf8Encoded));
-  data[data.length - 1] = 0x00;
-
-  return data;
-}
-
-List<int> encodeFixedLengthString(String value, int length,
-    {utf8Encoded: false}) {
-  var encodedValue = encodeString(value, utf8Encoded: utf8Encoded);
-
-  if (encodedValue.length != length) {
-    throw new ArgumentError("${encodedValue.length} != $length");
-  }
-
-  return encodedValue;
-}
-
-List<int> encodeLengthEncodedString(String value, {utf8Encoded: false}) {
-  var encodedValue = encodeString(value, utf8Encoded: utf8Encoded);
-
-  var data1 = encodeLengthEncodedInteger(encodedValue.length);
-  var data2 = encodedValue;
-
-  var data = new List(data1.length + data2.length);
-  data.setAll(0, data1);
-  data.setAll(data1.length, data2);
-
-  return data;
-}
-
-List<int> encodeFixedLengthInteger(int value, int length) {
-  var data = new List(length);
-
-  for (var i = 0, rotation = 0, mask = 0xff;
-      i < data.length;
-      i++, rotation += 8, mask <<= 8) {
-    data[i] = (value & mask) >> rotation;
-  }
-
-  return data;
-}
-
-List<int> encodeLengthEncodedInteger(int value) {
-  var data;
-
-  if (value < _MAX_INT_1) {
-    data = new List(1);
-    data[0] = value;
-  } else {
-    if (value < _MAX_INT_2) {
-      data = new List.filled(3, 0);
-      data[0] = _PREFIX_INT_2;
-    } else if (value < _MAX_INT_3) {
-      data = new List.filled(4, 0);
-      data[0] = _PREFIX_INT_3;
-    } else if (value < _MAX_INT_8) {
-      data = new List.filled(9, 0);
-      data[0] = _PREFIX_INT_8;
-    } else {
-      throw new UnsupportedError("Undefined value");
-    }
-
-    for (var i = 1, rotation = 0, mask = 0xff;
-        i < data.length;
-        i++, rotation += 8, mask <<= 8) {
-      data[i] = (value & mask) >> rotation;
-    }
-  }
-
-  return data;
 }

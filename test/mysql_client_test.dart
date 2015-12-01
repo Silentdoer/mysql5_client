@@ -53,8 +53,8 @@ Future run() async {
   var sw = new Stopwatch()..start();
 
   for (var i = 0; i < 10; i++) {
-    await writeCommandQueryPacket2(socket);
-    await readCommandQueryResponsePacket2(reader);
+    await writeCommandQueryPacket(socket);
+    await readCommandQueryResponsePacket(reader);
   }
 
   print("testMySql: ${sw.elapsedMilliseconds} ms");
@@ -72,60 +72,51 @@ Future run() async {
 }
 
 Future readInitialHandshakePacket(DataStreamReader reader) async {
-  var loaded = 0;
-
-  var payloadLength = decodeFixedLengthInteger(await reader.readBytes(3));
+  var payloadLength = await reader.readFixedLengthInteger(3);
   print("payloadLength: $payloadLength");
 
-  var sequenceId = decodeFixedLengthInteger1(await reader.readByte());
+  var sequenceId = await reader.readByte();
   print("sequenceId: $sequenceId");
 
+  reader.resetExpectedPayloadLength(payloadLength);
+
   // 1              [0a] protocol version
-  var protocolVersion = decodeFixedLengthInteger1(await reader.readByte());
-  print("$loaded: protocolVersion: $protocolVersion");
-  loaded += 1;
+  var protocolVersion = await reader.readByte();
+  print("protocolVersion: $protocolVersion");
 
   // string[NUL]    server version
-  var serverVersion = decodeString(await reader.readBytesUpTo(0x00));
-  print("$loaded: serverVersion: $serverVersion");
-  loaded += serverVersion.length + 1;
+  var serverVersion = await reader.readNulTerminatedString();
+  print("serverVersion: $serverVersion");
 
   // 4              connection id
-  var connectionId = decodeFixedLengthInteger(await reader.readBytes(4));
-  print("$loaded: connectionId: $connectionId");
-  loaded += 4;
+  var connectionId = await reader.readFixedLengthInteger(4);
+  print("connectionId: $connectionId");
 
   // string[8]      auth-plugin-data-part-1
-  var authPluginDataPart1 = decodeString(await reader.readBytes(8));
-  print("$loaded: authPluginDataPart1: $authPluginDataPart1");
-  loaded += 8;
+  var authPluginDataPart1 = await reader.readFixedLengthString(8);
+  print("authPluginDataPart1: $authPluginDataPart1");
 
   // 1              [00] filler
   await reader.skipByte();
-  print("$loaded: filler1: SKIPPED");
-  loaded += 1;
+  print("filler1: SKIPPED");
 
   // 2              capability flags (lower 2 bytes)
-  var capabilityFlags1 = decodeFixedLengthInteger(await reader.readBytes(2));
-  print("$loaded: capabilityFlags1: $capabilityFlags1");
-  loaded += 2;
+  var capabilityFlags1 = await reader.readFixedLengthInteger(2);
+  print("capabilityFlags1: $capabilityFlags1");
 
   // if more data in the packet:
-  if (loaded < payloadLength) {
+  if (reader.isAvailable) {
     // 1              character set
-    var characterSet = decodeFixedLengthInteger1(await reader.readByte());
-    print("$loaded: characterSet: $characterSet");
-    loaded += 1;
+    var characterSet = await reader.readByte();
+    print("characterSet: $characterSet");
 
     // 2              status flags
-    var statusFlags = decodeFixedLengthInteger(await reader.readBytes(2));
-    print("$loaded: statusFlags: $statusFlags");
-    loaded += 2;
+    var statusFlags = await reader.readFixedLengthInteger(2);
+    print("statusFlags: $statusFlags");
 
     // 2              capability flags (upper 2 bytes)
-    var capabilityFlags2 = decodeFixedLengthInteger(await reader.readBytes(2));
-    print("$loaded: capabilityFlags2: $capabilityFlags2");
-    loaded += 2;
+    var capabilityFlags2 = await reader.readFixedLengthInteger(2);
+    print("capabilityFlags2: $capabilityFlags2");
 
     serverCapabilityFlags = capabilityFlags1 | (capabilityFlags2 << 16);
     print("serverCapabilityFlags: $serverCapabilityFlags");
@@ -134,29 +125,25 @@ Future readInitialHandshakePacket(DataStreamReader reader) async {
     // if capabilities & CLIENT_PLUGIN_AUTH {
     if (serverCapabilityFlags & CLIENT_PLUGIN_AUTH != 0) {
       // 1              length of auth-plugin-data
-      authPluginDataLength = decodeFixedLengthInteger1(await reader.readByte());
-      print("$loaded: authPluginDataLength: $authPluginDataLength");
-      loaded += 1;
+      authPluginDataLength = await reader.readByte();
+      print("authPluginDataLength: $authPluginDataLength");
     } else {
       // 1              [00]
       await reader.skipByte();
-      print("$loaded: filler2: SKIPPED");
-      loaded += 1;
+      print("filler2: SKIPPED");
     }
 
     // string[10]     reserved (all [00])
     await reader.skipBytes(10);
-    print("$loaded: reserved1: SKIPPED");
-    loaded += 10;
+    print("reserved1: SKIPPED");
 
     var authPluginDataPart2 = "";
     // if capabilities & CLIENT_SECURE_CONNECTION {
     if (serverCapabilityFlags & CLIENT_SECURE_CONNECTION != 0) {
       // string[$len]   auth-plugin-data-part-2 ($len=MAX(13, length of auth-plugin-data - 8))
       var len = max(authPluginDataLength - 8, 13);
-      authPluginDataPart2 = decodeString(await reader.readBytes(len));
-      print("$loaded: authPluginDataPart2: $authPluginDataPart2");
-      loaded += len;
+      authPluginDataPart2 = await reader.readFixedLengthString(len);
+      print("authPluginDataPart2: $authPluginDataPart2");
     }
 
     authPluginData = "$authPluginDataPart1$authPluginDataPart2"
@@ -166,15 +153,9 @@ Future readInitialHandshakePacket(DataStreamReader reader) async {
     // if capabilities & CLIENT_PLUGIN_AUTH {
     if (serverCapabilityFlags & CLIENT_PLUGIN_AUTH != 0) {
       // string[NUL]    auth-plugin name
-      authPluginName = decodeString(await reader.readBytesUpTo(0x00));
-      print("$loaded: authPluginName: $authPluginName");
-      loaded += authPluginName.length + 1;
+      authPluginName = await reader.readNulTerminatedString();
+      print("authPluginName: $authPluginName");
     }
-  }
-
-  print("Loaded: $loaded");
-  if (loaded != payloadLength) {
-    throw new StateError("$loaded != $payloadLength");
   }
 }
 
@@ -247,131 +228,72 @@ Future writeHandshakeResponsePacket(Socket socket) async {
 }
 
 Future readCommandResponsePacket(DataStreamReader reader) async {
-  var loaded = 0;
-
-  var payloadLength = decodeFixedLengthInteger(await reader.readBytes(3));
+  var payloadLength = await reader.readFixedLengthInteger(3);
   print("payloadLength: $payloadLength");
 
-  var sequenceId = decodeFixedLengthInteger1(await reader.readByte());
+  var sequenceId = await reader.readByte();
   print("sequenceId: $sequenceId");
 
+  reader.resetExpectedPayloadLength(payloadLength);
+
   // int<1>	header	[00] or [fe] the OK packet header
-  var header = decodeFixedLengthInteger1(await reader.readByte());
-  print("$loaded: header: $header");
-  loaded += 1;
+  var header = await reader.readByte();
+  print("header: $header");
 
   // TODO distinguere il pacchetto OK, ERROR
 
   // int<lenenc>	affected_rows	affected rows
-  var affectedRowsFirstByte = await reader.readByte();
-  var affectedRowsBytesLength =
-      getDecodingLengthEncodedIntegerBytesLength(affectedRowsFirstByte);
-  var affectedRows = affectedRowsBytesLength > 1
-      ? decodeLengthEncodedInteger(
-          await reader.readBytes(affectedRowsBytesLength - 1))
-      : affectedRowsFirstByte;
-  print("$loaded: affectedRows: $affectedRows");
-  loaded += affectedRowsBytesLength;
+  var affectedRows = await reader.readLengthEncodedInteger();
+  print("affectedRows: $affectedRows");
 
   // int<lenenc>	last_insert_id	last insert-id
-  var lastInsertIdFirstByte = await reader.readByte();
-  var lastInsertIdBytesLength =
-      getDecodingLengthEncodedIntegerBytesLength(lastInsertIdFirstByte);
-  var lastInsertId = lastInsertIdBytesLength > 1
-      ? decodeLengthEncodedInteger(
-          await reader.readBytes(lastInsertIdBytesLength - 1))
-      : lastInsertIdFirstByte;
-  print("$loaded: lastInsertId: $lastInsertId");
-  loaded += lastInsertIdBytesLength;
+  var lastInsertId = await reader.readLengthEncodedInteger();
+  print("lastInsertId: $lastInsertId");
 
   var statusFlags;
   // if capabilities & CLIENT_PROTOCOL_41 {
   if (serverCapabilityFlags & CLIENT_PROTOCOL_41 != 0) {
     // int<2>	status_flags	Status Flags
-    statusFlags = decodeFixedLengthInteger(await reader.readBytes(2));
-    print("$loaded: statusFlags: $statusFlags");
-    loaded += 2;
+    statusFlags = await reader.readFixedLengthInteger(2);
+    print("statusFlags: $statusFlags");
     // int<2>	warnings	number of warnings
-    var warnings = decodeFixedLengthInteger(await reader.readBytes(2));
-    print("$loaded: warnings: $warnings");
-    loaded += 2;
+    var warnings = await reader.readFixedLengthInteger(2);
+    print("warnings: $warnings");
     // } elseif capabilities & CLIENT_TRANSACTIONS {
   } else if (serverCapabilityFlags & CLIENT_TRANSACTIONS != 0) {
     // int<2>	status_flags	Status Flags
-    statusFlags = decodeFixedLengthInteger(await reader.readBytes(2));
-    print("$loaded: statusFlags: $statusFlags");
-    loaded += 2;
+    statusFlags = await reader.readFixedLengthInteger(2);
+    print("statusFlags: $statusFlags");
   } else {
     statusFlags = 0;
-    print("$loaded: statusFlags: $statusFlags");
+    print("statusFlags: $statusFlags");
   }
 
   // if capabilities & CLIENT_SESSION_TRACK {
   if (serverCapabilityFlags & CLIENT_SESSION_TRACK != 0) {
     // string<lenenc>	info	human readable status information
-    if (loaded < payloadLength) {
-      var infoFirstByte = await reader.readByte();
-      var infoBytesLength =
-          getDecodingLengthEncodedIntegerBytesLength(infoFirstByte);
-      var infoLength = infoBytesLength > 1
-          ? decodeLengthEncodedInteger(
-              await reader.readBytes(infoBytesLength - 1))
-          : infoFirstByte;
-      var info = decodeString(await reader.readBytes(infoLength));
-      print("$loaded: info: $info");
-      loaded += infoBytesLength + infoLength;
+    if (reader.isAvailable) {
+      var info = await reader.readLengthEncodedString();
+      print("info: $info");
     }
 
     // if status_flags & SERVER_SESSION_STATE_CHANGED {
     if (statusFlags & SERVER_SESSION_STATE_CHANGED != 0) {
       // string<lenenc>	session_state_changes	session state info
-      if (loaded < payloadLength) {
-        var sessionStateChangesFirstByte = await reader.readByte();
-        var sessionStateChangesBytesLength =
-            getDecodingLengthEncodedIntegerBytesLength(
-                sessionStateChangesFirstByte);
-        var sessionStateChangesLength = sessionStateChangesBytesLength > 1
-            ? decodeLengthEncodedInteger(
-                await reader.readBytes(sessionStateChangesBytesLength - 1))
-            : sessionStateChangesFirstByte;
-        var sessionStateChanges =
-            decodeString(await reader.readBytes(sessionStateChangesLength));
-        print("$loaded: sessionStateChanges: $sessionStateChanges");
-        loaded += sessionStateChangesBytesLength + sessionStateChangesLength;
+      if (reader.isAvailable) {
+        var sessionStateChanges = await reader.readLengthEncodedString();
+        print("sessionStateChanges: $sessionStateChanges");
       }
     }
     // } else {
   } else {
     // string<EOF>	info	human readable status information
-    var info = decodeString(await reader.readBytes(payloadLength - loaded));
-    print("$loaded: info: $info");
-    loaded += info.length;
-  }
-
-  print("Loaded: $loaded");
-  if (loaded != payloadLength) {
-    throw new StateError("$loaded != $payloadLength");
+    var info = await reader.readRestOfPacketString();
+    print("info: $info");
   }
 }
 
-Future writeCommandQueryPacket1(Socket socket) async {
-  var sequenceId = 0x00;
-
-  var data = [];
-  // 1              [03] COM_QUERY
-  data.addAll(encodeFixedLengthInteger(COM_QUERY, 1));
-  // string[EOF]    the query the server shall execute
-  data.addAll(encodeString("select count(*) from people", utf8Encoded: true));
-
-  var packetHeaderData = new List(4);
-  packetHeaderData.setAll(0, encodeFixedLengthInteger(data.length, 3));
-  packetHeaderData.setAll(3, encodeFixedLengthInteger(sequenceId, 1));
-
-  socket.add(packetHeaderData);
-  socket.add(data);
-}
-
-Future writeCommandQueryPacket2(Socket socket) async {
+Future writeCommandQueryPacket(Socket socket) async {
   var sequenceId = 0x00;
 
   var data = [];
@@ -388,42 +310,7 @@ Future writeCommandQueryPacket2(Socket socket) async {
   socket.add(data);
 }
 
-Future readCommandQueryResponsePacket1(DataStreamReader reader) async {
-  await readResultSetColumnCountResponsePacket(reader);
-
-  await readResultSetColumnDefinitionResponsePacket(reader);
-  await readEOFResponsePacket(reader);
-
-  try {
-    while (true) {
-      await readResultSetRowResponsePacket(reader);
-    }
-  } on EOFError {
-    if (reader.isFirstByte) {
-      // EOF packet
-      // if capabilities & CLIENT_PROTOCOL_41 {
-      if (serverCapabilityFlags & CLIENT_PROTOCOL_41 != 0) {
-        // int<2>	warnings	number of warnings
-        var warnings = await reader.readFixedLengthInteger(2);
-
-        // int<2>	status_flags	Status Flags
-        var statusFlags = await reader.readFixedLengthInteger(2);
-      }
-    } else {
-      rethrow;
-    }
-  } on UndefinedError {
-    if (reader.isFirstByte) {
-      // TODO Error packet
-
-      throw new UnsupportedError("IMPLEMENT STARTED ERROR PACKET");
-    } else {
-      rethrow;
-    }
-  }
-}
-
-Future readCommandQueryResponsePacket2(DataStreamReader reader) async {
+Future readCommandQueryResponsePacket(DataStreamReader reader) async {
   var sw = new Stopwatch()..start();
 
   await readResultSetColumnCountResponsePacket(reader);
@@ -471,129 +358,62 @@ Future readCommandQueryResponsePacket2(DataStreamReader reader) async {
 }
 
 Future readResultSetColumnCountResponsePacket(DataStreamReader reader) async {
-  var loaded = 0;
+  var payloadLength = await reader.readFixedLengthInteger(3);
 
-  var payloadLength = decodeFixedLengthInteger(await reader.readBytes(3));
-  var sequenceId = decodeFixedLengthInteger1(await reader.readByte());
+  var sequenceId = await reader.readByte();
+
+  reader.resetExpectedPayloadLength(payloadLength);
 
   // A packet containing a Protocol::LengthEncodedInteger column_count
-  var columnCount = decodeFixedLengthInteger1(await reader.readByte());
-  print("$loaded: columnCount: $columnCount");
-  loaded += 1;
-
-  if (loaded != payloadLength) {
-    throw new StateError("$loaded != $payloadLength");
-  }
+  var columnCount = await reader.readByte();
 }
 
 Future readResultSetColumnDefinitionResponsePacket(
     DataStreamReader reader) async {
-  var loaded = 0;
+  var payloadLength = await reader.readFixedLengthInteger(3);
 
-  var payloadLength = decodeFixedLengthInteger(await reader.readBytes(3));
-  var sequenceId = decodeFixedLengthInteger1(await reader.readByte());
+  var sequenceId = await reader.readByte();
+
+  reader.resetExpectedPayloadLength(payloadLength);
 
   // lenenc_str     catalog
-  var catalogFirstByte = await reader.readByte();
-  var catalogBytesLength =
-      getDecodingLengthEncodedIntegerBytesLength(catalogFirstByte);
-  var catalogLength = catalogBytesLength > 1
-      ? decodeLengthEncodedInteger(
-          await reader.readBytes(catalogBytesLength - 1))
-      : catalogFirstByte;
-  var catalog = decodeString(await reader.readBytes(catalogLength));
-  loaded += catalogBytesLength + catalogLength;
+  var catalog = await reader.readLengthEncodedString();
 
   // lenenc_str     schema
-  var schemaFirstByte = await reader.readByte();
-  var schemaBytesLength =
-      getDecodingLengthEncodedIntegerBytesLength(schemaFirstByte);
-  var schemaLength = schemaBytesLength > 1
-      ? decodeLengthEncodedInteger(
-          await reader.readBytes(schemaBytesLength - 1))
-      : schemaFirstByte;
-  var schema = decodeString(await reader.readBytes(schemaLength));
-  loaded += schemaBytesLength + schemaLength;
+  var schema = await reader.readLengthEncodedString();
 
   // lenenc_str     table
-  var tableFirstByte = await reader.readByte();
-  var tableBytesLength =
-      getDecodingLengthEncodedIntegerBytesLength(tableFirstByte);
-  var tableLength = tableBytesLength > 1
-      ? decodeLengthEncodedInteger(await reader.readBytes(tableBytesLength - 1))
-      : tableFirstByte;
-  var table = decodeString(await reader.readBytes(tableLength));
-  loaded += tableBytesLength + tableLength;
+  var table = await reader.readLengthEncodedString();
 
   // lenenc_str     org_table
-  var orgTableFirstByte = await reader.readByte();
-  var orgTableBytesLength =
-      getDecodingLengthEncodedIntegerBytesLength(orgTableFirstByte);
-  var orgTableLength = orgTableBytesLength > 1
-      ? decodeLengthEncodedInteger(
-          await reader.readBytes(orgTableBytesLength - 1))
-      : orgTableFirstByte;
-  var orgTable = decodeString(await reader.readBytes(orgTableLength));
-  loaded += orgTableBytesLength + orgTableLength;
+  var orgTable = await reader.readLengthEncodedString();
 
   // lenenc_str     name
-  var nameFirstByte = await reader.readByte();
-  var nameBytesLength =
-      getDecodingLengthEncodedIntegerBytesLength(nameFirstByte);
-  var nameLength = nameBytesLength > 1
-      ? decodeLengthEncodedInteger(await reader.readBytes(nameBytesLength - 1))
-      : nameFirstByte;
-  var name = decodeString(await reader.readBytes(nameLength));
-  loaded += nameBytesLength + nameLength;
+  var name = await reader.readLengthEncodedString();
 
   // lenenc_str     org_name
-  var orgNameFirstByte = await reader.readByte();
-  var orgNameBytesLength =
-      getDecodingLengthEncodedIntegerBytesLength(orgNameFirstByte);
-  var orgNameLength = orgNameBytesLength > 1
-      ? decodeLengthEncodedInteger(
-          await reader.readBytes(orgNameBytesLength - 1))
-      : orgNameFirstByte;
-  var orgName = decodeString(await reader.readBytes(orgNameLength));
-  loaded += orgNameBytesLength + orgNameLength;
+  var orgName = await reader.readLengthEncodedString();
 
   // lenenc_int     length of fixed-length fields [0c]
-  var fieldsLengthFirstByte = await reader.readByte();
-  var fieldsLengthBytesLength =
-      getDecodingLengthEncodedIntegerBytesLength(fieldsLengthFirstByte);
-  var fieldsLength = fieldsLengthBytesLength > 1
-      ? decodeLengthEncodedInteger(
-          await reader.readBytes(fieldsLengthBytesLength - 1))
-      : fieldsLengthFirstByte;
-  loaded += fieldsLengthBytesLength;
+  var fieldsLength = await reader.readLengthEncodedInteger();
 
   // 2              character set
-  var characterSet = decodeFixedLengthInteger(await reader.readBytes(2));
-  loaded += 2;
+  var characterSet = await reader.readFixedLengthInteger(2);
 
   // 4              column length
-  var columnLength = decodeFixedLengthInteger(await reader.readBytes(4));
-  loaded += 4;
+  var columnLength = await reader.readFixedLengthInteger(4);
 
   // 1              type
-  var type = decodeFixedLengthInteger1(await reader.readByte());
-  loaded += 1;
+  var type = await reader.readByte();
 
   // 2              flags
-  var flags = decodeFixedLengthInteger(await reader.readBytes(2));
-  loaded += 2;
+  var flags = await reader.readFixedLengthInteger(2);
 
   // 1              decimals
-  var decimals = decodeFixedLengthInteger1(await reader.readByte());
-  loaded += 1;
+  var decimals = await reader.readByte();
 
   // 2              filler [00] [00]
   await reader.skipBytes(2);
-  loaded += 2;
-
-  if (loaded != payloadLength) {
-    throw new StateError("$loaded != $payloadLength");
-  }
 }
 
 Future readResultSetRowResponsePacket(DataStreamReader reader) async {
@@ -613,38 +433,15 @@ Future readResultSetRowResponsePacket(DataStreamReader reader) async {
   }
 }
 
-Future readResponsePacket(DataStreamReader reader) async {
-  var loaded = 0;
-
-  var payloadLength = decodeFixedLengthInteger(await reader.readBytes(3));
-  print("payloadLength: $payloadLength");
-
-  var sequenceId = decodeFixedLengthInteger1(await reader.readByte());
-  print("sequenceId: $sequenceId");
-
-  // TODO solo per test iniziale
-  if (loaded < payloadLength) {
-    var data = await reader.readBytes(payloadLength - loaded);
-    print("$loaded: last data: $data");
-    loaded += data.length;
-  }
-
-  print("Loaded: $loaded");
-  if (loaded != payloadLength) {
-    throw new StateError("$loaded != $payloadLength");
-  }
-}
-
 Future readEOFResponsePacket(DataStreamReader reader) async {
-  var loaded = 0;
+  var payloadLength = await reader.readFixedLengthInteger(3);
 
-  var payloadLength = decodeFixedLengthInteger(await reader.readBytes(3));
-  var sequenceId = decodeFixedLengthInteger1(await reader.readByte());
+  var sequenceId = await reader.readByte();
+
+  reader.resetExpectedPayloadLength(payloadLength);
 
   // int<1>	header	[00] or [fe] the OK packet header
-  var header = decodeFixedLengthInteger1(await reader.readByte());
-  loaded += 1;
-
+  var header = await reader.readByte();
   if (header != 0xfe) {
     throw new StateError("$header != 0xfe");
   }
@@ -652,14 +449,8 @@ Future readEOFResponsePacket(DataStreamReader reader) async {
   // if capabilities & CLIENT_PROTOCOL_41 {
   if (serverCapabilityFlags & CLIENT_PROTOCOL_41 != 0) {
     // int<2>	warnings	number of warnings
-    var warnings = decodeFixedLengthInteger(await reader.readBytes(2));
-    loaded += 2;
+    var warnings = await reader.readFixedLengthInteger(2);
     // int<2>	status_flags	Status Flags
-    var statusFlags = decodeFixedLengthInteger(await reader.readBytes(2));
-    loaded += 2;
-  }
-
-  if (loaded != payloadLength) {
-    throw new StateError("$loaded != $payloadLength");
+    var statusFlags = await reader.readFixedLengthInteger(2);
   }
 }

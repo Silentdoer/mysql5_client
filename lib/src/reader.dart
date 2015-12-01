@@ -161,11 +161,15 @@ class DataBuffer {
     throw new UnsupportedError("${data.length} length");
   }
 
-  String toString() => this.singleRange != null ? new String.fromCharCodes(
-      this.singleRange.data, this.singleRange.start, this.singleRange.end) : _EMPTY_STRING;
+  String toString() => this.singleRange != null
+      ? new String.fromCharCodes(
+          this.singleRange.data, this.singleRange.start, this.singleRange.end)
+      : _EMPTY_STRING;
 
-  String toUTF8() => this.singleRange != null ? UTF8.decoder.convert(
-      this.singleRange.data, this.singleRange.start, this.singleRange.end) : _EMPTY_STRING;
+  String toUTF8() => this.singleRange != null
+      ? UTF8.decoder.convert(
+          this.singleRange.data, this.singleRange.start, this.singleRange.end)
+      : _EMPTY_STRING;
 }
 
 class DataRange {
@@ -231,14 +235,12 @@ class DataStreamReader {
 
   DataStreamReader(this._stream) : this._dataBuffer = new DataBuffer() {
     this._loadedCount = 0;
-    this._expectedPayloadLength = -1;
     this._stream.listen(_onData);
   }
 
   bool get isFirstByte => _loadedCount == 1;
 
-  bool get isAvailable =>
-      _expectedPayloadLength == -1 || _loadedCount < _expectedPayloadLength;
+  bool get isAvailable => _loadedCount < _expectedPayloadLength;
 
   void resetExpectedPayloadLength(int expectedPayloadLength) {
     _loadedCount = 0;
@@ -278,8 +280,7 @@ class DataStreamReader {
             bytesLength = 4;
             break;
           case _PREFIX_INT_8:
-            if (_expectedPayloadLength == -1 ||
-                (_expectedPayloadLength - _loadedCount) >= 8) {
+            if (_expectedPayloadLength - _loadedCount >= 8) {
               bytesLength = 9;
             } else {
               throw new EOFError();
@@ -312,6 +313,12 @@ class DataStreamReader {
 
   Future<String> readNulTerminatedUTF8String() =>
       this._readUpToBuffer(0x00).then((_) => _dataBuffer.toUTF8());
+
+  Future<String> readRestOfPacketString() => this
+      .readFixedLengthString(this._expectedPayloadLength - this._loadedCount);
+
+  Future<String> readRestOfPacketUTF8String() => this
+      .readFixedLengthUTF8String(this._expectedPayloadLength - this._loadedCount);
 
   Future skipByte() {
     var value = _readChunk((chunk) => chunk.skipSingle());

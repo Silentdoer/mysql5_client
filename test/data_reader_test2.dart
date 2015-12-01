@@ -14,23 +14,30 @@ Future main() async {
   controller.add([71, 72, 73]);
   controller.add([74, 75, 76]);
   controller.add([0x01, 70]);
-  controller.add([0xfb]);
+  controller.add([0x00]);
   controller.add([0x01, 70]);
-  controller.add([0xff]);
+  controller.add([0xfb]);
 
   var reader = new DataStreamReader(controller.stream);
   // print(await reader.readBytes(2));
-  print(await reader.readBytes(1));
+  print(await reader.readBytes(6));
 
   // print(await reader.readFixedLengthString(4));
 
-  print(await reader.readBytes(3));
+  // print(await reader.readBytes(3));
 
   // print(await reader.readLengthEncodedInteger());
   // print(await reader.readLengthEncodedInteger());
+  print(await reader.readLengthEncodedString());
+
+  print("***");
 
   print(await reader.readLengthEncodedString());
 
+  print(await reader.readLengthEncodedString());
+
+  print(await reader.readLengthEncodedString());
+/*
   try {
     print(await reader.readLengthEncodedString());
   } on NullError {
@@ -48,5 +55,5 @@ Future main() async {
   } on UndefinedError {
     print("Undefined value");
   }
-
+*/
 }

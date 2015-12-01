@@ -26,6 +26,7 @@ const int _PREFIX_INT_3 = 0xfd;
 final int _MAX_INT_8 = pow(2, 8 * 8);
 const int _PREFIX_INT_8 = 0xfe;
 
+const String _EMPTY_STRING = "";
 const List<int> _EMPTY_DATA = const [];
 const List<DataRange> _EMPTY_RANGE_LIST = const [];
 final DataBuffer _EMPTY_BUFFER = new DataBuffer();
@@ -42,10 +43,6 @@ class EOFError extends Error {
   String toString() => "EOF value";
 }
 
-// TODO creare un pool di DataRange, DataBuffer
-
-// TODO gestione del clean
-// TODO gestione del pool di data range
 // TODO gestione del length = null (toString da null)
 class DataBuffer {
   final List<DataRange> _dataRanges = new List<DataRange>();
@@ -164,11 +161,11 @@ class DataBuffer {
     throw new UnsupportedError("${data.length} length");
   }
 
-  String toString() => new String.fromCharCodes(
-      this.singleRange.data, this.singleRange.start, this.singleRange.end);
+  String toString() => this.singleRange != null ? new String.fromCharCodes(
+      this.singleRange.data, this.singleRange.start, this.singleRange.end) : _EMPTY_STRING;
 
-  String toUTF8() => UTF8.decoder.convert(
-      this.singleRange.data, this.singleRange.start, this.singleRange.end);
+  String toUTF8() => this.singleRange != null ? UTF8.decoder.convert(
+      this.singleRange.data, this.singleRange.start, this.singleRange.end) : _EMPTY_STRING;
 }
 
 class DataRange {
@@ -302,14 +299,12 @@ class DataStreamReader {
 
   Future<String> readLengthEncodedString() => this
       .readLengthEncodedInteger()
-      .then((length) =>
-          length != null ? this._readFixedLengthBuffer(length) : null)
+      .then((length) => this._readFixedLengthBuffer(length))
       .then((_) => _dataBuffer.toString());
 
   Future<String> readLengthEncodedUTF8String() => this
       .readLengthEncodedInteger()
-      .then((length) =>
-          length != null ? this._readFixedLengthBuffer(length) : null)
+      .then((length) => this._readFixedLengthBuffer(length))
       .then((_) => _dataBuffer.toUTF8());
 
   Future<String> readNulTerminatedString() =>
@@ -357,8 +352,8 @@ class DataStreamReader {
       _readUpToBuffer(terminator).then((_) => _dataBuffer.data);
 
   Future _readFixedLengthBuffer(int length) {
+    _dataBuffer.clean();
     if (length > 0) {
-      _dataBuffer.clean();
       return _thenFuture(__readFixedLengthBuffer(length), (_) => _);
     } else {
       return new Future.value();

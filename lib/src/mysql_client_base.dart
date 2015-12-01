@@ -65,10 +65,6 @@ List<int> encodeString(String value, {utf8Encoded: false}) {
   return !utf8Encoded ? value.codeUnits : UTF8.encode(value);
 }
 
-String decodeString(List<int> data, {utf8Encoded: false}) {
-  return !utf8Encoded ? new String.fromCharCodes(data) : UTF8.decode(data);
-}
-
 List<int> encodeFixedFilledLengthString(int value, int length) {
   return new List.filled(length, value);
 }
@@ -146,84 +142,4 @@ List<int> encodeLengthEncodedInteger(int value) {
   }
 
   return data;
-}
-
-int getDecodingLengthEncodedIntegerBytesLength(int firstByte) {
-  switch (firstByte) {
-    case _PREFIX_INT_2:
-      return 3;
-    case _PREFIX_INT_3:
-      return 4;
-    case _PREFIX_INT_8:
-      return 9;
-    default:
-      return 1;
-  }
-}
-
-int decodeFixedLengthInteger1(data) => data;
-
-int decodeFixedLengthInteger(List<int> data) {
-  switch (data.length) {
-    case 1:
-      return data[0];
-    case 2:
-      return data[0] | data[1] << 8;
-    case 3:
-      return data[0] | data[1] << 8 | data[2] << 16;
-    case 4:
-      return data[0] | data[1] << 8 | data[2] << 16 | data[3] << 24;
-    case 5:
-      return data[0] |
-          data[1] << 8 |
-          data[2] << 16 |
-          data[3] << 24 |
-          data[4] << 32;
-    case 6:
-      return data[0] |
-          data[1] << 8 |
-          data[2] << 16 |
-          data[3] << 24 |
-          data[4] << 32 |
-          data[5] << 40;
-    case 7:
-      return data[0] |
-          data[1] << 8 |
-          data[2] << 16 |
-          data[3] << 24 |
-          data[4] << 32 |
-          data[5] << 40 |
-          data[6] << 48;
-    case 8:
-      return data[0] |
-          data[1] << 8 |
-          data[2] << 16 |
-          data[3] << 24 |
-          data[4] << 32 |
-          data[5] << 40 |
-          data[6] << 48 |
-          data[7] << 56;
-  }
-
-  throw new UnsupportedError("${data.length} length");
-}
-
-int decodeLengthEncodedInteger(List<int> secondData) {
-  switch (secondData.length) {
-    case 2:
-      return secondData[0] | secondData[1] << 8;
-    case 3:
-      return secondData[0] | secondData[1] << 8 | secondData[2] << 16;
-    case 8:
-      return secondData[0] |
-          secondData[1] << 8 |
-          secondData[2] << 16 |
-          secondData[3] << 24 |
-          secondData[4] << 32 |
-          secondData[5] << 40 |
-          secondData[6] << 48 |
-          secondData[7] << 56;
-  }
-
-  throw new UnsupportedError("${secondData.length} length");
 }

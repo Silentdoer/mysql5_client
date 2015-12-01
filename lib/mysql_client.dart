@@ -4,5 +4,5 @@
 /// The mysql_client library.
 library mysql_client;
 
-export 'src/reader.dart';
+export 'src/data_reader.dart';
 export 'src/mysql_client_base.dart';

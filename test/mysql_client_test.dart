@@ -59,13 +59,6 @@ Future run() async {
 
   print("testMySql: ${sw.elapsedMilliseconds} ms");
 
-  print("DATA_RANGE_COUNT: $DATA_RANGE_COUNT");
-  print("DATA_BUFFER_COUNT: $DATA_BUFFER_COUNT");
-  print("DATA_CHUNK_COUNT: $DATA_CHUNK_COUNT");
-  print("BUFFER_LIST_COUNT: $BUFFER_LIST_COUNT");
-  print("RANGE_LIST_COUNT: $RANGE_LIST_COUNT");
-  print("LIST1_COUNT: $LIST1_COUNT");
-
   await socket.close();
 
   socket.destroy();
@@ -75,13 +68,13 @@ Future readInitialHandshakePacket(DataStreamReader reader) async {
   var payloadLength = await reader.readFixedLengthInteger(3);
   print("payloadLength: $payloadLength");
 
-  var sequenceId = await reader.readByte();
+  var sequenceId = await reader.readOneLengthInteger();
   print("sequenceId: $sequenceId");
 
   reader.resetExpectedPayloadLength(payloadLength);
 
   // 1              [0a] protocol version
-  var protocolVersion = await reader.readByte();
+  var protocolVersion = await reader.readOneLengthInteger();
   print("protocolVersion: $protocolVersion");
 
   // string[NUL]    server version
@@ -107,7 +100,7 @@ Future readInitialHandshakePacket(DataStreamReader reader) async {
   // if more data in the packet:
   if (reader.isAvailable) {
     // 1              character set
-    var characterSet = await reader.readByte();
+    var characterSet = await reader.readOneLengthInteger();
     print("characterSet: $characterSet");
 
     // 2              status flags
@@ -125,7 +118,7 @@ Future readInitialHandshakePacket(DataStreamReader reader) async {
     // if capabilities & CLIENT_PLUGIN_AUTH {
     if (serverCapabilityFlags & CLIENT_PLUGIN_AUTH != 0) {
       // 1              length of auth-plugin-data
-      authPluginDataLength = await reader.readByte();
+      authPluginDataLength = await reader.readOneLengthInteger();
       print("authPluginDataLength: $authPluginDataLength");
     } else {
       // 1              [00]
@@ -231,13 +224,13 @@ Future readCommandResponsePacket(DataStreamReader reader) async {
   var payloadLength = await reader.readFixedLengthInteger(3);
   print("payloadLength: $payloadLength");
 
-  var sequenceId = await reader.readByte();
+  var sequenceId = await reader.readOneLengthInteger();
   print("sequenceId: $sequenceId");
 
   reader.resetExpectedPayloadLength(payloadLength);
 
   // int<1>	header	[00] or [fe] the OK packet header
-  var header = await reader.readByte();
+  var header = await reader.readOneLengthInteger();
   print("header: $header");
 
   // TODO distinguere il pacchetto OK, ERROR
@@ -360,19 +353,19 @@ Future readCommandQueryResponsePacket(DataStreamReader reader) async {
 Future readResultSetColumnCountResponsePacket(DataStreamReader reader) async {
   var payloadLength = await reader.readFixedLengthInteger(3);
 
-  var sequenceId = await reader.readByte();
+  var sequenceId = await reader.readOneLengthInteger();
 
   reader.resetExpectedPayloadLength(payloadLength);
 
   // A packet containing a Protocol::LengthEncodedInteger column_count
-  var columnCount = await reader.readByte();
+  var columnCount = await reader.readOneLengthInteger();
 }
 
 Future readResultSetColumnDefinitionResponsePacket(
     DataStreamReader reader) async {
   var payloadLength = await reader.readFixedLengthInteger(3);
 
-  var sequenceId = await reader.readByte();
+  var sequenceId = await reader.readOneLengthInteger();
 
   reader.resetExpectedPayloadLength(payloadLength);
 
@@ -404,13 +397,13 @@ Future readResultSetColumnDefinitionResponsePacket(
   var columnLength = await reader.readFixedLengthInteger(4);
 
   // 1              type
-  var type = await reader.readByte();
+  var type = await reader.readOneLengthInteger();
 
   // 2              flags
   var flags = await reader.readFixedLengthInteger(2);
 
   // 1              decimals
-  var decimals = await reader.readByte();
+  var decimals = await reader.readOneLengthInteger();
 
   // 2              filler [00] [00]
   await reader.skipBytes(2);
@@ -436,12 +429,12 @@ Future readResultSetRowResponsePacket(DataStreamReader reader) async {
 Future readEOFResponsePacket(DataStreamReader reader) async {
   var payloadLength = await reader.readFixedLengthInteger(3);
 
-  var sequenceId = await reader.readByte();
+  var sequenceId = await reader.readOneLengthInteger();
 
   reader.resetExpectedPayloadLength(payloadLength);
 
   // int<1>	header	[00] or [fe] the OK packet header
-  var header = await reader.readByte();
+  var header = await reader.readOneLengthInteger();
   if (header != 0xfe) {
     throw new StateError("$header != 0xfe");
   }
@@ -453,4 +446,49 @@ Future readEOFResponsePacket(DataStreamReader reader) async {
     // int<2>	status_flags	Status Flags
     var statusFlags = await reader.readFixedLengthInteger(2);
   }
+}
+
+int decodeFixedLengthInteger(List<int> data) {
+  switch (data.length) {
+    case 1:
+      return data[0];
+    case 2:
+      return data[0] | data[1] << 8;
+    case 3:
+      return data[0] | data[1] << 8 | data[2] << 16;
+    case 4:
+      return data[0] | data[1] << 8 | data[2] << 16 | data[3] << 24;
+    case 5:
+      return data[0] |
+          data[1] << 8 |
+          data[2] << 16 |
+          data[3] << 24 |
+          data[4] << 32;
+    case 6:
+      return data[0] |
+          data[1] << 8 |
+          data[2] << 16 |
+          data[3] << 24 |
+          data[4] << 32 |
+          data[5] << 40;
+    case 7:
+      return data[0] |
+          data[1] << 8 |
+          data[2] << 16 |
+          data[3] << 24 |
+          data[4] << 32 |
+          data[5] << 40 |
+          data[6] << 48;
+    case 8:
+      return data[0] |
+          data[1] << 8 |
+          data[2] << 16 |
+          data[3] << 24 |
+          data[4] << 32 |
+          data[5] << 40 |
+          data[6] << 48 |
+          data[7] << 56;
+  }
+
+  throw new UnsupportedError("${data.length} length");
 }

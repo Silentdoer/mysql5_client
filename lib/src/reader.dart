@@ -317,8 +317,8 @@ class DataStreamReader {
   Future<String> readRestOfPacketString() => this
       .readFixedLengthString(this._expectedPayloadLength - this._loadedCount);
 
-  Future<String> readRestOfPacketUTF8String() => this
-      .readFixedLengthUTF8String(this._expectedPayloadLength - this._loadedCount);
+  Future<String> readRestOfPacketUTF8String() => this.readFixedLengthUTF8String(
+      this._expectedPayloadLength - this._loadedCount);
 
   Future skipByte() {
     var value = _readChunk((chunk) => chunk.skipSingle());

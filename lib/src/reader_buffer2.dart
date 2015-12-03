@@ -7,8 +7,6 @@ import "data_range2.dart";
 import "data_commons.dart";
 
 class ReaderBuffer {
-  static const String _EMPTY_STRING = "";
-
   // TODO capire se esiste una struttura più efficiente (DoubleLinkedList?)
   final List<DataRange> _dataRanges = [];
 
@@ -28,9 +26,21 @@ class ReaderBuffer {
 
   bool get isAvailable => leftLoadingCount > 0;
 
+  DataRange get lastRange => _dataRanges.last;
+
   void add(DataRange dataRange) {
+    assert(dataRange != null);
     _payloadLength += dataRange.length;
     _dataRanges.add(dataRange);
+  }
+
+  void clean() {
+    for (var range in _dataRanges) {
+      range.close();
+    }
+    _dataRanges.clear();
+    _payloadLength = 0;
+    _loadedCount = 0;
   }
 
   void skipByte() {
@@ -75,7 +85,7 @@ class ReaderBuffer {
   int _readOneByte() {
     var byte = _dataRanges[0].extractOneByte();
     if (_dataRanges[0].isEmpty) {
-      _dataRanges.removeAt(0);
+      _dataRanges.removeAt(0).close();
     }
     return byte;
   }
@@ -83,7 +93,7 @@ class ReaderBuffer {
   DataRange _readFixedLengthDataRange(int length) {
     var range = _dataRanges[0].extractFixedLengthDataRange(length);
     if (_dataRanges[0].isEmpty) {
-      _dataRanges.removeAt(0);
+      _dataRanges.removeAt(0).close();
     }
 
     var leftLength = length - range.length;
@@ -114,24 +124,19 @@ class ReaderBuffer {
   DataRange _readUpToDataRange(int terminator) {
     var range = _dataRanges[0].extractUpToDataRange(terminator);
     if (_dataRanges[0].isEmpty) {
-      _dataRanges.removeAt(0);
+      _dataRanges.removeAt(0).close();
     }
 
     if (range.isPending) {
       // devo costruire un range da zero
       var data = new List();
-
-      data.setRange(0, range.length, range.data, range.start);
-
-      var start = range.length;
+      data.addAll(range.data.sublist(range.start, range.start + range.length));
       do {
         range = _dataRanges[0].extractUpToDataRange(terminator);
         if (_dataRanges[0].isEmpty) {
-          _dataRanges.removeAt(0);
+          _dataRanges.removeAt(0).close();
         }
-        var end = start + range.length;
-        data.setRange(start, end, range.data, range.start);
-        start = end;
+        data.addAll(range.data.sublist(range.start, range.start + range.length));
       } while (range.isPending);
 
       return new DataRange(data, 0, data.length);

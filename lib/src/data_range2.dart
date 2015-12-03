@@ -25,13 +25,17 @@ class DataRange {
 
   bool get isInitialized => _data != null;
 
-  void _open(List<int> data, [int start = 0, int length]) {
+  void _open(List<int> data, [int start, int length]) {
+    assert(data != null);
+    assert(start == 0 || (data.isNotEmpty && start >= 0 && start < data.length));
+    assert(length == null || length == -1 || (length >= 0 && length <= data.length - start));
+
     this._data = data;
     this._start = start;
     if (length == null) {
-      length = this._data.length - this._start;
-    }
-    if (this._start + length <= this._data.length) {
+      this._isPending = false;
+      this._length = this._data.length - this._start;
+    } else if (length != -1) {
       this._isPending = false;
       this._length = length;
     } else {
@@ -57,6 +61,7 @@ class DataRange {
   List<int> get data => _data;
 
   int extractOneByte() {
+    assert(_length > 0);
     var value = _data[_start];
     _start++;
     _length--;
@@ -64,14 +69,32 @@ class DataRange {
   }
 
   DataRange extractFixedLengthDataRange(int length) {
-    throw new UnsupportedError("TOIMPLEMENT");
+    assert(length >= 0 && length <= _length);
+    DataRange range = new DataRange(_data, _start, length);
+    _start += range._length;
+    _length -= range._length;
+    return range;
   }
 
   DataRange extractUpToDataRange(int terminator) {
-    throw new UnsupportedError("TOIMPLEMENT");
+    assert(terminator != null);
+    int i = _data.indexOf(terminator, _start);
+
+    DataRange range = new DataRange(_data, _start, i);
+    if (range.isPending) {
+      _start += range._length;
+      _length -= range._length;
+    } else {
+      // salto il terminatore
+      _start += range._length + 1;
+      _length -= range._length + 1;
+    }
+    return range;
   }
 
   int toInt() {
+    assert(_length > 0 && _length <= 8);
+
     var i = _start;
     switch (_length) {
       case 1:

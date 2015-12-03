@@ -5,3 +5,8 @@
 library mysql_client;
 
 export 'src/connection2.dart';
+
+
+// TODO togliere
+export "src/reader_buffer2.dart";
+export "src/data_range2.dart";

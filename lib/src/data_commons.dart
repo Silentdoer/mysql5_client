@@ -5,6 +5,8 @@ library mysql_client.data_commons;
 
 import "dart:math";
 
+const int NULL_TERMINATOR = 0x00;
+
 const int PREFIX_NULL = 0xfb;
 const int PREFIX_UNDEFINED = 0xff;
 

@@ -12,20 +12,23 @@ import "package:sqljocky/sqljocky.dart";
 
 Future main() async {
   await test1();
-  await test2();
+  // await test2();
 }
 
 Future test1() async {
   var connection = new ConnectionImpl();
-  await connection.connect("localhost", 3306, "root", "mysql", "test");
 
-  var sw = new Stopwatch()..start();
-  for (var i = 0; i < 1; i++) {
-    await connection.executeQuery("SELECT * FROM people LIMIT 10");
+  try {
+    await connection.connect("localhost", 3306, "root", "mysql", "test");
+
+    var sw = new Stopwatch()..start();
+    for (var i = 0; i < 1; i++) {
+      await connection.executeQuery("SELECT * FROM people LIMIT 10");
+    }
+    print("testMySql: ${sw.elapsedMilliseconds} ms");
+  } finally {
+    await connection.close();
   }
-  print("testMySql: ${sw.elapsedMilliseconds} ms");
-
-  await connection.close();
 }
 
 Future test2() async {

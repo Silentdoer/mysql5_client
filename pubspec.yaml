@@ -9,6 +9,7 @@ environment:
 
 dependencies:
   crypto: ^0.9.1
+  sqljocky: any
   stack_trace: any
 
 dev_dependencies:

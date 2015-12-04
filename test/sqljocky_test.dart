@@ -5,44 +5,30 @@ library mysql_client.test;
 
 import "dart:async";
 
-import 'package:mysql_client/mysql_client.dart';
 import "package:sqljocky/sqljocky.dart";
 
-// sudo ngrep -x -q -d lo0 '' 'port 3306'
-
 Future main() async {
-  await test1();
-  await test2();
+  await run();
 }
 
-Future test1() async {
-  var connection = new ConnectionImpl();
-  await connection.connect("localhost", 3306, "root", "mysql", "test");
-
-  var sw = new Stopwatch()..start();
-  for (var i = 0; i < 1; i++) {
-    await connection.executeQuery("SELECT * FROM people LIMIT 10");
-  }
-  print("testMySql: ${sw.elapsedMilliseconds} ms");
-
-  await connection.close();
-}
-
-Future test2() async {
+Future run() async {
   var pool = new ConnectionPool(
       host: 'localhost', port: 3306,
       user: 'root', password: 'mysql',
       db: 'test', max: 1);
+
   var connection = await pool.getConnection();
 
   var sw = new Stopwatch()..start();
+
   for (var i = 0; i < 1; i++) {
-    var results = await connection.query('SELECT * FROM people LIMIT 10');
+    var results = await connection.query('SELECT * FROM people LIMIT 100');
     await results.length;
   }
 
   print("testMySql: ${sw.elapsedMilliseconds} ms");
 
   await connection.release();
+
   pool.closeConnectionsWhenNotInUse();
 }

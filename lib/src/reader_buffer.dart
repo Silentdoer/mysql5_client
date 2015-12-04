@@ -65,14 +65,18 @@ class ReaderBuffer {
     _POOL.add(this);
   }
 
-  bool get isAllLoaded => _loadedCount < _payloadLength;
+  bool get isAllLoaded => _loadLeftCount == 0;
 
-  bool get isAllRead => _readCount == _payloadLength;
+  bool get isAllRead => _readLeftCount == 0;
 
   bool get isFirstByte => _readCount == 1;
 
+  int get _loadLeftCount => _payloadLength - _loadedCount;
+
+  int get _readLeftCount => _payloadLength - _readCount;
+
   void loadChunk(DataChunk chunk) {
-    chunk.consume(_payloadLength - _loadedCount, (data, index, available) {
+    chunk.consume(_loadLeftCount, (data, index, available) {
       var range = new DataRange(data, index, available);
       _loadedCount += available;
       _dataRanges.add(range);
@@ -89,8 +93,14 @@ class ReaderBuffer {
 
   int readOneLengthInteger() => _readOneByte();
 
-  int readFixedLengthInteger(int length) =>
-      _readFixedLengthDataRange(length).toInt();
+  int readFixedLengthInteger(int length) {
+    var range = _readFixedLengthDataRange(length);
+    try {
+      return range.toInt();
+    } finally {
+      range.deinitialize();
+    }
+  }
 
   int readLengthEncodedInteger() {
     var firstByte = _readOneByte();
@@ -103,7 +113,7 @@ class ReaderBuffer {
         bytesLength = 4;
         break;
       case PREFIX_INT_8:
-        if (_payloadLength - _readCount >= 8) {
+        if (_readLeftCount >= 8) {
           bytesLength = 9;
         } else {
           throw new EOFError(this);
@@ -116,20 +126,44 @@ class ReaderBuffer {
       default:
         return firstByte;
     }
-    return _readFixedLengthDataRange(bytesLength - 1).toInt();
+    return readFixedLengthInteger(bytesLength - 1);
   }
 
-  String readNulTerminatedString() =>
-      _readUpToDataRange(NULL_TERMINATOR).toString();
+  String readNulTerminatedString() {
+    var range = _readUpToDataRange(NULL_TERMINATOR);
+    try {
+      return range.toString();
+    } finally {
+      range.deinitialize();
+    }
+  }
 
-  String readNulTerminatedUTF8String() =>
-      _readUpToDataRange(NULL_TERMINATOR).toUTF8String();
+  String readNulTerminatedUTF8String() {
+    var range = _readUpToDataRange(NULL_TERMINATOR);
+    try {
+      return range.toUTF8String();
+    } finally {
+      range.deinitialize();
+    }
+  }
 
-  String readFixedLengthString(int length) =>
-      _readFixedLengthDataRange(length).toString();
+  String readFixedLengthString(int length) {
+    var range = _readFixedLengthDataRange(length);
+    try {
+      return range.toString();
+    } finally {
+      range.deinitialize();
+    }
+  }
 
-  String readFixedLengthUTF8String(int length) =>
-      _readFixedLengthDataRange(length).toUTF8String();
+  String readFixedLengthUTF8String(int length) {
+    var range = _readFixedLengthDataRange(length);
+    try {
+      return range.toUTF8String();
+    } finally {
+      range.deinitialize();
+    }
+  }
 
   String readLengthEncodedString() =>
       readFixedLengthString(readLengthEncodedInteger());
@@ -137,11 +171,10 @@ class ReaderBuffer {
   String readLengthEncodedUTF8String() =>
       readFixedLengthUTF8String(readLengthEncodedInteger());
 
-  String readRestOfPacketString() =>
-      readFixedLengthString(_payloadLength - _readCount);
+  String readRestOfPacketString() => readFixedLengthString(_readLeftCount);
 
   String readRestOfPacketUTF8String() =>
-      readFixedLengthUTF8String(_payloadLength - _readCount);
+      readFixedLengthUTF8String(_readLeftCount);
 
   int _readOneByte() {
     var byte = _dataRanges[0].extractOneByte();

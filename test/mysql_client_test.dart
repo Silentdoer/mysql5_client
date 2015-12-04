@@ -21,7 +21,7 @@ Future run() async {
 
   var sw = new Stopwatch()..start();
 
-  for (var i = 0; i < 10; i++) {
+  for (var i = 0; i < 100; i++) {
     await connection.executeQuery("SELECT * FROM people");
   }
 

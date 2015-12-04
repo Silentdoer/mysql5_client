@@ -34,7 +34,7 @@ class DataReader {
   }
 
   _readBufferInternal(ReaderBuffer buffer) {
-    return buffer.isAllLoaded ? _readBuffer(buffer) : buffer;
+    return buffer.isAllLoaded ? buffer : _readBuffer(buffer);
   }
 
   _readChunk(chunkReader(DataChunk chunk)) {

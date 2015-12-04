@@ -17,10 +17,6 @@ class DataChunk {
 
   bool get isEmpty => _data.length - _index == 0;
 
-  int get index => _index;
-
-  List<int> get data => _data;
-
   void consume(int length, handler(List<int> data, int index, int available)) {
     length = min(_data.length - _index, length);
     handler(_data, _index, length);

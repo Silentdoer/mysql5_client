@@ -28,4 +28,11 @@ Future run() async {
   print("testMySql: ${sw.elapsedMilliseconds} ms");
 
   await connection.close();
+
+  print("CHUNK_COUNTER: $CHUNK_COUNTER");
+  print("RANGE_COUNTER: $RANGE_COUNTER");
+  print("BUFFER_COUNTER: $BUFFER_COUNTER");
+  print("LIST1_COUNTER: $LIST1_COUNTER");
+  print("LIST2_COUNTER: $LIST2_COUNTER");
+  print("SUBLIST_COUNTER: $SUBLIST_COUNTER");
 }

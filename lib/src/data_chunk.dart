@@ -3,42 +3,27 @@
 
 library mysql_client.data_chunk;
 
-import "data_range.dart";
+import 'dart:math';
+import 'data_statistics.dart';
 
 class DataChunk {
   final List<int> _data;
 
   int _index;
 
-  DataChunk(this._data) : this._index = 0;
+  DataChunk(this._data) : this._index = 0 {
+    CHUNK_COUNTER++;
+  }
 
   bool get isEmpty => _data.length - _index == 0;
 
-  void skipSingle() {
-    _index++;
-  }
+  int get index => _index;
 
-  int readSingle() => _data[_index++];
+  List<int> get data => _data;
 
-  DataRange readFixedRange(int length) {
-    var readData = new DataRange(_data, _index, length);
-    _index += readData.length;
-    return readData;
-  }
-
-  DataRange readRangeUpTo(int terminator) {
-    var readData;
-
-    var toIndex = _data.indexOf(terminator, _index) + 1;
-
-    if (toIndex > 0) {
-      readData = new DataRange(_data, _index, toIndex - _index - 1);
-      _index = toIndex;
-    } else {
-      readData = new DataRange(_data, _index, _data.length - _index + 1);
-      _index = _data.length;
-    }
-
-    return readData;
+  void consume(int length, handler(List<int> data, int index, int available)) {
+    length = min(_data.length - _index, length);
+    handler(_data, _index, length);
+    _index += length;
   }
 }

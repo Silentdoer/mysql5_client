@@ -7,6 +7,8 @@ import "dart:convert";
 
 import "package:crypto/crypto.dart";
 
+import "data_commons.dart";
+import "reader_buffer.dart";
 import "data_reader.dart";
 import "data_writer.dart";
 
@@ -28,7 +30,7 @@ class InitialHandshakePacket {
   int payloadLength;
   int sequenceId;
   int protocolVersion;
-  int serverVersion;
+  String serverVersion;
   int connectionId;
   String authPluginDataPart1;
   int capabilityFlags1;
@@ -65,7 +67,8 @@ class ConnectionImpl implements Connection {
         _decodeFixedLengthInteger([0x0d, 0xa2, 0x00, 0x00]); // TODO sistemare
   }
 
-  Future connect(host, int port, String userName, String password, String database) async {
+  Future connect(
+      host, int port, String userName, String password, String database) async {
     _socket = await Socket.connect(host, port);
     _socket.setOption(SocketOption.TCP_NODELAY, true);
 
@@ -76,7 +79,12 @@ class ConnectionImpl implements Connection {
 
     _serverCapabilityFlags = initialHandshakePacket.serverCapabilityFlags;
 
-    await _writeHandshakeResponsePacket(userName, password, database, initialHandshakePacket.authPluginData, initialHandshakePacket.authPluginName);
+    await _writeHandshakeResponsePacket(
+        userName,
+        password,
+        database,
+        initialHandshakePacket.authPluginData,
+        initialHandshakePacket.authPluginName);
 
     await _readCommandResponsePacket();
   }
@@ -100,79 +108,80 @@ class ConnectionImpl implements Connection {
   Future<InitialHandshakePacket> _readInitialHandshakePacket() async {
     var packet = new InitialHandshakePacket();
 
-    packet.payloadLength = await _reader.readFixedLengthInteger(3);
+    var headerBuffer = await _reader.readBuffer(4);
+    packet.payloadLength = headerBuffer.readFixedLengthInteger(3);
+    packet.sequenceId = headerBuffer.readOneLengthInteger();
+    headerBuffer.deinitialize();
 
-    packet.sequenceId = await _reader.readOneLengthInteger();
-
-    _reader.resetExpectedPayloadLength(packet.payloadLength);
+    var buffer = await _reader.readBuffer(packet.payloadLength);
 
     // 1              [0a] protocol version
-    packet.protocolVersion = await _reader.readOneLengthInteger();
-
+    packet.protocolVersion = buffer.readOneLengthInteger();
     // string[NUL]    server version
-    packet.serverVersion = await _reader.readNulTerminatedString();
-
+    packet.serverVersion = buffer.readNulTerminatedString();
     // 4              connection id
-    packet.connectionId = await _reader.readFixedLengthInteger(4);
-
+    packet.connectionId = buffer.readFixedLengthInteger(4);
     // string[8]      auth-plugin-data-part-1
-    packet.authPluginDataPart1 = await _reader.readFixedLengthString(8);
-
+    packet.authPluginDataPart1 = buffer.readFixedLengthString(8);
     // 1              [00] filler
-    await _reader.skipByte();
-
+    buffer.skipByte();
     // 2              capability flags (lower 2 bytes)
-    packet.capabilityFlags1 = await _reader.readFixedLengthInteger(2);
+    packet.capabilityFlags1 = buffer.readFixedLengthInteger(2);
 
     // if more data in the packet:
-    if (_reader.isAvailable) {
+    if (!buffer.isAllRead) {
       // 1              character set
-      packet.characterSet = await _reader.readOneLengthInteger();
+      packet.characterSet = buffer.readOneLengthInteger();
 
       // 2              status flags
-      packet.statusFlags = await _reader.readFixedLengthInteger(2);
+      packet.statusFlags = buffer.readFixedLengthInteger(2);
 
       // 2              capability flags (upper 2 bytes)
-      packet.capabilityFlags2 = await _reader.readFixedLengthInteger(2);
+      packet.capabilityFlags2 = buffer.readFixedLengthInteger(2);
 
-      packet.serverCapabilityFlags = packet.capabilityFlags1 | (packet.capabilityFlags2 << 16);
-      print("serverCapabilityFlags: $_serverCapabilityFlags");
+      packet.serverCapabilityFlags =
+          packet.capabilityFlags1 | (packet.capabilityFlags2 << 16);
 
       // if capabilities & CLIENT_PLUGIN_AUTH {
       if (packet.serverCapabilityFlags & CLIENT_PLUGIN_AUTH != 0) {
         // 1              length of auth-plugin-data
-        packet.authPluginDataLength = await _reader.readOneLengthInteger();
+        packet.authPluginDataLength = buffer.readOneLengthInteger();
       } else {
         // 1              [00]
-        await _reader.skipByte();
+        buffer.skipByte();
         packet.authPluginDataLength = 0;
       }
 
       // string[10]     reserved (all [00])
-      await _reader.skipBytes(10);
+      buffer.skipBytes(10);
 
       // if capabilities & CLIENT_SECURE_CONNECTION {
       if (packet.serverCapabilityFlags & CLIENT_SECURE_CONNECTION != 0) {
         // string[$len]   auth-plugin-data-part-2 ($len=MAX(13, length of auth-plugin-data - 8))
         var len = max(packet.authPluginDataLength - 8, 13);
-        packet.authPluginDataPart2 = await _reader.readFixedLengthString(len);
+        packet.authPluginDataPart2 = buffer.readFixedLengthString(len);
       } else {
         packet.authPluginDataPart2 = "";
       }
 
-      packet.authPluginData = "${packet.authPluginDataPart1}${packet.authPluginDataPart2}"
-          .substring(0, packet.authPluginDataLength - 1);
+      packet.authPluginData =
+          "${packet.authPluginDataPart1}${packet.authPluginDataPart2}"
+              .substring(0, packet.authPluginDataLength - 1);
 
       // if capabilities & CLIENT_PLUGIN_AUTH {
       if (packet.serverCapabilityFlags & CLIENT_PLUGIN_AUTH != 0) {
         // string[NUL]    auth-plugin name
-        packet.authPluginName = await _reader.readNulTerminatedString();
+        packet.authPluginName = buffer.readNulTerminatedString();
       }
     }
+
+    buffer.deinitialize();
+
     return packet;
   }
 
-  Future _writeHandshakeResponsePacket(String userName, String password, String database, String authPluginData, String authPluginName) async {
+  Future _writeHandshakeResponsePacket(String userName, String password,
+      String database, String authPluginData, String authPluginName) async {
     WriterBuffer buffer = _writer.createBuffer();
 
     var sequenceId =
@@ -242,69 +251,59 @@ class ConnectionImpl implements Connection {
   }
 
   Future _readCommandResponsePacket() async {
-    var payloadLength = await _reader.readFixedLengthInteger(3);
-    print("payloadLength: $payloadLength");
+    var headerBuffer = await _reader.readBuffer(4);
+    var payloadLength = headerBuffer.readFixedLengthInteger(3);
+    var sequenceId = headerBuffer.readOneLengthInteger();
+    headerBuffer.deinitialize();
 
-    var sequenceId = await _reader.readOneLengthInteger();
-    print("sequenceId: $sequenceId");
-
-    _reader.resetExpectedPayloadLength(payloadLength);
+    var buffer = await _reader.readBuffer(payloadLength);
 
     // int<1>	header	[00] or [fe] the OK packet header
-    var header = await _reader.readOneLengthInteger();
-    print("header: $header");
+    var header = buffer.readOneLengthInteger();
 
     // TODO distinguere il pacchetto OK, ERROR
 
     // int<lenenc>	affected_rows	affected rows
-    var affectedRows = await _reader.readLengthEncodedInteger();
-    print("affectedRows: $affectedRows");
-
+    var affectedRows = buffer.readLengthEncodedInteger();
     // int<lenenc>	last_insert_id	last insert-id
-    var lastInsertId = await _reader.readLengthEncodedInteger();
-    print("lastInsertId: $lastInsertId");
+    var lastInsertId = buffer.readLengthEncodedInteger();
 
     var statusFlags;
     // if capabilities & CLIENT_PROTOCOL_41 {
     if (_serverCapabilityFlags & CLIENT_PROTOCOL_41 != 0) {
       // int<2>	status_flags	Status Flags
-      statusFlags = await _reader.readFixedLengthInteger(2);
-      print("statusFlags: $statusFlags");
+      statusFlags = buffer.readFixedLengthInteger(2);
       // int<2>	warnings	number of warnings
-      var warnings = await _reader.readFixedLengthInteger(2);
-      print("warnings: $warnings");
+      var warnings = buffer.readFixedLengthInteger(2);
       // } elseif capabilities & CLIENT_TRANSACTIONS {
     } else if (_serverCapabilityFlags & CLIENT_TRANSACTIONS != 0) {
       // int<2>	status_flags	Status Flags
-      statusFlags = await _reader.readFixedLengthInteger(2);
-      print("statusFlags: $statusFlags");
+      statusFlags = buffer.readFixedLengthInteger(2);
     } else {
       statusFlags = 0;
-      print("statusFlags: $statusFlags");
     }
 
     // if capabilities & CLIENT_SESSION_TRACK {
     if (_serverCapabilityFlags & CLIENT_SESSION_TRACK != 0) {
       // string<lenenc>	info	human readable status information
-      if (_reader.isAvailable) {
-        var info = await _reader.readLengthEncodedString();
-        print("info: $info");
+      if (!buffer.isAllRead) {
+        var info = buffer.readLengthEncodedString();
       }
 
       // if status_flags & SERVER_SESSION_STATE_CHANGED {
       if (statusFlags & SERVER_SESSION_STATE_CHANGED != 0) {
         // string<lenenc>	session_state_changes	session state info
-        if (_reader.isAvailable) {
-          var sessionStateChanges = await _reader.readLengthEncodedString();
-          print("sessionStateChanges: $sessionStateChanges");
+        if (!buffer.isAllRead) {
+          var sessionStateChanges = buffer.readLengthEncodedString();
         }
       }
       // } else {
     } else {
       // string<EOF>	info	human readable status information
-      var info = await _reader.readRestOfPacketString();
-      print("info: $info");
+      var info = buffer.readRestOfPacketString();
     }
+
+    buffer.deinitialize();
   }
 
   Future _writeCommandQueryPacket(String query) async {
@@ -338,115 +337,132 @@ class ConnectionImpl implements Connection {
       while (true) {
         await _readResultSetRowResponsePacket();
       }
-    } on EOFError {
-      if (_reader.isFirstByte) {
+    } on EOFError catch (e) {
+      if (e.buffer.isFirstByte) {
         // EOF packet
         // if capabilities & CLIENT_PROTOCOL_41 {
         if (_serverCapabilityFlags & CLIENT_PROTOCOL_41 != 0) {
           // int<2>	warnings	number of warnings
-          var warnings = await _reader.readFixedLengthInteger(2);
+          var warnings = e.buffer.readFixedLengthInteger(2);
 
           // int<2>	status_flags	Status Flags
-          var statusFlags = await _reader.readFixedLengthInteger(2);
+          var statusFlags = e.buffer.readFixedLengthInteger(2);
         }
+        e.buffer.deinitialize();
       } else {
+        e.buffer.deinitialize();
+
         rethrow;
       }
-    } on UndefinedError {
-      if (_reader.isFirstByte) {
+    } on UndefinedError catch (e) {
+      if (e.buffer.isFirstByte) {
         // TODO Error packet
+
+        e.buffer.deinitialize();
 
         throw new UnsupportedError("IMPLEMENT STARTED ERROR PACKET");
       } else {
+        e.buffer.deinitialize();
+
         rethrow;
       }
     }
   }
 
   Future _readResultSetColumnCountResponsePacket() async {
-    var payloadLength = await _reader.readFixedLengthInteger(3);
+    var headerBuffer = await _reader.readBuffer(4);
+    var payloadLength = headerBuffer.readFixedLengthInteger(3);
+    var sequenceId = headerBuffer.readOneLengthInteger();
+    headerBuffer.deinitialize();
 
-    var sequenceId = await _reader.readOneLengthInteger();
-
-    _reader.resetExpectedPayloadLength(payloadLength);
+    var buffer = await _reader.readBuffer(payloadLength);
 
     // A packet containing a Protocol::LengthEncodedInteger column_count
-    var columnCount = await _reader.readOneLengthInteger();
+    var columnCount = buffer.readOneLengthInteger();
+
+    buffer.deinitialize();
   }
 
   Future _readResultSetColumnDefinitionResponsePacket() async {
-    var payloadLength = await _reader.readFixedLengthInteger(3);
+    var headerBuffer = await _reader.readBuffer(4);
+    var payloadLength = headerBuffer.readFixedLengthInteger(3);
+    var sequenceId = headerBuffer.readOneLengthInteger();
+    headerBuffer.deinitialize();
 
-    var sequenceId = await _reader.readOneLengthInteger();
-
-    _reader.resetExpectedPayloadLength(payloadLength);
+    var buffer = await _reader.readBuffer(payloadLength);
 
     // lenenc_str     catalog
-    var catalog = await _reader.readLengthEncodedString();
+    var catalog = buffer.readLengthEncodedString();
 
     // lenenc_str     schema
-    var schema = await _reader.readLengthEncodedString();
+    var schema = buffer.readLengthEncodedString();
 
     // lenenc_str     table
-    var table = await _reader.readLengthEncodedString();
+    var table = buffer.readLengthEncodedString();
 
     // lenenc_str     org_table
-    var orgTable = await _reader.readLengthEncodedString();
+    var orgTable = buffer.readLengthEncodedString();
 
     // lenenc_str     name
-    var name = await _reader.readLengthEncodedString();
+    var name = buffer.readLengthEncodedString();
 
     // lenenc_str     org_name
-    var orgName = await _reader.readLengthEncodedString();
+    var orgName = buffer.readLengthEncodedString();
 
     // lenenc_int     length of fixed-length fields [0c]
-    var fieldsLength = await _reader.readLengthEncodedInteger();
+    var fieldsLength = buffer.readLengthEncodedInteger();
 
     // 2              character set
-    var characterSet = await _reader.readFixedLengthInteger(2);
+    var characterSet = buffer.readFixedLengthInteger(2);
 
     // 4              column length
-    var columnLength = await _reader.readFixedLengthInteger(4);
+    var columnLength = buffer.readFixedLengthInteger(4);
 
     // 1              type
-    var type = await _reader.readOneLengthInteger();
+    var type = buffer.readOneLengthInteger();
 
     // 2              flags
-    var flags = await _reader.readFixedLengthInteger(2);
+    var flags = buffer.readFixedLengthInteger(2);
 
     // 1              decimals
-    var decimals = await _reader.readOneLengthInteger();
+    var decimals = buffer.readOneLengthInteger();
 
     // 2              filler [00] [00]
-    await _reader.skipBytes(2);
+    buffer.skipBytes(2);
+
+    buffer.deinitialize();
   }
 
   Future _readResultSetRowResponsePacket() async {
-    var payloadLength = await _reader.readFixedLengthInteger(3);
+    var headerBuffer = await _reader.readBuffer(4);
+    var payloadLength = headerBuffer.readFixedLengthInteger(3);
+    var sequenceId = headerBuffer.readOneLengthInteger();
+    headerBuffer.deinitialize();
 
-    var sequenceId = await _reader.readFixedLengthInteger(1);
+    var buffer = await _reader.readBuffer(payloadLength);
 
-    _reader.resetExpectedPayloadLength(payloadLength);
-
-    while (_reader.isAvailable) {
+    while (!buffer.isAllRead) {
       var value;
       try {
-        value = await _reader.readLengthEncodedString();
+        value = buffer.readLengthEncodedString();
       } on NullError {
         value = null;
       }
     }
+
+    buffer.deinitialize();
   }
 
   Future _readEOFResponsePacket() async {
-    var payloadLength = await _reader.readFixedLengthInteger(3);
+    var headerBuffer = await _reader.readBuffer(4);
+    var payloadLength = headerBuffer.readFixedLengthInteger(3);
+    var sequenceId = headerBuffer.readOneLengthInteger();
+    headerBuffer.deinitialize();
 
-    var sequenceId = await _reader.readOneLengthInteger();
-
-    _reader.resetExpectedPayloadLength(payloadLength);
+    var buffer = await _reader.readBuffer(payloadLength);
 
     // int<1>	header	[00] or [fe] the OK packet header
-    var header = await _reader.readOneLengthInteger();
+    var header = buffer.readOneLengthInteger();
     if (header != 0xfe) {
       throw new StateError("$header != 0xfe");
     }
@@ -454,10 +470,12 @@ class ConnectionImpl implements Connection {
     // if capabilities & CLIENT_PROTOCOL_41 {
     if (_serverCapabilityFlags & CLIENT_PROTOCOL_41 != 0) {
       // int<2>	warnings	number of warnings
-      var warnings = await _reader.readFixedLengthInteger(2);
+      var warnings = buffer.readFixedLengthInteger(2);
       // int<2>	status_flags	Status Flags
-      var statusFlags = await _reader.readFixedLengthInteger(2);
+      var statusFlags = buffer.readFixedLengthInteger(2);
     }
+
+    buffer.deinitialize();
   }
 
   String _generateAuthResponse(
@@ -505,34 +523,34 @@ class ConnectionImpl implements Connection {
         return data[0] | data[1] << 8 | data[2] << 16 | data[3] << 24;
       case 5:
         return data[0] |
-        data[1] << 8 |
-        data[2] << 16 |
-        data[3] << 24 |
-        data[4] << 32;
+            data[1] << 8 |
+            data[2] << 16 |
+            data[3] << 24 |
+            data[4] << 32;
       case 6:
         return data[0] |
-        data[1] << 8 |
-        data[2] << 16 |
-        data[3] << 24 |
-        data[4] << 32 |
-        data[5] << 40;
+            data[1] << 8 |
+            data[2] << 16 |
+            data[3] << 24 |
+            data[4] << 32 |
+            data[5] << 40;
       case 7:
         return data[0] |
-        data[1] << 8 |
-        data[2] << 16 |
-        data[3] << 24 |
-        data[4] << 32 |
-        data[5] << 40 |
-        data[6] << 48;
+            data[1] << 8 |
+            data[2] << 16 |
+            data[3] << 24 |
+            data[4] << 32 |
+            data[5] << 40 |
+            data[6] << 48;
       case 8:
         return data[0] |
-        data[1] << 8 |
-        data[2] << 16 |
-        data[3] << 24 |
-        data[4] << 32 |
-        data[5] << 40 |
-        data[6] << 48 |
-        data[7] << 56;
+            data[1] << 8 |
+            data[2] << 16 |
+            data[3] << 24 |
+            data[4] << 32 |
+            data[5] << 40 |
+            data[6] << 48 |
+            data[7] << 56;
     }
 
     throw new UnsupportedError("${data.length} length");

@@ -5,3 +5,5 @@
 library mysql_client;
 
 export 'src/connection.dart';
+
+export "src/data_statistics.dart";

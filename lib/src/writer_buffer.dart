@@ -40,7 +40,7 @@ abstract class WriterBuffer {
 }
 
 class WriterBufferImpl implements WriterBuffer {
-  final List<int> _data = [];
+  final List<int> _data = new List();
 
   int get length => _data.length;
 

@@ -22,7 +22,7 @@ Future run() async {
   var sw = new Stopwatch()..start();
 
   for (var i = 0; i < 10; i++) {
-    await connection.executeQuery("SELECT * FROM people LIMIT 100");
+    await connection.executeQuery("SELECT * FROM people");
   }
 
   print("testMySql: ${sw.elapsedMilliseconds} ms");

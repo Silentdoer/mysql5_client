@@ -6,7 +6,6 @@ library mysql_client.data_range;
 import "dart:convert";
 
 class DataRange {
-  // TODO capire se esiste una struttura più efficiente
   static final List<DataRange> _POOL = new List();
 
   List<int> _data;

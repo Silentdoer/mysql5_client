@@ -6,6 +6,7 @@ library mysql_client.data_buffer;
 import "data_chunk.dart";
 import "data_range.dart";
 import "data_commons.dart";
+import 'dart:io';
 
 class UndefinedError extends Error {
   final ReaderBuffer buffer;
@@ -24,11 +25,9 @@ class EOFError extends Error {
 }
 
 class ReaderBuffer {
-  // TODO capire se esiste una struttura più efficiente
   static final List<ReaderBuffer> _POOL = new List();
 
-  // TODO capire se esiste una struttura più efficiente (DoubleLinkedList?)
-  final List<DataRange> _dataRanges = [];
+  final List<DataRange> _dataRanges = new List();
 
   int _payloadLength;
   int _loadedCount;
@@ -196,6 +195,7 @@ class ReaderBuffer {
       data.setRange(0, range.length, range.data, range.start);
       var start = range.length;
       do {
+        range.deinitialize();
         range = _dataRanges[0].extractFixedLengthDataRange(leftLength);
         if (_dataRanges[0].isEmpty) {
           _dataRanges.removeAt(0).deinitialize();
@@ -206,6 +206,7 @@ class ReaderBuffer {
         leftLength -= range.length;
       } while (range.isPending);
 
+      range.deinitialize();
       range = new DataRange(data);
     }
     _readCount += range.length;
@@ -220,18 +221,20 @@ class ReaderBuffer {
 
     if (range.isPending) {
       // devo costruire un range da zero
-      var data = new List();
-      data.addAll(range.data.sublist(range.start, range.start + range.length));
+      var builder = new BytesBuilder();
+      builder.add(range.data.sublist(range.start, range.start + range.length));
       do {
+        range.deinitialize();
         range = _dataRanges[0].extractUpToDataRange(terminator);
         if (_dataRanges[0].isEmpty) {
           _dataRanges.removeAt(0).deinitialize();
         }
-        data.addAll(
-            range.data.sublist(range.start, range.start + range.length));
+        builder
+            .add(range.data.sublist(range.start, range.start + range.length));
       } while (range.isPending);
 
-      range = new DataRange(data);
+      range.deinitialize();
+      range = new DataRange(builder.takeBytes());
     }
 
     // salto il terminatore

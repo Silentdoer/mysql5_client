@@ -10,7 +10,6 @@ import "data_chunk.dart";
 import "reader_buffer.dart";
 
 class DataReader {
-  // TODO capire se esiste una struttura più efficiente (DoubleLinkedList?)
   final Queue<DataChunk> _chunks = new Queue();
 
   final Stream<List<int>> _stream;

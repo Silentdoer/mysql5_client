@@ -4,7 +4,6 @@
 library mysql_client.data_range;
 
 import "dart:convert";
-import "data_statistics.dart";
 
 class DataRange {
   // TODO capire se esiste una struttura più efficiente
@@ -31,9 +30,7 @@ class DataRange {
     return range;
   }
 
-  DataRange._() {
-    RANGE_COUNTER++;
-  }
+  DataRange._();
 
   void _initialize(List<int> data, int start, int length) {
     assert(data != null);

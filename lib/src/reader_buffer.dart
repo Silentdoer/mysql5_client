@@ -6,7 +6,6 @@ library mysql_client.data_buffer;
 import "data_chunk.dart";
 import "data_range.dart";
 import "data_commons.dart";
-import "data_statistics.dart";
 
 class UndefinedError extends Error {
   final ReaderBuffer buffer;
@@ -46,7 +45,6 @@ class ReaderBuffer {
   ReaderBuffer._() {
     _loadedCount = 0;
     _readCount = 0;
-    BUFFER_COUNTER++;
   }
 
   void _initialize(int payloadLength) {
@@ -194,11 +192,8 @@ class ReaderBuffer {
     var leftLength = length - range.length;
     if (range.isPending) {
       // devo costruire un range da zero
-      LIST1_COUNTER++;
       var data = new List(length);
-
       data.setRange(0, range.length, range.data, range.start);
-
       var start = range.length;
       do {
         range = _dataRanges[0].extractFixedLengthDataRange(leftLength);
@@ -225,16 +220,13 @@ class ReaderBuffer {
 
     if (range.isPending) {
       // devo costruire un range da zero
-      LIST2_COUNTER++;
       var data = new List();
-      SUBLIST_COUNTER++;
       data.addAll(range.data.sublist(range.start, range.start + range.length));
       do {
         range = _dataRanges[0].extractUpToDataRange(terminator);
         if (_dataRanges[0].isEmpty) {
           _dataRanges.removeAt(0).deinitialize();
         }
-        SUBLIST_COUNTER++;
         data.addAll(
             range.data.sublist(range.start, range.start + range.length));
       } while (range.isPending);

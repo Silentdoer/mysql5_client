@@ -4,16 +4,13 @@
 library mysql_client.data_chunk;
 
 import 'dart:math';
-import 'data_statistics.dart';
 
 class DataChunk {
   final List<int> _data;
 
   int _index;
 
-  DataChunk(this._data) : this._index = 0 {
-    CHUNK_COUNTER++;
-  }
+  DataChunk(this._data) : this._index = 0;
 
   bool get isEmpty => _data.length - _index == 0;
 

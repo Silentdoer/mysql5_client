@@ -39,9 +39,15 @@ class ReaderBuffer {
 
   bool get isFirstByte => _readCount == 1;
 
+  int get payloadLength => _payloadLength;
+
   int get _loadLeftCount => _payloadLength - _loadedCount;
 
   int get _readLeftCount => _payloadLength - _readCount;
+
+  String toString() {
+    return _dataRanges[0].data.sublist(_dataRanges[0].start, _dataRanges[0].end).toString();
+  }
 
   void loadChunk(DataChunk chunk) {
     chunk.consume(_loadLeftCount, (data, index, available) {
@@ -51,7 +57,7 @@ class ReaderBuffer {
     });
   }
 
-  int checkByte() => _dataRanges[0].checkOneByte();
+  int get first => _dataRanges[0].first;
 
   void skipByte() {
     _readOneByte();

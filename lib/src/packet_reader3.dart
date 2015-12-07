@@ -27,6 +27,12 @@ class ResponseError extends Error {
   ResponseError(this.packet);
 }
 
+class PacketBuffer {
+  final int sequenceId;
+  final ReaderBuffer payload;
+  PacketBuffer(this.sequenceId, this.payload);
+}
+
 abstract class Packet {
   final int payloadLength;
   final int sequenceId;
@@ -113,7 +119,7 @@ class PacketReader {
     var sequenceId = _buffer.readOneLengthInteger();
 
     _buffer = await _reader.readBuffer(payloadLength);
-    var header = _buffer.first;
+    var header = _buffer.checkByte();
     if (_isOkHeader(header, payloadLength)) {
       return _completeOkPacket(new OkPacket(payloadLength, sequenceId));
     } else if (_isErrorHeader(header, payloadLength)) {
@@ -131,7 +137,7 @@ class PacketReader {
     var sequenceId = _buffer.readOneLengthInteger();
 
     _buffer = await _reader.readBuffer(payloadLength);
-    var header = _buffer.first;
+    var header = _buffer.checkByte();
     if (_isErrorHeader(header, payloadLength)) {
       throw new ResponseError(_completeErrorPacket(
           new ErrorPacket(payloadLength, sequenceId)));
@@ -141,13 +147,13 @@ class PacketReader {
     }
   }
 
-  Future readCommandQueryResponsePacket() async {
+  Future readCommandQueryResponsePacket(PacketBuffer packetBuffer) async {
     _buffer = await _reader.readBuffer(4);
     var payloadLength = _buffer.readFixedLengthInteger(3);
     var sequenceId = _buffer.readOneLengthInteger();
 
     _buffer = await _reader.readBuffer(payloadLength);
-    var header = _buffer.first;
+    var header = _buffer.checkByte();
     if (_isOkHeader(header, payloadLength)) {
       return _completeOkPacket(new OkPacket(payloadLength, sequenceId));
     } else if (_isErrorHeader(header, payloadLength)) {
@@ -160,10 +166,10 @@ class PacketReader {
     }
   }
 
-  Future<ResultSetPacket> _completeResultSetPacket(
-      int payloadLength, int sequenceId) async {
+  ResultSetPacket _completeResultSetPacket(PacketBuffer packetBuffer) {
+    _buffer = packetBuffer.payload;
 
-    _readResultSetColumnCountResponsePacket(payloadLength, sequenceId);
+    _readResultSetColumnCountResponsePacket(packetBuffer);
 
     var columnCount = 3;
     for (var i = 0; i < columnCount; i++) {
@@ -198,19 +204,15 @@ class PacketReader {
     }
   }
 
-  void _readResultSetColumnCountResponsePacket(
-      int payloadLength, int sequenceId) {
+  void _readResultSetColumnCountResponsePacket(PacketBuffer packetBuffer) {
+    _buffer = packetBuffer.payload;
+
     // A packet containing a Protocol::LengthEncodedInteger column_count
     var columnCount = _buffer.readOneLengthInteger();
   }
 
-  Future _readResultSetColumnDefinitionResponsePacket() async {
-    _buffer = await _reader.readBuffer(4);
-
-    var payloadLength = _buffer.readFixedLengthInteger(3);
-    var sequenceId = _buffer.readOneLengthInteger();
-
-    _buffer = await _reader.readBuffer(payloadLength);
+  void _readResultSetColumnDefinitionResponsePacket(PacketBuffer packetBuffer) {
+    _buffer = packetBuffer.payload;
 
     // lenenc_str     catalog
     var catalog = _buffer.readLengthEncodedString();
@@ -240,12 +242,8 @@ class PacketReader {
     _buffer.skipBytes(2);
   }
 
-  Future _readResultSetRowResponsePacket() async {
-    _buffer = await _reader.readBuffer(4);
-    var payloadLength = _buffer.readFixedLengthInteger(3);
-    var sequenceId = _buffer.readOneLengthInteger();
-
-    _buffer = await _reader.readBuffer(payloadLength);
+  void _readResultSetRowResponsePacket(PacketBuffer packetBuffer) {
+    _buffer = packetBuffer.payload;
 
     while (!_buffer.isAllRead) {
       var value;
@@ -254,15 +252,13 @@ class PacketReader {
       } on NullError {
         value = null;
       }
+
+      print(value);
     }
   }
 
-  Future _readEOFResponsePacket() async {
-    _buffer = await _reader.readBuffer(4);
-    var payloadLength = _buffer.readFixedLengthInteger(3);
-    var sequenceId = _buffer.readOneLengthInteger();
-
-    _buffer = await _reader.readBuffer(payloadLength);
+  void _readEOFResponsePacket(PacketBuffer packetBuffer) {
+    _buffer = packetBuffer.payload;
 
     // int<1>	header	[00] or [fe] the OK packet header
     var header = _buffer.readOneLengthInteger();

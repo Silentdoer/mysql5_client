@@ -5,14 +5,11 @@ library mysql_client.test;
 
 import "dart:async";
 
-import 'package:mysql_client/mysql_client.dart';
-import "package:sqljocky/sqljocky.dart";
-
-// sudo ngrep -x -q -d lo0 '' 'port 3306'
+import 'package:mysql_client/mysql_client2.dart';
+// import 'package:mysql_client/mysql_client.dart';
 
 Future main() async {
   await test1();
-  // await test2();
 }
 
 Future test1() async {
@@ -29,23 +26,4 @@ Future test1() async {
   } finally {
     await connection.close();
   }
-}
-
-Future test2() async {
-  var pool = new ConnectionPool(
-      host: 'localhost', port: 3306,
-      user: 'root', password: 'mysql',
-      db: 'test', max: 1);
-  var connection = await pool.getConnection();
-
-  var sw = new Stopwatch()..start();
-  for (var i = 0; i < 1; i++) {
-    var results = await connection.query('SELECT * FROM people LIMIT 10');
-    await results.length;
-  }
-
-  print("testMySql: ${sw.elapsedMilliseconds} ms");
-
-  await connection.release();
-  pool.closeConnectionsWhenNotInUse();
 }

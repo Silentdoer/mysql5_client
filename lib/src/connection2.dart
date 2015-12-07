@@ -10,7 +10,7 @@ import "package:crypto/crypto.dart";
 import "data_reader.dart";
 import "data_writer.dart";
 
-import "packet_reader.dart";
+import "packet_reader2.dart";
 
 class SqlError extends Error {}
 
@@ -47,22 +47,21 @@ class ConnectionImpl implements Connection {
         clientCapabilityFlags: _clientCapabilityFlags);
     _writer = new DataWriter(_socket);
 
-    var initialHandshakePacket = await _reader.readInitialHandshakePacket();
+    var response1 = await _reader.readInitialHandshakeResponse();
 
-    _reader.serverCapabilityFlags =
-        initialHandshakePacket.serverCapabilityFlags;
-    _serverCapabilityFlags = initialHandshakePacket.serverCapabilityFlags;
+    if (response1 is! InitialHandshakePacket) {
+      throw new SqlError();
+    }
 
-    await _writeHandshakeResponsePacket(
-        userName,
-        password,
-        database,
-        initialHandshakePacket.authPluginData,
-        initialHandshakePacket.authPluginName);
+    _reader.serverCapabilityFlags = response1.serverCapabilityFlags;
+    _serverCapabilityFlags = response1.serverCapabilityFlags;
 
-    var commandResponsePacket = await _reader.readCommandResponsePacket();
+    await _writeHandshakeResponsePacket(userName, password, database,
+        response1.authPluginData, response1.authPluginName);
 
-    if (commandResponsePacket is ErrorPacket) {
+    var response2 = await _reader.readCommandResponse();
+
+    if (response2 is ErrorPacket) {
       throw new SqlError();
     }
   }
@@ -80,7 +79,25 @@ class ConnectionImpl implements Connection {
   Future executeQuery(String query) async {
     await _writeCommandQueryPacket(query);
 
-    var commandResponsePacket = await _reader.readCommandQueryResponsePacket();
+    var response1 = await _reader.readCommandQueryResponse();
+
+    if (response1 is! ResultSetColumnCountResponsePacket) {
+      throw new SqlError();
+    }
+
+    while (true) {
+      var response2 = await _reader.readResultSetColumnDefinitionResponse();
+      if (response2 is! ResultSetColumnDefinitionResponsePacket) {
+        break;
+      }
+    }
+
+    while (true) {
+      var response3 = await _reader.readResultSetRowResponse();
+      if (response3 is! ResultSetRowResponsePacket) {
+        break;
+      }
+    }
   }
 
   Future _writeHandshakeResponsePacket(String userName, String password,

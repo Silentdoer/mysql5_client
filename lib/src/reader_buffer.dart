@@ -80,6 +80,8 @@ class ReaderBuffer {
     });
   }
 
+  int checkByte() => _dataRanges[0].checkOneByte();
+
   void skipByte() {
     _readOneByte();
   }

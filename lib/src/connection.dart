@@ -81,6 +81,10 @@ class ConnectionImpl implements Connection {
 
     var response1 = await _reader.readCommandQueryResponse();
 
+    if (response1 is OkPacket) {
+      return;
+    }
+
     if (response1 is! ResultSetColumnCountResponsePacket) {
       throw new SqlError();
     }
@@ -91,13 +95,15 @@ class ConnectionImpl implements Connection {
         break;
       }
     }
-
+/*
     while (true) {
       var response3 = await _reader.readResultSetRowResponse();
       if (response3 is! ResultSetRowResponsePacket) {
         break;
       }
     }
+*/
+    await _reader.readResultSetRowResponses();
   }
 
   Future _writeHandshakeResponsePacket(String userName, String password,

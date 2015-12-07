@@ -116,18 +116,50 @@ class PacketReader {
   PacketReader(this._reader, {this.clientCapabilityFlags: 0});
 
   Future<Packet> readInitialHandshakeResponse() =>
-      _readSyncPacket(_readInitialHandshakeResponse);
+      _readSyncPacketFromBuffer(_readInitialHandshakeResponseInternal);
 
-  Future<Packet> readCommandResponse() => _readSyncPacket(_readCommandResponse);
+  Future<Packet> readCommandResponse() =>
+      _readSyncPacketFromBuffer(_readCommandResponseInternal);
 
   Future<Packet> readCommandQueryResponse() =>
-      _readSyncPacket(_readCommandQueryResponse);
+      _readSyncPacketFromBuffer(_readCommandQueryResponseInternal);
 
   Future<Packet> readResultSetColumnDefinitionResponse() =>
-      _readSyncPacket(_readResultSetColumnDefinitionResponse);
+      _readSyncPacketFromBuffer(_readResultSetColumnDefinitionResponseInternal);
 
   Future<Packet> readResultSetRowResponse() =>
-      _readSyncPacket(_readResultSetRowResponse);
+      _readSyncPacketFromBuffer(_readResultSetRowResponseInternal);
+
+  Future<List<Packet>> readResultSetRowResponses([int length]) async =>
+      _readResultSetRowResponses(new List<Packet>(), length);
+
+  _readResultSetRowResponse() =>
+      _readPacketFromBuffer(_readResultSetRowResponseInternal);
+
+  _readResultSetRowResponses(List<Packet> packets, [int length]) {
+    var value = _readResultSetRowResponse();
+    if (value is Future) {
+      return value.then((packet) =>
+          _readResultSetRowResponsesInternal(packets, packet, length));
+    } else {
+      return _readResultSetRowResponsesInternal(packets, value, length);
+    }
+  }
+
+  _readResultSetRowResponsesInternal(List<Packet> packets, Packet packet,
+      [int length]) {
+    if (packet is ResultSetRowResponsePacket) {
+      packets.add(packet);
+
+      if (length == null || packets.length < length) {
+        return _readResultSetRowResponses(packets, length);
+      } else {
+        return packets;
+      }
+    } else {
+      return packets;
+    }
+  }
 
   bool _isOkPacket(PacketBuffer buffer) =>
       buffer.header == 0 && buffer.payloadLength >= 7;
@@ -139,7 +171,7 @@ class PacketReader {
 
   bool _isLocalInFilePacket(PacketBuffer buffer) => buffer.header == 0xfb;
 
-  Packet _readCommandResponse(PacketBuffer buffer) {
+  Packet _readCommandResponseInternal(PacketBuffer buffer) {
     if (_isOkPacket(buffer)) {
       return _readOkPacket(buffer);
     } else if (_isErrorPacket(buffer)) {
@@ -149,7 +181,7 @@ class PacketReader {
     }
   }
 
-  Packet _readInitialHandshakeResponse(PacketBuffer buffer) {
+  Packet _readInitialHandshakeResponseInternal(PacketBuffer buffer) {
     if (_isErrorPacket(buffer)) {
       return _readErrorPacket(buffer);
     } else {
@@ -157,7 +189,7 @@ class PacketReader {
     }
   }
 
-  Packet _readCommandQueryResponse(PacketBuffer buffer) {
+  Packet _readCommandQueryResponseInternal(PacketBuffer buffer) {
     if (_isOkPacket(buffer)) {
       return _readOkPacket(buffer);
     } else if (_isErrorPacket(buffer)) {
@@ -169,7 +201,7 @@ class PacketReader {
     }
   }
 
-  Packet _readResultSetColumnDefinitionResponse(PacketBuffer buffer) {
+  Packet _readResultSetColumnDefinitionResponseInternal(PacketBuffer buffer) {
     if (_isErrorPacket(buffer)) {
       return _readErrorPacket(buffer);
     } else if (_isEOFPacket(buffer)) {
@@ -179,7 +211,7 @@ class PacketReader {
     }
   }
 
-  Packet _readResultSetRowResponse(PacketBuffer buffer) {
+  Packet _readResultSetRowResponseInternal(PacketBuffer buffer) {
     if (_isErrorPacket(buffer)) {
       return _readErrorPacket(buffer);
     } else if (_isEOFPacket(buffer)) {
@@ -293,16 +325,19 @@ class PacketReader {
       PacketBuffer buffer) {
     var packet = new ResultSetRowResponsePacket();
 
-    packet.values = [];
+    // packet.values = [];
 
     while (!buffer.payload.isAllRead) {
       var value;
-      try {
-        value = buffer.payload.readLengthEncodedString();
-      } on NullError {
+      if (buffer.payload.first != PREFIX_NULL) {
+        // value = buffer.payload.readLengthEncodedString();
+        var fieldLength = buffer.payload.readLengthEncodedInteger();
+        buffer.payload.skipBytes(fieldLength);
+      } else {
+        buffer.payload.skipByte();
         value = null;
       }
-      packet.values.add(value);
+      // packet.values.add(value);
     }
 
     return packet;
@@ -409,12 +444,21 @@ class PacketReader {
     }
   }
 
-  Future<Packet> _readSyncPacket(Packet reader(PacketBuffer buffer)) {
+  Future<Packet> _readSyncPacketFromBuffer(Packet reader(PacketBuffer buffer)) {
     var value = _readPacketBuffer();
     if (value is Future) {
       return value.then((buffer) => reader(buffer));
     } else {
       return new Future.value(reader(value));
+    }
+  }
+
+  _readPacketFromBuffer(Packet reader(PacketBuffer buffer)) {
+    var value = _readPacketBuffer();
+    if (value is Future) {
+      return value.then((buffer) => reader(buffer));
+    } else {
+      return reader(value);
     }
   }
 

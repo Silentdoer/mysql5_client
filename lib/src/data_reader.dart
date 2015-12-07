@@ -20,7 +20,7 @@ class DataReader {
     this._stream.listen(_onData);
   }
 
-  Future<ReaderBuffer> readBuffer(int length) async {
+  Future<ReaderBuffer> readBuffer(int length) {
     var value = _readBuffer(new ReaderBuffer(length));
     return value is Future ? value : new Future.value(value);
   }

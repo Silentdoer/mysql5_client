@@ -26,35 +26,26 @@ class DataReader {
   }
 
   _readBuffer(ReaderBuffer buffer) {
-    var value = _readChunk((chunk) => buffer.loadChunk(chunk));
-    return value is Future
-        ? value.then((_) => _readBufferInternal(buffer))
-        : _readBufferInternal(buffer);
+    if (_chunks.isEmpty) {
+      _dataReadyCompleter = new Completer();
+
+      return _dataReadyCompleter.future
+          .then((_) => _readBufferInternal(buffer));
+    } else {
+      return _readBufferInternal(buffer);
+    }
   }
 
   _readBufferInternal(ReaderBuffer buffer) {
-    return buffer.isAllLoaded ? buffer : _readBuffer(buffer);
-  }
-
-  _readChunk(chunkReader(DataChunk chunk)) {
-    if (_chunks.isEmpty) {
-      _dataReadyCompleter = new Completer();
-      return _dataReadyCompleter.future
-          .then((_) => _readChunkInternal(chunkReader));
-    } else {
-      return _readChunkInternal(chunkReader);
-    }
-  }
-
-  _readChunkInternal(chunkReader(DataChunk chunk)) {
     var chunk = _chunks.first;
-    try {
-      return chunkReader(chunk);
-    } finally {
-      if (chunk.isEmpty) {
-        _chunks.removeFirst();
-      }
+
+    buffer.loadChunk(chunk);
+
+    if (chunk.isEmpty) {
+      _chunks.removeFirst();
     }
+
+    return buffer.isAllLoaded ? buffer : _readBuffer(buffer);
   }
 
   void _onData(List<int> data) {

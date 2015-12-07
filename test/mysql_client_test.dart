@@ -22,8 +22,8 @@ Future test1() async {
     await connection.connect("localhost", 3306, "root", "mysql", "test");
 
     var sw = new Stopwatch()..start();
-    for (var i = 0; i < 1; i++) {
-      await connection.executeQuery("SELECT * FROM people LIMIT 10");
+    for (var i = 0; i < 10; i++) {
+      await connection.executeQuery("SELECT * FROM people");
     }
     print("testMySql: ${sw.elapsedMilliseconds} ms");
   } finally {

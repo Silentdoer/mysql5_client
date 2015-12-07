@@ -6,32 +6,12 @@ library mysql_client.data_range;
 import "dart:convert";
 
 class DataRange {
-  static final List<DataRange> _POOL = new List();
-
   List<int> _data;
   int _start;
   int _length;
   bool _isPending;
 
-  factory DataRange(List<int> data, [int start = 0, int length]) {
-    var range = _POOL.isNotEmpty ? _POOL.removeLast() : new DataRange._();
-
-    range._initialize(data, start, length);
-
-    return range;
-  }
-
-  factory DataRange.pending(List<int> data, [int start = 0]) {
-    var range = _POOL.isNotEmpty ? _POOL.removeLast() : new DataRange._();
-
-    range._initializePending(data, start);
-
-    return range;
-  }
-
-  DataRange._();
-
-  void _initialize(List<int> data, int start, int length) {
+  DataRange(List<int> data, [int start = 0, int length]) {
     assert(data != null);
     assert(
         start == 0 || (data.isNotEmpty && start >= 0 && start < data.length));
@@ -43,7 +23,7 @@ class DataRange {
     this._length = length ?? this._data.length - this._start;
   }
 
-  void _initializePending(List<int> data, int start) {
+  DataRange.pending(List<int> data, [int start = 0]) {
     assert(data != null);
     assert(
         start == 0 || (data.isNotEmpty && start >= 0 && start < data.length));
@@ -52,15 +32,6 @@ class DataRange {
     this._start = start;
     this._isPending = true;
     this._length = this._data.length - this._start;
-  }
-
-  void deinitialize() {
-    _data = null;
-    _start = null;
-    _length = null;
-    _isPending = null;
-
-    _POOL.add(this);
   }
 
   bool get isEmpty => _length == 0;

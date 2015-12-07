@@ -109,23 +109,17 @@ class PacketReader {
     var headerBuffer = await _reader.readBuffer(4);
     var payloadLength = headerBuffer.readFixedLengthInteger(3);
     var sequenceId = headerBuffer.readOneLengthInteger();
-    headerBuffer.deinitialize();
 
     var buffer = await _reader.readBuffer(payloadLength);
-    try {
-      var header = buffer.checkByte();
-      if (_isOkHeader(header, payloadLength)) {
-        return _completeOkPacket(
-            new OkPacket(payloadLength, sequenceId), buffer);
-      } else if (_isErrorHeader(header, payloadLength)) {
-        throw new ResponseError(_completeErrorPacket(
-            new ErrorPacket(payloadLength, sequenceId), buffer));
-      } else {
-        throw new UnsupportedError(
-            "header: $header, payloadLength: $payloadLength");
-      }
-    } finally {
-      buffer.deinitialize();
+    var header = buffer.checkByte();
+    if (_isOkHeader(header, payloadLength)) {
+      return _completeOkPacket(new OkPacket(payloadLength, sequenceId), buffer);
+    } else if (_isErrorHeader(header, payloadLength)) {
+      throw new ResponseError(_completeErrorPacket(
+          new ErrorPacket(payloadLength, sequenceId), buffer));
+    } else {
+      throw new UnsupportedError(
+          "header: $header, payloadLength: $payloadLength");
     }
   }
 
@@ -133,20 +127,15 @@ class PacketReader {
     var headerBuffer = await _reader.readBuffer(4);
     var payloadLength = headerBuffer.readFixedLengthInteger(3);
     var sequenceId = headerBuffer.readOneLengthInteger();
-    headerBuffer.deinitialize();
 
     var buffer = await _reader.readBuffer(payloadLength);
-    try {
-      var header = buffer.checkByte();
-      if (_isErrorHeader(header, payloadLength)) {
-        throw new ResponseError(_completeErrorPacket(
-            new ErrorPacket(payloadLength, sequenceId), buffer));
-      } else {
-        return _completeInitialHandshakePacket(
-            new InitialHandshakePacket(payloadLength, sequenceId), buffer);
-      }
-    } finally {
-      buffer.deinitialize();
+    var header = buffer.checkByte();
+    if (_isErrorHeader(header, payloadLength)) {
+      throw new ResponseError(_completeErrorPacket(
+          new ErrorPacket(payloadLength, sequenceId), buffer));
+    } else {
+      return _completeInitialHandshakePacket(
+          new InitialHandshakePacket(payloadLength, sequenceId), buffer);
     }
   }
 
@@ -154,25 +143,18 @@ class PacketReader {
     var headerBuffer = await _reader.readBuffer(4);
     var payloadLength = headerBuffer.readFixedLengthInteger(3);
     var sequenceId = headerBuffer.readOneLengthInteger();
-    headerBuffer.deinitialize();
 
     var buffer = await _reader.readBuffer(payloadLength);
-    try {
-      var header = buffer.checkByte();
-      if (_isOkHeader(header, payloadLength)) {
-        return _completeOkPacket(
-            new OkPacket(payloadLength, sequenceId), buffer);
-      } else if (_isErrorHeader(header, payloadLength)) {
-        throw new ResponseError(_completeErrorPacket(
-            new ErrorPacket(payloadLength, sequenceId), buffer));
-      } else if (_isLocalInFileHeader(header, payloadLength)) {
-        throw new UnsupportedError("Protocol::LOCAL_INFILE_Data");
-      } else {
-        return await _completeResultSetPacket(
-            payloadLength, sequenceId, buffer);
-      }
-    } finally {
-      buffer.deinitialize();
+    var header = buffer.checkByte();
+    if (_isOkHeader(header, payloadLength)) {
+      return _completeOkPacket(new OkPacket(payloadLength, sequenceId), buffer);
+    } else if (_isErrorHeader(header, payloadLength)) {
+      throw new ResponseError(_completeErrorPacket(
+          new ErrorPacket(payloadLength, sequenceId), buffer));
+    } else if (_isLocalInFileHeader(header, payloadLength)) {
+      throw new UnsupportedError("Protocol::LOCAL_INFILE_Data");
+    } else {
+      return await _completeResultSetPacket(payloadLength, sequenceId, buffer);
     }
 
     // TODO migliorare la gestione del risultato
@@ -180,7 +162,6 @@ class PacketReader {
 
   Future<ResultSetPacket> _completeResultSetPacket(
       int payloadLength, int sequenceId, ReaderBuffer buffer) async {
-
     _readResultSetColumnCountResponsePacket(payloadLength, sequenceId, buffer);
 
     var columnCount = 3;
@@ -203,22 +184,14 @@ class PacketReader {
           // int<2>	status_flags	Status Flags
           var statusFlags = e.buffer.readFixedLengthInteger(2);
         }
-        e.buffer.deinitialize();
       } else {
-        e.buffer.deinitialize();
-
         rethrow;
       }
     } on UndefinedError catch (e) {
       if (e.buffer.isFirstByte) {
         // TODO Error packet
-
-        e.buffer.deinitialize();
-
         throw new UnsupportedError("IMPLEMENT STARTED ERROR PACKET");
       } else {
-        e.buffer.deinitialize();
-
         rethrow;
       }
     }
@@ -234,7 +207,6 @@ class PacketReader {
     var headerBuffer = await _reader.readBuffer(4);
     var payloadLength = headerBuffer.readFixedLengthInteger(3);
     var sequenceId = headerBuffer.readOneLengthInteger();
-    headerBuffer.deinitialize();
 
     var buffer = await _reader.readBuffer(payloadLength);
 
@@ -264,15 +236,12 @@ class PacketReader {
     var decimals = buffer.readOneLengthInteger();
     // 2              filler [00] [00]
     buffer.skipBytes(2);
-
-    buffer.deinitialize();
   }
 
   Future _readResultSetRowResponsePacket() async {
     var headerBuffer = await _reader.readBuffer(4);
     var payloadLength = headerBuffer.readFixedLengthInteger(3);
     var sequenceId = headerBuffer.readOneLengthInteger();
-    headerBuffer.deinitialize();
 
     var buffer = await _reader.readBuffer(payloadLength);
 
@@ -284,17 +253,14 @@ class PacketReader {
         value = null;
       }
 
-      print(value);
+      // print(value);
     }
-
-    buffer.deinitialize();
   }
 
   Future _readEOFResponsePacket() async {
     var headerBuffer = await _reader.readBuffer(4);
     var payloadLength = headerBuffer.readFixedLengthInteger(3);
     var sequenceId = headerBuffer.readOneLengthInteger();
-    headerBuffer.deinitialize();
 
     var buffer = await _reader.readBuffer(payloadLength);
 
@@ -311,8 +277,6 @@ class PacketReader {
       // int<2>	status_flags	Status Flags
       var statusFlags = buffer.readFixedLengthInteger(2);
     }
-
-    buffer.deinitialize();
   }
 
   bool _isOkHeader(int header, int payloadLength) {

@@ -25,41 +25,16 @@ class EOFError extends Error {
 }
 
 class ReaderBuffer {
-  static final List<ReaderBuffer> _POOL = new List();
-
   final List<DataRange> _dataRanges = new List();
 
   int _payloadLength;
   int _loadedCount;
   int _readCount;
 
-  factory ReaderBuffer(int payloadLength) {
-    var buffer = _POOL.isNotEmpty ? _POOL.removeLast() : new ReaderBuffer._();
-
-    buffer._initialize(payloadLength);
-
-    return buffer;
-  }
-
-  ReaderBuffer._() {
-    _loadedCount = 0;
-    _readCount = 0;
-  }
-
-  void _initialize(int payloadLength) {
+  ReaderBuffer(int payloadLength) {
     _payloadLength = payloadLength;
-  }
-
-  void deinitialize() {
-    for (var range in _dataRanges) {
-      range.deinitialize();
-    }
-    _dataRanges.clear();
-    _payloadLength = null;
     _loadedCount = 0;
     _readCount = 0;
-
-    _POOL.add(this);
   }
 
   bool get isAllLoaded => _loadLeftCount == 0;
@@ -87,18 +62,14 @@ class ReaderBuffer {
   }
 
   void skipBytes(int length) {
-    _readFixedLengthDataRange(length).deinitialize();
+    _readFixedLengthDataRange(length);
   }
 
   int readOneLengthInteger() => _readOneByte();
 
   int readFixedLengthInteger(int length) {
     var range = _readFixedLengthDataRange(length);
-    try {
-      return range.toInt();
-    } finally {
-      range.deinitialize();
-    }
+    return range.toInt();
   }
 
   int readLengthEncodedInteger() {
@@ -130,38 +101,22 @@ class ReaderBuffer {
 
   String readNulTerminatedString() {
     var range = _readUpToDataRange(NULL_TERMINATOR);
-    try {
-      return range.toString();
-    } finally {
-      range.deinitialize();
-    }
+    return range.toString();
   }
 
   String readNulTerminatedUTF8String() {
     var range = _readUpToDataRange(NULL_TERMINATOR);
-    try {
-      return range.toUTF8String();
-    } finally {
-      range.deinitialize();
-    }
+    return range.toUTF8String();
   }
 
   String readFixedLengthString(int length) {
     var range = _readFixedLengthDataRange(length);
-    try {
-      return range.toString();
-    } finally {
-      range.deinitialize();
-    }
+    return range.toString();
   }
 
   String readFixedLengthUTF8String(int length) {
     var range = _readFixedLengthDataRange(length);
-    try {
-      return range.toUTF8String();
-    } finally {
-      range.deinitialize();
-    }
+    return range.toUTF8String();
   }
 
   String readLengthEncodedString() =>
@@ -178,7 +133,7 @@ class ReaderBuffer {
   int _readOneByte() {
     var byte = _dataRanges[0].extractOneByte();
     if (_dataRanges[0].isEmpty) {
-      _dataRanges.removeAt(0).deinitialize();
+      _dataRanges.removeAt(0);
     }
     _readCount++;
     return byte;
@@ -187,7 +142,7 @@ class ReaderBuffer {
   DataRange _readFixedLengthDataRange(int length) {
     var range = _dataRanges[0].extractFixedLengthDataRange(length);
     if (_dataRanges[0].isEmpty) {
-      _dataRanges.removeAt(0).deinitialize();
+      _dataRanges.removeAt(0);
     }
 
     var leftLength = length - range.length;
@@ -197,10 +152,9 @@ class ReaderBuffer {
       data.setRange(0, range.length, range.data, range.start);
       var start = range.length;
       do {
-        range.deinitialize();
         range = _dataRanges[0].extractFixedLengthDataRange(leftLength);
         if (_dataRanges[0].isEmpty) {
-          _dataRanges.removeAt(0).deinitialize();
+          _dataRanges.removeAt(0);
         }
         var end = start + range.length;
         data.setRange(start, end, range.data, range.start);
@@ -208,7 +162,6 @@ class ReaderBuffer {
         leftLength -= range.length;
       } while (range.isPending);
 
-      range.deinitialize();
       range = new DataRange(data);
     }
     _readCount += range.length;
@@ -218,7 +171,7 @@ class ReaderBuffer {
   DataRange _readUpToDataRange(int terminator) {
     var range = _dataRanges[0].extractUpToDataRange(terminator);
     if (_dataRanges[0].isEmpty) {
-      _dataRanges.removeAt(0).deinitialize();
+      _dataRanges.removeAt(0);
     }
 
     if (range.isPending) {
@@ -226,16 +179,14 @@ class ReaderBuffer {
       var builder = new BytesBuilder();
       builder.add(range.data.sublist(range.start, range.start + range.length));
       do {
-        range.deinitialize();
         range = _dataRanges[0].extractUpToDataRange(terminator);
         if (_dataRanges[0].isEmpty) {
-          _dataRanges.removeAt(0).deinitialize();
+          _dataRanges.removeAt(0);
         }
         builder
             .add(range.data.sublist(range.start, range.start + range.length));
       } while (range.isPending);
 
-      range.deinitialize();
       range = new DataRange(builder.takeBytes());
     }
 

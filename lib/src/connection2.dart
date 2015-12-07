@@ -85,6 +85,8 @@ class ConnectionImpl implements Connection {
       throw new SqlError();
     }
 
+    print(response1.columnCount);
+
     while (true) {
       var response2 = await _reader.readResultSetColumnDefinitionResponse();
       if (response2 is! ResultSetColumnDefinitionResponsePacket) {

@@ -93,6 +93,8 @@ class InitialHandshakePacket extends Packet {
 }
 
 class ResultSetColumnCountResponsePacket extends Packet {
+  int columnCount;
+
   ResultSetColumnCountResponsePacket(int payloadLength, int sequenceId)
       : super(payloadLength, sequenceId);
 }
@@ -109,8 +111,10 @@ class ResultSetRowResponsePacket extends Packet {
 
 class PacketBuffer {
   final int sequenceId;
+
   final ReaderBuffer payload;
-  PacketBuffer(this.sequenceId, this.payload);
+
+  PacketBuffer(this.sequenceId, ReaderBuffer payload) : this.payload = payload;
 
   int get header => payload.first;
 
@@ -120,16 +124,26 @@ class PacketBuffer {
 class PacketReader {
   final DataReader _reader;
 
-  // ReaderBuffer _buffer;
-
   int serverCapabilityFlags;
   final int clientCapabilityFlags;
 
   PacketReader(this._reader, {this.clientCapabilityFlags: 0});
 
-  Future<Packet> readInitialHandshakeResponse() async {
-    var buffer = await _readPacketBuffer();
+  Future<Packet> readInitialHandshakeResponse() =>
+      _readSyncPacket(_readInitialHandshakeResponse);
 
+  Future<Packet> readCommandResponse() => _readSyncPacket(_readCommandResponse);
+
+  Future<Packet> readCommandQueryResponse() =>
+      _readSyncPacket(_readCommandQueryResponse);
+
+  Future<Packet> readResultSetColumnDefinitionResponse() =>
+      _readSyncPacket(_readResultSetColumnDefinitionResponse);
+
+  Future<Packet> readResultSetRowResponse() =>
+      _readSyncPacket(_readResultSetRowResponse);
+
+  Packet _readInitialHandshakeResponse(PacketBuffer buffer) {
     if (_isErrorPacket(buffer)) {
       return _readErrorPacket(buffer);
     } else {
@@ -137,9 +151,7 @@ class PacketReader {
     }
   }
 
-  Future<Packet> readCommandResponse() async {
-    var buffer = await _readPacketBuffer();
-
+  Packet _readCommandResponse(PacketBuffer buffer) {
     if (_isOkPacket(buffer)) {
       return _readOkPacket(buffer);
     } else if (_isErrorPacket(buffer)) {
@@ -149,9 +161,7 @@ class PacketReader {
     }
   }
 
-  Future<Packet> readCommandQueryResponse() async {
-    var buffer = await _readPacketBuffer();
-
+  Packet _readCommandQueryResponse(PacketBuffer buffer) {
     if (_isOkPacket(buffer)) {
       return _readOkPacket(buffer);
     } else if (_isErrorPacket(buffer)) {
@@ -163,9 +173,7 @@ class PacketReader {
     }
   }
 
-  Future<Packet> readResultSetColumnDefinitionResponse() async {
-    var buffer = await _readPacketBuffer();
-
+  Packet _readResultSetColumnDefinitionResponse(PacketBuffer buffer) {
     if (_isErrorPacket(buffer)) {
       return _readErrorPacket(buffer);
     } else if (_isEOFPacket(buffer)) {
@@ -175,9 +183,7 @@ class PacketReader {
     }
   }
 
-  Future<Packet> readResultSetRowResponse() async {
-    var buffer = await _readPacketBuffer();
-
+  Packet _readResultSetRowResponse(PacketBuffer buffer) {
     if (_isErrorPacket(buffer)) {
       return _readErrorPacket(buffer);
     } else if (_isEOFPacket(buffer)) {
@@ -187,39 +193,6 @@ class PacketReader {
     }
   }
 
-  Future<PacketBuffer> _readPacketBuffer() async {
-    var header = await _reader.readBuffer(4);
-    var payloadLength = header.readFixedLengthInteger(3);
-    var sequenceId = header.readOneLengthInteger();
-
-    var payload = await _reader.readBuffer(payloadLength);
-
-    return new PacketBuffer(sequenceId, payload);
-  }
-/*
-  readPacket(List<int> header, List<int> payload) {
-    var value = createBuffer2(header);
-    if (value is Future) {
-      return value.then((header) {
-        return readPacket2(header, payload);
-      });
-    } else {
-      return readPacket2(value, payload);
-    }
-  }
-
-  _readPacketBufferInternal(ReaderBuffer buffer) {
-    var payloadLength = _buffer.readFixedLengthInteger(3);
-    var sequenceId = _buffer.readOneLengthInteger();
-
-    var value = createBuffer2(payload);
-    if (value is Future) {
-      return value.then((payload) => new Packet(sequenceId, payload));
-    } else {
-      return new Packet(sequenceId, value);
-    }
-  }
-*/
   InitialHandshakePacket _readInitialHandshakePacket(PacketBuffer buffer) {
     var packet =
         new InitialHandshakePacket(buffer.payloadLength, buffer.sequenceId);
@@ -284,7 +257,7 @@ class PacketReader {
     var packet = new ResultSetColumnCountResponsePacket(
         buffer.payloadLength, buffer.sequenceId);
 
-    buffer.payload.skipByte();
+    packet.columnCount = buffer.payload.readOneLengthInteger();
 
     return packet;
   }
@@ -366,5 +339,36 @@ class PacketReader {
   void _completeSuccessResponsePacket(
       SuccessResponsePacket packet, PacketBuffer buffer) {
     buffer.payload.skipBytes(buffer.payloadLength);
+  }
+
+  Future<Packet> _readSyncPacket(Packet reader(PacketBuffer buffer)) {
+    var value = _readPacketBuffer();
+    if (value is Future) {
+      return value.then((buffer) => reader(buffer));
+    } else {
+      return new Future.value(reader(value));
+    }
+  }
+
+  _readPacketBuffer() {
+    var value = _reader.readBuffer(4);
+    if (value is Future) {
+      return value.then((header) => _readPacketBufferInternal(header));
+    } else {
+      return _readPacketBufferInternal(value);
+    }
+  }
+
+  _readPacketBufferInternal(ReaderBuffer header) {
+    var payloadLength = header.readFixedLengthInteger(3);
+    var sequenceId = header.readOneLengthInteger();
+
+    var value = _reader.readBuffer(payloadLength);
+
+    if (value is Future) {
+      return value.then((payload) => new PacketBuffer(sequenceId, payload));
+    } else {
+      return new PacketBuffer(sequenceId, value);
+    }
   }
 }

@@ -20,10 +20,7 @@ class DataReader {
     this._stream.listen(_onData);
   }
 
-  Future<ReaderBuffer> readBuffer(int length) {
-    var value = _readBuffer(new ReaderBuffer(length));
-    return value is Future ? value : new Future.value(value);
-  }
+  readBuffer(int length) => _readBuffer(new ReaderBuffer(length));
 
   _readBuffer(ReaderBuffer buffer) {
     if (_chunks.isEmpty) {

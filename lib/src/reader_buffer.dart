@@ -33,13 +33,11 @@ class ReaderBuffer {
     _readCount = 0;
   }
 
+  int get payloadLength => _payloadLength;
+
   bool get isAllLoaded => _loadLeftCount == 0;
 
   bool get isAllRead => _readLeftCount == 0;
-
-  bool get isFirstByte => _readCount == 1;
-
-  int get payloadLength => _payloadLength;
 
   int get _loadLeftCount => _payloadLength - _loadedCount;
 

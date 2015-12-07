@@ -53,6 +53,8 @@ class ConnectionImpl implements Connection {
       throw new SqlError();
     }
 
+    // il buffer deve essere letto per poter accedere alle proprietà
+    response1.readBuffer();
     _reader.serverCapabilityFlags = response1.serverCapabilityFlags;
     _serverCapabilityFlags = response1.serverCapabilityFlags;
 
@@ -85,8 +87,6 @@ class ConnectionImpl implements Connection {
       throw new SqlError();
     }
 
-    print(response1.columnCount);
-
     while (true) {
       var response2 = await _reader.readResultSetColumnDefinitionResponse();
       if (response2 is! ResultSetColumnDefinitionResponsePacket) {
@@ -99,6 +99,8 @@ class ConnectionImpl implements Connection {
       if (response3 is! ResultSetRowResponsePacket) {
         break;
       }
+
+      // response3.readBuffer();
     }
   }
 

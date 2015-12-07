@@ -28,10 +28,16 @@ class ResponseError extends Error {
 }
 
 abstract class Packet {
+  final PacketBuffer buffer;
   final int payloadLength;
   final int sequenceId;
 
-  Packet(this.payloadLength, this.sequenceId);
+  Packet.fromBuffer(PacketBuffer buffer)
+      : this.payloadLength = buffer.payloadLength,
+        this.sequenceId = buffer.sequenceId,
+        this.buffer = buffer;
+
+  void readBuffer();
 }
 
 abstract class GenericResponsePacket extends Packet {
@@ -39,8 +45,8 @@ abstract class GenericResponsePacket extends Packet {
   String info;
   String sessionStateChanges;
 
-  GenericResponsePacket(int payloadLength, int sequenceId)
-      : super(payloadLength, sequenceId);
+  GenericResponsePacket.fromBuffer(PacketBuffer buffer)
+      : super.fromBuffer(buffer);
 }
 
 abstract class SuccessResponsePacket extends GenericResponsePacket {
@@ -49,18 +55,31 @@ abstract class SuccessResponsePacket extends GenericResponsePacket {
   int statusFlags;
   int warnings;
 
-  SuccessResponsePacket(int payloadLength, int sequenceId)
-      : super(payloadLength, sequenceId);
+  SuccessResponsePacket.fromBuffer(PacketBuffer buffer)
+      : super.fromBuffer(buffer);
+
+  void readBuffer() {
+    buffer.payload.skipBytes(buffer.payloadLength);
+  }
 }
 
 class OkPacket extends SuccessResponsePacket {
-  OkPacket(int payloadLength, int sequenceId)
-      : super(payloadLength, sequenceId);
+  OkPacket.fromBuffer(PacketBuffer buffer) : super.fromBuffer(buffer);
 }
 
 class EOFPacket extends SuccessResponsePacket {
-  EOFPacket(int payloadLength, int sequenceId)
-      : super(payloadLength, sequenceId);
+  EOFPacket.fromBuffer(PacketBuffer buffer) : super.fromBuffer(buffer);
+
+  void readBuffer() {
+    // check CLIENT_DEPRECATE_EOF flag
+    bool isEOFDeprecated = false;
+
+    if (isEOFDeprecated) {
+      super.readBuffer();
+    } else {
+      buffer.payload.skipBytes(buffer.payloadLength);
+    }
+  }
 }
 
 class ErrorPacket extends GenericResponsePacket {
@@ -69,8 +88,11 @@ class ErrorPacket extends GenericResponsePacket {
   String sqlState;
   String errorMessage;
 
-  ErrorPacket(int payloadLength, int sequenceId)
-      : super(payloadLength, sequenceId);
+  ErrorPacket.fromBuffer(PacketBuffer buffer) : super.fromBuffer(buffer);
+
+  void readBuffer() {
+    buffer.payload.skipBytes(buffer.payloadLength);
+  }
 }
 
 class InitialHandshakePacket extends Packet {
@@ -88,25 +110,99 @@ class InitialHandshakePacket extends Packet {
   String authPluginData;
   String authPluginName;
 
-  InitialHandshakePacket(int payloadLength, int sequenceId)
-      : super(payloadLength, sequenceId);
+  InitialHandshakePacket.fromBuffer(PacketBuffer buffer)
+      : super.fromBuffer(buffer);
+
+  void readBuffer() {
+    var _buffer = this.buffer.payload;
+
+    // 1              [0a] protocol version
+    this.protocolVersion = _buffer.readOneLengthInteger();
+    // string[NUL]    server version
+    this.serverVersion = _buffer.readNulTerminatedString();
+    // 4              connection id
+    this.connectionId = _buffer.readFixedLengthInteger(4);
+    // string[8]      auth-plugin-data-part-1
+    this.authPluginDataPart1 = _buffer.readFixedLengthString(8);
+    // 1              [00] filler
+    _buffer.skipByte();
+    // 2              capability flags (lower 2 bytes)
+    this.capabilityFlags1 = _buffer.readFixedLengthInteger(2);
+    // if more data in the packet:
+    if (!_buffer.isAllRead) {
+      // 1              character set
+      this.characterSet = _buffer.readOneLengthInteger();
+      // 2              status flags
+      this.statusFlags = _buffer.readFixedLengthInteger(2);
+      // 2              capability flags (upper 2 bytes)
+      this.capabilityFlags2 = _buffer.readFixedLengthInteger(2);
+      this.serverCapabilityFlags =
+          this.capabilityFlags1 | (this.capabilityFlags2 << 16);
+      // if capabilities & CLIENT_PLUGIN_AUTH {
+      if (this.serverCapabilityFlags & CLIENT_PLUGIN_AUTH != 0) {
+        // 1              length of auth-plugin-data
+        this.authPluginDataLength = _buffer.readOneLengthInteger();
+      } else {
+        // 1              [00]
+        _buffer.skipByte();
+        this.authPluginDataLength = 0;
+      }
+      // string[10]     reserved (all [00])
+      _buffer.skipBytes(10);
+      // if capabilities & CLIENT_SECURE_CONNECTION {
+      if (this.serverCapabilityFlags & CLIENT_SECURE_CONNECTION != 0) {
+        // string[$len]   auth-plugin-data-part-2 ($len=MAX(13, length of auth-plugin-data - 8))
+        var len = max(this.authPluginDataLength - 8, 13);
+        this.authPluginDataPart2 = _buffer.readFixedLengthString(len);
+      } else {
+        this.authPluginDataPart2 = "";
+      }
+      this.authPluginData =
+          "${this.authPluginDataPart1}${this.authPluginDataPart2}"
+              .substring(0, this.authPluginDataLength - 1);
+      // if capabilities & CLIENT_PLUGIN_AUTH {
+      if (this.serverCapabilityFlags & CLIENT_PLUGIN_AUTH != 0) {
+        // string[NUL]    auth-plugin name
+        this.authPluginName = _buffer.readNulTerminatedString();
+      }
+    }
+  }
 }
 
 class ResultSetColumnCountResponsePacket extends Packet {
   int columnCount;
 
-  ResultSetColumnCountResponsePacket(int payloadLength, int sequenceId)
-      : super(payloadLength, sequenceId);
+  ResultSetColumnCountResponsePacket.fromBuffer(PacketBuffer buffer)
+      : super.fromBuffer(buffer);
+
+  void readBuffer() {
+    this.columnCount = buffer.payload.readOneLengthInteger();
+  }
 }
 
 class ResultSetColumnDefinitionResponsePacket extends Packet {
-  ResultSetColumnDefinitionResponsePacket(int payloadLength, int sequenceId)
-      : super(payloadLength, sequenceId);
+  ResultSetColumnDefinitionResponsePacket.fromBuffer(PacketBuffer buffer)
+      : super.fromBuffer(buffer);
+
+  void readBuffer() {
+    buffer.payload.skipBytes(buffer.payloadLength);
+  }
 }
 
 class ResultSetRowResponsePacket extends Packet {
-  ResultSetRowResponsePacket(int payloadLength, int sequenceId)
-      : super(payloadLength, sequenceId);
+  ResultSetRowResponsePacket.fromBuffer(PacketBuffer buffer)
+      : super.fromBuffer(buffer);
+
+  void readBuffer() {
+    while (!buffer.payload.isAllRead) {
+      var value;
+      try {
+        value = buffer.payload.readLengthEncodedString();
+      } on NullError {
+        value = null;
+      }
+    }
+  }
 }
 
 class PacketBuffer {
@@ -193,153 +289,39 @@ class PacketReader {
     }
   }
 
-  InitialHandshakePacket _readInitialHandshakePacket(PacketBuffer buffer) {
-    var packet =
-        new InitialHandshakePacket(buffer.payloadLength, buffer.sequenceId);
-
-    var _buffer = buffer.payload;
-
-    // 1              [0a] protocol version
-    packet.protocolVersion = _buffer.readOneLengthInteger();
-    // string[NUL]    server version
-    packet.serverVersion = _buffer.readNulTerminatedString();
-    // 4              connection id
-    packet.connectionId = _buffer.readFixedLengthInteger(4);
-    // string[8]      auth-plugin-data-part-1
-    packet.authPluginDataPart1 = _buffer.readFixedLengthString(8);
-    // 1              [00] filler
-    _buffer.skipByte();
-    // 2              capability flags (lower 2 bytes)
-    packet.capabilityFlags1 = _buffer.readFixedLengthInteger(2);
-    // if more data in the packet:
-    if (!_buffer.isAllRead) {
-      // 1              character set
-      packet.characterSet = _buffer.readOneLengthInteger();
-      // 2              status flags
-      packet.statusFlags = _buffer.readFixedLengthInteger(2);
-      // 2              capability flags (upper 2 bytes)
-      packet.capabilityFlags2 = _buffer.readFixedLengthInteger(2);
-      packet.serverCapabilityFlags =
-          packet.capabilityFlags1 | (packet.capabilityFlags2 << 16);
-      // if capabilities & CLIENT_PLUGIN_AUTH {
-      if (packet.serverCapabilityFlags & CLIENT_PLUGIN_AUTH != 0) {
-        // 1              length of auth-plugin-data
-        packet.authPluginDataLength = _buffer.readOneLengthInteger();
-      } else {
-        // 1              [00]
-        _buffer.skipByte();
-        packet.authPluginDataLength = 0;
-      }
-      // string[10]     reserved (all [00])
-      _buffer.skipBytes(10);
-      // if capabilities & CLIENT_SECURE_CONNECTION {
-      if (packet.serverCapabilityFlags & CLIENT_SECURE_CONNECTION != 0) {
-        // string[$len]   auth-plugin-data-part-2 ($len=MAX(13, length of auth-plugin-data - 8))
-        var len = max(packet.authPluginDataLength - 8, 13);
-        packet.authPluginDataPart2 = _buffer.readFixedLengthString(len);
-      } else {
-        packet.authPluginDataPart2 = "";
-      }
-      packet.authPluginData =
-          "${packet.authPluginDataPart1}${packet.authPluginDataPart2}"
-              .substring(0, packet.authPluginDataLength - 1);
-      // if capabilities & CLIENT_PLUGIN_AUTH {
-      if (packet.serverCapabilityFlags & CLIENT_PLUGIN_AUTH != 0) {
-        // string[NUL]    auth-plugin name
-        packet.authPluginName = _buffer.readNulTerminatedString();
-      }
-    }
-    return packet;
-  }
+  InitialHandshakePacket _readInitialHandshakePacket(PacketBuffer buffer) =>
+      new InitialHandshakePacket.fromBuffer(buffer);
 
   ResultSetColumnCountResponsePacket _readResultSetColumnCountResponsePacket(
-      PacketBuffer buffer) {
-    var packet = new ResultSetColumnCountResponsePacket(
-        buffer.payloadLength, buffer.sequenceId);
-
-    packet.columnCount = buffer.payload.readOneLengthInteger();
-
-    return packet;
-  }
+          PacketBuffer buffer) =>
+      new ResultSetColumnCountResponsePacket.fromBuffer(buffer);
 
   ResultSetColumnDefinitionResponsePacket _readResultSetColumnDefinitionResponsePacket(
-      PacketBuffer buffer) {
-    var packet = new ResultSetColumnDefinitionResponsePacket(
-        buffer.payloadLength, buffer.sequenceId);
-
-    buffer.payload.skipBytes(buffer.payloadLength);
-
-    return packet;
-  }
+          PacketBuffer buffer) =>
+      new ResultSetColumnDefinitionResponsePacket.fromBuffer(buffer);
 
   ResultSetRowResponsePacket _readResultSetRowResponsePacket(
-      PacketBuffer buffer) {
-    var packet =
-        new ResultSetRowResponsePacket(buffer.payloadLength, buffer.sequenceId);
+          PacketBuffer buffer) =>
+      new ResultSetRowResponsePacket.fromBuffer(buffer);
 
-    while (!buffer.payload.isAllRead) {
-      var value;
-      try {
-        value = buffer.payload.readLengthEncodedString();
-      } on NullError {
-        value = null;
-      }
-    }
+  bool _isOkPacket(PacketBuffer buffer) =>
+      buffer.header == 0 && buffer.payloadLength >= 7;
 
-    return packet;
-  }
+  bool _isEOFPacket(PacketBuffer buffer) =>
+      buffer.header == 0xfe && buffer.payloadLength < 9;
 
-  bool _isOkPacket(PacketBuffer buffer) {
-    return buffer.header == 0 && buffer.payloadLength >= 7;
-  }
+  bool _isErrorPacket(PacketBuffer buffer) => buffer.header == 0xff;
 
-  bool _isEOFPacket(PacketBuffer buffer) {
-    return buffer.header == 0xfe && buffer.payloadLength < 9;
-  }
+  bool _isLocalInFilePacket(PacketBuffer buffer) => buffer.header == 0xfb;
 
-  bool _isErrorPacket(PacketBuffer buffer) {
-    return buffer.header == 0xff;
-  }
+  OkPacket _readOkPacket(PacketBuffer buffer) =>
+      new OkPacket.fromBuffer(buffer);
 
-  bool _isLocalInFilePacket(PacketBuffer buffer) {
-    return buffer.header == 0xfb;
-  }
+  ErrorPacket _readErrorPacket(PacketBuffer buffer) =>
+      new ErrorPacket(buffer.payloadLength, buffer.sequenceId);
 
-  OkPacket _readOkPacket(PacketBuffer buffer) {
-    var packet = new OkPacket(buffer.payloadLength, buffer.sequenceId);
-
-    _completeSuccessResponsePacket(packet, buffer);
-
-    return packet;
-  }
-
-  ErrorPacket _readErrorPacket(PacketBuffer buffer) {
-    var packet = new ErrorPacket(buffer.payloadLength, buffer.sequenceId);
-
-    buffer.payload.skipBytes(buffer.payloadLength);
-
-    return packet;
-  }
-
-  EOFPacket _readEOFPacket(PacketBuffer buffer) {
-    var packet = new EOFPacket(buffer.payloadLength, buffer.sequenceId);
-
-    // check CLIENT_DEPRECATE_EOF flag
-    bool isEOFDeprecated = false;
-
-    if (isEOFDeprecated) {
-      _completeSuccessResponsePacket(packet, buffer);
-    } else {
-      buffer.payload.skipBytes(packet.payloadLength);
-    }
-
-    return packet;
-  }
-
-  void _completeSuccessResponsePacket(
-      SuccessResponsePacket packet, PacketBuffer buffer) {
-    buffer.payload.skipBytes(buffer.payloadLength);
-  }
+  EOFPacket _readEOFPacket(PacketBuffer buffer) =>
+      new EOFPacket.fromBuffer(buffer);
 
   Future<Packet> _readSyncPacket(Packet reader(PacketBuffer buffer)) {
     var value = _readPacketBuffer();

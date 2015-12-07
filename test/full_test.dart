@@ -9,12 +9,12 @@ import "package:sqljocky/sqljocky.dart";
 import 'package:mysql_client/mysql_client.dart';
 
 const SIMPLE_INSERTS = 1000;
-const SIMPLE_SELECTS = 1000;
+const SIMPLE_SELECTS = 100;
 
 // sudo ngrep -x -q -d lo0 '' 'port 3306'
 
 Future main() async {
-  // await new SqlJockySpeedTest().run();
+  await new SqlJockySpeedTest().run();
 
   await new MySqlClientSpeedTest().run();
 }
@@ -88,10 +88,9 @@ abstract class SpeedTest {
 
   void logTime(String operation, Stopwatch sw) {
     var time = sw.elapsedMicroseconds;
-    var seconds = time / 1000000;
-    print("$operation took: ${seconds} s");
+    var seconds = time / 1000;
+    print("$operation took: ${seconds} ms");
   }
-
 }
 
 class MySqlClientSpeedTest extends SpeedTest {

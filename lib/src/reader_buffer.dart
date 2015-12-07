@@ -8,19 +8,15 @@ import "data_range.dart";
 import "data_commons.dart";
 import 'dart:io';
 
+class NullError extends Error {
+  String toString() => "Null value";
+}
+
 class UndefinedError extends Error {
-  final ReaderBuffer buffer;
-
-  UndefinedError(this.buffer);
-
   String toString() => "Undefined value";
 }
 
 class EOFError extends Error {
-  final ReaderBuffer buffer;
-
-  EOFError(this.buffer);
-
   String toString() => "EOF value";
 }
 
@@ -86,13 +82,13 @@ class ReaderBuffer {
         if (_readLeftCount >= 8) {
           bytesLength = 9;
         } else {
-          throw new EOFError(this);
+          throw new EOFError();
         }
         break;
       case PREFIX_NULL:
         throw new NullError();
       case PREFIX_UNDEFINED:
-        throw new UndefinedError(this);
+        throw new UndefinedError();
       default:
         return firstByte;
     }

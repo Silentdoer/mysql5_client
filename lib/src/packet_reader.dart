@@ -100,23 +100,25 @@ class ResultSetPacket extends Packet {
 class PacketReader {
   final DataReader _reader;
 
+  ReaderBuffer _buffer;
+
   int serverCapabilityFlags;
   final int clientCapabilityFlags;
 
   PacketReader(this._reader, {this.clientCapabilityFlags: 0});
 
   Future<GenericResponsePacket> readCommandResponsePacket() async {
-    var headerBuffer = await _reader.readBuffer(4);
-    var payloadLength = headerBuffer.readFixedLengthInteger(3);
-    var sequenceId = headerBuffer.readOneLengthInteger();
+    _buffer = await _reader.readBuffer(4);
+    var payloadLength = _buffer.readFixedLengthInteger(3);
+    var sequenceId = _buffer.readOneLengthInteger();
 
-    var buffer = await _reader.readBuffer(payloadLength);
-    var header = buffer.checkByte();
+    _buffer = await _reader.readBuffer(payloadLength);
+    var header = _buffer.checkByte();
     if (_isOkHeader(header, payloadLength)) {
-      return _completeOkPacket(new OkPacket(payloadLength, sequenceId), buffer);
+      return _completeOkPacket(new OkPacket(payloadLength, sequenceId));
     } else if (_isErrorHeader(header, payloadLength)) {
       throw new ResponseError(_completeErrorPacket(
-          new ErrorPacket(payloadLength, sequenceId), buffer));
+          new ErrorPacket(payloadLength, sequenceId)));
     } else {
       throw new UnsupportedError(
           "header: $header, payloadLength: $payloadLength");
@@ -124,45 +126,44 @@ class PacketReader {
   }
 
   Future<InitialHandshakePacket> readInitialHandshakePacket() async {
-    var headerBuffer = await _reader.readBuffer(4);
-    var payloadLength = headerBuffer.readFixedLengthInteger(3);
-    var sequenceId = headerBuffer.readOneLengthInteger();
+    _buffer = await _reader.readBuffer(4);
+    var payloadLength = _buffer.readFixedLengthInteger(3);
+    var sequenceId = _buffer.readOneLengthInteger();
 
-    var buffer = await _reader.readBuffer(payloadLength);
-    var header = buffer.checkByte();
+    _buffer = await _reader.readBuffer(payloadLength);
+    var header = _buffer.checkByte();
     if (_isErrorHeader(header, payloadLength)) {
       throw new ResponseError(_completeErrorPacket(
-          new ErrorPacket(payloadLength, sequenceId), buffer));
+          new ErrorPacket(payloadLength, sequenceId)));
     } else {
       return _completeInitialHandshakePacket(
-          new InitialHandshakePacket(payloadLength, sequenceId), buffer);
+          new InitialHandshakePacket(payloadLength, sequenceId));
     }
   }
 
   Future readCommandQueryResponsePacket() async {
-    var headerBuffer = await _reader.readBuffer(4);
-    var payloadLength = headerBuffer.readFixedLengthInteger(3);
-    var sequenceId = headerBuffer.readOneLengthInteger();
+    _buffer = await _reader.readBuffer(4);
+    var payloadLength = _buffer.readFixedLengthInteger(3);
+    var sequenceId = _buffer.readOneLengthInteger();
 
-    var buffer = await _reader.readBuffer(payloadLength);
-    var header = buffer.checkByte();
+    _buffer = await _reader.readBuffer(payloadLength);
+    var header = _buffer.checkByte();
     if (_isOkHeader(header, payloadLength)) {
-      return _completeOkPacket(new OkPacket(payloadLength, sequenceId), buffer);
+      return _completeOkPacket(new OkPacket(payloadLength, sequenceId));
     } else if (_isErrorHeader(header, payloadLength)) {
       throw new ResponseError(_completeErrorPacket(
-          new ErrorPacket(payloadLength, sequenceId), buffer));
+          new ErrorPacket(payloadLength, sequenceId)));
     } else if (_isLocalInFileHeader(header, payloadLength)) {
       throw new UnsupportedError("Protocol::LOCAL_INFILE_Data");
     } else {
-      return await _completeResultSetPacket(payloadLength, sequenceId, buffer);
+      return await _completeResultSetPacket(payloadLength, sequenceId);
     }
-
-    // TODO migliorare la gestione del risultato
   }
 
   Future<ResultSetPacket> _completeResultSetPacket(
-      int payloadLength, int sequenceId, ReaderBuffer buffer) async {
-    _readResultSetColumnCountResponsePacket(payloadLength, sequenceId, buffer);
+      int payloadLength, int sequenceId) async {
+
+    _readResultSetColumnCountResponsePacket(payloadLength, sequenceId);
 
     var columnCount = 3;
     for (var i = 0; i < columnCount; i++) {
@@ -174,21 +175,21 @@ class PacketReader {
       while (true) {
         await _readResultSetRowResponsePacket();
       }
-    } on EOFError catch (e) {
-      if (e.buffer.isFirstByte) {
+    } on EOFError {
+      if (_buffer.isFirstByte) {
         // EOF packet
         // if capabilities & CLIENT_PROTOCOL_41 {
         if (serverCapabilityFlags & CLIENT_PROTOCOL_41 != 0) {
           // int<2>	warnings	number of warnings
-          var warnings = e.buffer.readFixedLengthInteger(2);
+          var warnings = _buffer.readFixedLengthInteger(2);
           // int<2>	status_flags	Status Flags
-          var statusFlags = e.buffer.readFixedLengthInteger(2);
+          var statusFlags = _buffer.readFixedLengthInteger(2);
         }
       } else {
         rethrow;
       }
-    } on UndefinedError catch (e) {
-      if (e.buffer.isFirstByte) {
+    } on UndefinedError {
+      if (_buffer.isFirstByte) {
         // TODO Error packet
         throw new UnsupportedError("IMPLEMENT STARTED ERROR PACKET");
       } else {
@@ -198,57 +199,57 @@ class PacketReader {
   }
 
   void _readResultSetColumnCountResponsePacket(
-      int payloadLength, int sequenceId, ReaderBuffer buffer) {
+      int payloadLength, int sequenceId) {
     // A packet containing a Protocol::LengthEncodedInteger column_count
-    var columnCount = buffer.readOneLengthInteger();
+    var columnCount = _buffer.readOneLengthInteger();
   }
 
   Future _readResultSetColumnDefinitionResponsePacket() async {
-    var headerBuffer = await _reader.readBuffer(4);
-    var payloadLength = headerBuffer.readFixedLengthInteger(3);
-    var sequenceId = headerBuffer.readOneLengthInteger();
+    _buffer = await _reader.readBuffer(4);
+    var payloadLength = _buffer.readFixedLengthInteger(3);
+    var sequenceId = _buffer.readOneLengthInteger();
 
-    var buffer = await _reader.readBuffer(payloadLength);
+    _buffer = await _reader.readBuffer(payloadLength);
 
     // lenenc_str     catalog
-    var catalog = buffer.readLengthEncodedString();
+    var catalog = _buffer.readLengthEncodedString();
     // lenenc_str     schema
-    var schema = buffer.readLengthEncodedString();
+    var schema = _buffer.readLengthEncodedString();
     // lenenc_str     table
-    var table = buffer.readLengthEncodedString();
+    var table = _buffer.readLengthEncodedString();
     // lenenc_str     org_table
-    var orgTable = buffer.readLengthEncodedString();
+    var orgTable = _buffer.readLengthEncodedString();
     // lenenc_str     name
-    var name = buffer.readLengthEncodedString();
+    var name = _buffer.readLengthEncodedString();
     // lenenc_str     org_name
-    var orgName = buffer.readLengthEncodedString();
+    var orgName = _buffer.readLengthEncodedString();
     // lenenc_int     length of fixed-length fields [0c]
-    var fieldsLength = buffer.readLengthEncodedInteger();
+    var fieldsLength = _buffer.readLengthEncodedInteger();
     // 2              character set
-    var characterSet = buffer.readFixedLengthInteger(2);
+    var characterSet = _buffer.readFixedLengthInteger(2);
     // 4              column length
-    var columnLength = buffer.readFixedLengthInteger(4);
+    var columnLength = _buffer.readFixedLengthInteger(4);
     // 1              type
-    var type = buffer.readOneLengthInteger();
+    var type = _buffer.readOneLengthInteger();
     // 2              flags
-    var flags = buffer.readFixedLengthInteger(2);
+    var flags = _buffer.readFixedLengthInteger(2);
     // 1              decimals
-    var decimals = buffer.readOneLengthInteger();
+    var decimals = _buffer.readOneLengthInteger();
     // 2              filler [00] [00]
-    buffer.skipBytes(2);
+    _buffer.skipBytes(2);
   }
 
   Future _readResultSetRowResponsePacket() async {
-    var headerBuffer = await _reader.readBuffer(4);
-    var payloadLength = headerBuffer.readFixedLengthInteger(3);
-    var sequenceId = headerBuffer.readOneLengthInteger();
+    _buffer = await _reader.readBuffer(4);
+    var payloadLength = _buffer.readFixedLengthInteger(3);
+    var sequenceId = _buffer.readOneLengthInteger();
 
-    var buffer = await _reader.readBuffer(payloadLength);
+    _buffer = await _reader.readBuffer(payloadLength);
 
-    while (!buffer.isAllRead) {
+    while (!_buffer.isAllRead) {
       var value;
       try {
-        value = buffer.readLengthEncodedString();
+        value = _buffer.readLengthEncodedString();
       } on NullError {
         value = null;
       }
@@ -258,14 +259,14 @@ class PacketReader {
   }
 
   Future _readEOFResponsePacket() async {
-    var headerBuffer = await _reader.readBuffer(4);
-    var payloadLength = headerBuffer.readFixedLengthInteger(3);
-    var sequenceId = headerBuffer.readOneLengthInteger();
+    _buffer = await _reader.readBuffer(4);
+    var payloadLength = _buffer.readFixedLengthInteger(3);
+    var sequenceId = _buffer.readOneLengthInteger();
 
-    var buffer = await _reader.readBuffer(payloadLength);
+    _buffer = await _reader.readBuffer(payloadLength);
 
     // int<1>	header	[00] or [fe] the OK packet header
-    var header = buffer.readOneLengthInteger();
+    var header = _buffer.readOneLengthInteger();
     if (header != 0xfe) {
       throw new StateError("$header != 0xfe");
     }
@@ -273,9 +274,9 @@ class PacketReader {
     // if capabilities & CLIENT_PROTOCOL_41 {
     if (serverCapabilityFlags & CLIENT_PROTOCOL_41 != 0) {
       // int<2>	warnings	number of warnings
-      var warnings = buffer.readFixedLengthInteger(2);
+      var warnings = _buffer.readFixedLengthInteger(2);
       // int<2>	status_flags	Status Flags
-      var statusFlags = buffer.readFixedLengthInteger(2);
+      var statusFlags = _buffer.readFixedLengthInteger(2);
     }
   }
 
@@ -295,64 +296,64 @@ class PacketReader {
     return header == 0xfb;
   }
 
-  OkPacket _completeOkPacket(OkPacket packet, ReaderBuffer buffer) {
-    return _completeSuccessResponsePacket(packet, buffer);
+  OkPacket _completeOkPacket(OkPacket packet) {
+    return _completeSuccessResponsePacket(packet);
   }
 
-  EOFPacket _completeEOFPacket(EOFPacket packet, ReaderBuffer buffer) {
+  EOFPacket _completeEOFPacket(EOFPacket packet) {
     // check CLIENT_DEPRECATE_EOF flag
     bool isEOFDeprecated = false;
 
     if (isEOFDeprecated) {
-      return _completeSuccessResponsePacket(packet, buffer);
+      return _completeSuccessResponsePacket(packet);
     } else {
       // if capabilities & CLIENT_PROTOCOL_41 {
       if (serverCapabilityFlags & CLIENT_PROTOCOL_41 != 0) {
         // int<2>	warnings	number of warnings
-        packet.warnings = buffer.readFixedLengthInteger(2);
+        packet.warnings = _buffer.readFixedLengthInteger(2);
         // int<2>	status_flags	Status Flags
-        packet.statusFlags = buffer.readFixedLengthInteger(2);
+        packet.statusFlags = _buffer.readFixedLengthInteger(2);
       }
     }
 
     return packet;
   }
 
-  ErrorPacket _completeErrorPacket(ErrorPacket packet, ReaderBuffer buffer) {
+  ErrorPacket _completeErrorPacket(ErrorPacket packet) {
     // int<2>	error_code	error-code
-    packet.errorCode = buffer.readFixedLengthInteger(2);
+    packet.errorCode = _buffer.readFixedLengthInteger(2);
     // if capabilities & CLIENT_PROTOCOL_41 {
     if (serverCapabilityFlags & CLIENT_PROTOCOL_41 != 0) {
       // string[1]	sql_state_marker	# marker of the SQL State
-      packet.sqlStateMarker = buffer.readFixedLengthString(1);
+      packet.sqlStateMarker = _buffer.readFixedLengthString(1);
       // string[5]	sql_state	SQL State
-      packet.sqlState = buffer.readFixedLengthString(5);
+      packet.sqlState = _buffer.readFixedLengthString(5);
     }
     // string<EOF>	error_message	human readable error message
-    packet.errorMessage = buffer.readRestOfPacketString();
+    packet.errorMessage = _buffer.readRestOfPacketString();
 
     return packet;
   }
 
   SuccessResponsePacket _completeSuccessResponsePacket(
-      SuccessResponsePacket packet, ReaderBuffer buffer) {
+      SuccessResponsePacket packet) {
     // int<1>	header	[00] or [fe] the OK packet header
-    packet.header = buffer.readOneLengthInteger();
+    packet.header = _buffer.readOneLengthInteger();
     // int<lenenc>	affected_rows	affected rows
-    packet.affectedRows = buffer.readLengthEncodedInteger();
+    packet.affectedRows = _buffer.readLengthEncodedInteger();
     // int<lenenc>	last_insert_id	last insert-id
-    packet.lastInsertId = buffer.readLengthEncodedInteger();
+    packet.lastInsertId = _buffer.readLengthEncodedInteger();
 
     // if capabilities & CLIENT_PROTOCOL_41 {
     if (serverCapabilityFlags & CLIENT_PROTOCOL_41 != 0) {
       // int<2>	status_flags	Status Flags
-      packet.statusFlags = buffer.readFixedLengthInteger(2);
+      packet.statusFlags = _buffer.readFixedLengthInteger(2);
       // int<2>	warnings	number of warnings
-      packet.warnings = buffer.readFixedLengthInteger(2);
+      packet.warnings = _buffer.readFixedLengthInteger(2);
       // } elseif capabilities & CLIENT_TRANSACTIONS {
     } else if (serverCapabilityFlags & CLIENT_TRANSACTIONS != 0) {
       // int<2>	status_flags	Status Flags
-      packet.statusFlags = buffer.readFixedLengthInteger(2);
+      packet.statusFlags = _buffer.readFixedLengthInteger(2);
     } else {
       packet.statusFlags = 0;
     }
@@ -360,66 +361,66 @@ class PacketReader {
     // if capabilities & CLIENT_SESSION_TRACK {
     if (serverCapabilityFlags & CLIENT_SESSION_TRACK != 0) {
       // string<lenenc>	info	human readable status information
-      if (!buffer.isAllRead) {
-        packet.info = buffer.readLengthEncodedString();
+      if (!_buffer.isAllRead) {
+        packet.info = _buffer.readLengthEncodedString();
       }
 
       // if status_flags & SERVER_SESSION_STATE_CHANGED {
       if (packet.statusFlags & SERVER_SESSION_STATE_CHANGED != 0) {
         // string<lenenc>	session_state_changes	session state info
-        if (!buffer.isAllRead) {
-          packet.sessionStateChanges = buffer.readLengthEncodedString();
+        if (!_buffer.isAllRead) {
+          packet.sessionStateChanges = _buffer.readLengthEncodedString();
         }
       }
       // } else {
     } else {
       // string<EOF>	info	human readable status information
-      packet.info = buffer.readRestOfPacketString();
+      packet.info = _buffer.readRestOfPacketString();
     }
 
     return packet;
   }
 
   InitialHandshakePacket _completeInitialHandshakePacket(
-      InitialHandshakePacket packet, ReaderBuffer buffer) {
+      InitialHandshakePacket packet) {
     // 1              [0a] protocol version
-    packet.protocolVersion = buffer.readOneLengthInteger();
+    packet.protocolVersion = _buffer.readOneLengthInteger();
     // string[NUL]    server version
-    packet.serverVersion = buffer.readNulTerminatedString();
+    packet.serverVersion = _buffer.readNulTerminatedString();
     // 4              connection id
-    packet.connectionId = buffer.readFixedLengthInteger(4);
+    packet.connectionId = _buffer.readFixedLengthInteger(4);
     // string[8]      auth-plugin-data-part-1
-    packet.authPluginDataPart1 = buffer.readFixedLengthString(8);
+    packet.authPluginDataPart1 = _buffer.readFixedLengthString(8);
     // 1              [00] filler
-    buffer.skipByte();
+    _buffer.skipByte();
     // 2              capability flags (lower 2 bytes)
-    packet.capabilityFlags1 = buffer.readFixedLengthInteger(2);
+    packet.capabilityFlags1 = _buffer.readFixedLengthInteger(2);
     // if more data in the packet:
-    if (!buffer.isAllRead) {
+    if (!_buffer.isAllRead) {
       // 1              character set
-      packet.characterSet = buffer.readOneLengthInteger();
+      packet.characterSet = _buffer.readOneLengthInteger();
       // 2              status flags
-      packet.statusFlags = buffer.readFixedLengthInteger(2);
+      packet.statusFlags = _buffer.readFixedLengthInteger(2);
       // 2              capability flags (upper 2 bytes)
-      packet.capabilityFlags2 = buffer.readFixedLengthInteger(2);
+      packet.capabilityFlags2 = _buffer.readFixedLengthInteger(2);
       packet.serverCapabilityFlags =
           packet.capabilityFlags1 | (packet.capabilityFlags2 << 16);
       // if capabilities & CLIENT_PLUGIN_AUTH {
       if (packet.serverCapabilityFlags & CLIENT_PLUGIN_AUTH != 0) {
         // 1              length of auth-plugin-data
-        packet.authPluginDataLength = buffer.readOneLengthInteger();
+        packet.authPluginDataLength = _buffer.readOneLengthInteger();
       } else {
         // 1              [00]
-        buffer.skipByte();
+        _buffer.skipByte();
         packet.authPluginDataLength = 0;
       }
       // string[10]     reserved (all [00])
-      buffer.skipBytes(10);
+      _buffer.skipBytes(10);
       // if capabilities & CLIENT_SECURE_CONNECTION {
       if (packet.serverCapabilityFlags & CLIENT_SECURE_CONNECTION != 0) {
         // string[$len]   auth-plugin-data-part-2 ($len=MAX(13, length of auth-plugin-data - 8))
         var len = max(packet.authPluginDataLength - 8, 13);
-        packet.authPluginDataPart2 = buffer.readFixedLengthString(len);
+        packet.authPluginDataPart2 = _buffer.readFixedLengthString(len);
       } else {
         packet.authPluginDataPart2 = "";
       }
@@ -429,7 +430,7 @@ class PacketReader {
       // if capabilities & CLIENT_PLUGIN_AUTH {
       if (packet.serverCapabilityFlags & CLIENT_PLUGIN_AUTH != 0) {
         // string[NUL]    auth-plugin name
-        packet.authPluginName = buffer.readNulTerminatedString();
+        packet.authPluginName = _buffer.readNulTerminatedString();
       }
     }
 

@@ -3,7 +3,6 @@
 
 library mysql_client.data_buffer;
 
-import "data_chunk.dart";
 import "data_range.dart";
 import "data_commons.dart";
 import 'dart:io';
@@ -21,33 +20,18 @@ class EOFError extends Error {
 }
 
 class ReaderBuffer {
-  final List<DataRange> _dataRanges = new List();
+  final List<DataRange> _dataRanges;
+  final int _payloadLength;
 
-  int _payloadLength;
-  int _loadedCount;
   int _readCount;
 
-  ReaderBuffer(int payloadLength) {
-    _payloadLength = payloadLength;
-    _loadedCount = 0;
+  ReaderBuffer(this._dataRanges, this._payloadLength) {
     _readCount = 0;
   }
 
   int get payloadLength => _payloadLength;
 
-  bool get isAllLoaded => _loadLeftCount == 0;
-
   bool get isAllRead => _readLeftCount == 0;
-
-  int get first => _dataRanges[0].first;
-
-  void loadChunk(DataChunk chunk) {
-    chunk.consume(_loadLeftCount, (data, index, available) {
-      var range = new DataRange(data, index, available);
-      _loadedCount += available;
-      _dataRanges.add(range);
-    });
-  }
 
   void skipByte() {
     _readOneByte();
@@ -56,6 +40,8 @@ class ReaderBuffer {
   void skipBytes(int length) {
     _readFixedLengthDataRange(length);
   }
+
+  int checkOneLengthInteger() => _dataRanges[0].checkOneByte();
 
   int readOneLengthInteger() => _readOneByte();
 
@@ -111,8 +97,6 @@ class ReaderBuffer {
 
   String readRestOfPacketUTF8String() =>
       readFixedLengthUTF8String(_readLeftCount);
-
-  int get _loadLeftCount => _payloadLength - _loadedCount;
 
   int get _readLeftCount => _payloadLength - _readCount;
 

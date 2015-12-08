@@ -1,13 +1,9 @@
 @startuml
 
-interface DataChunkConsumer {
-    void DataChunkConsumer(List<int> data, int index, int available)
-}
-
 class DataChunk {
     bool get isEmpty
     DataChunk(List<int> data)
-    void consume(int length, DataChunkConsumer consumer)
+    DataRange extractDataRange(int length)
 }
 
 class DataRange {
@@ -17,9 +13,9 @@ class DataRange {
     int get length
     bool get isPending
     List<int> get data
-    int get first
     DataRange(List<int> data, [int start = 0, int length])
     DataRange.pending(List<int> data, [int start = 0])
+    int checkOneByte()
     int extractOneByte()
     DataRange extractFixedLengthDataRange(int length)
     DataRange extractUpToDataRange(int terminator)
@@ -30,13 +26,11 @@ class DataRange {
 
 class ReaderBuffer {
     int get payloadLength
-    bool get isAllLoaded
     bool get isAllRead
-    int get first
-    ReaderBuffer(int payloadLength)
-    void loadChunk(DataChunk chunk)
+    ReaderBuffer(List<DataRange> dataRanges, int payloadLength)
     void skipByte()
     void skipBytes(int length)
+    int checkOneLengthInteger()
     int readOneLengthInteger()
     int readFixedLengthInteger(int length)
     int readLengthEncodedInteger()
@@ -54,5 +48,10 @@ class DataReader {
     DataReader(Stream<List<int>> stream)
     Future?<ReaderBuffer> readBuffer(int length)
 }
+
+DataChunk .> DataRange
+ReaderBuffer .> DataRange
+DataReader .> DataChunk
+DataReader .> ReaderBuffer
 
 @enduml

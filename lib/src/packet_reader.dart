@@ -101,7 +101,7 @@ class PacketBuffer {
 
   PacketBuffer(this.sequenceId, ReaderBuffer payload) : this.payload = payload;
 
-  int get header => payload.first;
+  int get header => payload.checkOneLengthInteger();
 
   int get payloadLength => this.payload.payloadLength;
 }

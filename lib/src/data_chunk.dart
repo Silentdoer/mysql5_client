@@ -4,8 +4,7 @@
 library mysql_client.data_chunk;
 
 import 'dart:math';
-
-typedef void DataChunkConsumer(List<int> data, int index, int available);
+import 'data_range.dart';
 
 class DataChunk {
   final List<int> _data;
@@ -16,9 +15,10 @@ class DataChunk {
 
   bool get isEmpty => _data.length - _index == 0;
 
-  void consume(int length, DataChunkConsumer consumer) {
+  DataRange extractDataRange(int length) {
     length = min(_data.length - _index, length);
-    consumer(_data, _index, length);
+    var range = new DataRange(_data, _index, length);
     _index += length;
+    return range;
   }
 }

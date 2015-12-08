@@ -41,7 +41,7 @@ class DataRange {
   bool get isPending => _isPending;
   List<int> get data => _data;
 
-  int get first => _data[_start];
+  int checkOneByte() => _data[_start];
 
   int extractOneByte() {
     assert(_length > 0);

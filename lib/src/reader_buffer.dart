@@ -3,6 +3,7 @@
 
 library mysql_client.data_buffer;
 
+import "data_chunk.dart";
 import "data_range.dart";
 import "data_commons.dart";
 import 'dart:io';
@@ -20,18 +21,18 @@ class EOFError extends Error {
 }
 
 class ReaderBuffer {
-  final List<DataRange> _dataRanges;
+  final List<DataChunk> _chunks;
   final int _payloadLength;
 
   int _readCount;
 
-  ReaderBuffer(this._dataRanges, this._payloadLength) {
+  ReaderBuffer(this._chunks, this._payloadLength) {
     _readCount = 0;
   }
 
   int get payloadLength => _payloadLength;
 
-  bool get isAllRead => _readLeftCount == 0;
+  bool get isAllRead => _payloadLength == _readCount;
 
   void skipByte() {
     _readOneByte();
@@ -41,7 +42,7 @@ class ReaderBuffer {
     _readFixedLengthDataRange(length);
   }
 
-  int checkOneLengthInteger() => _dataRanges[0].checkOneByte();
+  int checkOneLengthInteger() => _chunks[0].checkOneByte();
 
   int readOneLengthInteger() => _readOneByte();
 
@@ -59,7 +60,7 @@ class ReaderBuffer {
         bytesLength = 4;
         break;
       case PREFIX_INT_8:
-        if (_readLeftCount >= 8) {
+        if (_payloadLength - _readCount >= 8) {
           bytesLength = 9;
         } else {
           throw new EOFError();
@@ -93,38 +94,36 @@ class ReaderBuffer {
   String readLengthEncodedUTF8String() =>
       readFixedLengthUTF8String(readLengthEncodedInteger());
 
-  String readRestOfPacketString() => readFixedLengthString(_readLeftCount);
+  String readRestOfPacketString() => readFixedLengthString(_payloadLength - _readCount);
 
   String readRestOfPacketUTF8String() =>
-      readFixedLengthUTF8String(_readLeftCount);
-
-  int get _readLeftCount => _payloadLength - _readCount;
+      readFixedLengthUTF8String(_payloadLength - _readCount);
 
   int _readOneByte() {
-    var byte = _dataRanges[0].extractOneByte();
-    if (_dataRanges[0].isEmpty) {
-      _dataRanges.removeAt(0);
+    var byte = _chunks[0].extractOneByte();
+    if (_chunks[0].isEmpty) {
+      _chunks.removeAt(0);
     }
     _readCount++;
     return byte;
   }
 
   DataRange _readFixedLengthDataRange(int length) {
-    var range = _dataRanges[0].extractFixedLengthDataRange(length);
-    if (_dataRanges[0].isEmpty) {
-      _dataRanges.removeAt(0);
+    var range = _chunks[0].extractFixedLengthDataRange(length);
+    if (_chunks[0].isEmpty) {
+      _chunks.removeAt(0);
     }
 
-    var leftLength = length - range.length;
     if (range.isPending) {
       // devo costruire un range da zero
       var data = new List(length);
       data.setRange(0, range.length, range.data, range.start);
       var start = range.length;
+      var leftLength = length - range.length;
       do {
-        range = _dataRanges[0].extractFixedLengthDataRange(leftLength);
-        if (_dataRanges[0].isEmpty) {
-          _dataRanges.removeAt(0);
+        range = _chunks[0].extractFixedLengthDataRange(leftLength);
+        if (_chunks[0].isEmpty) {
+          _chunks.removeAt(0);
         }
         var end = start + range.length;
         data.setRange(start, end, range.data, range.start);
@@ -134,14 +133,15 @@ class ReaderBuffer {
 
       range = new DataRange(data);
     }
+
     _readCount += range.length;
     return range;
   }
 
   DataRange _readUpToDataRange(int terminator) {
-    var range = _dataRanges[0].extractUpToDataRange(terminator);
-    if (_dataRanges[0].isEmpty) {
-      _dataRanges.removeAt(0);
+    var range = _chunks[0].extractUpToDataRange(terminator);
+    if (_chunks[0].isEmpty) {
+      _chunks.removeAt(0);
     }
 
     if (range.isPending) {
@@ -149,9 +149,9 @@ class ReaderBuffer {
       var builder = new BytesBuilder();
       builder.add(range.data.sublist(range.start, range.start + range.length));
       do {
-        range = _dataRanges[0].extractUpToDataRange(terminator);
-        if (_dataRanges[0].isEmpty) {
-          _dataRanges.removeAt(0);
+        range = _chunks[0].extractUpToDataRange(terminator);
+        if (_chunks[0].isEmpty) {
+          _chunks.removeAt(0);
         }
         builder
             .add(range.data.sublist(range.start, range.start + range.length));
@@ -160,7 +160,7 @@ class ReaderBuffer {
       range = new DataRange(builder.takeBytes());
     }
 
-    // salto il terminatore
+    // skip the terminator
     _readCount += range.length + 1;
     return range;
   }

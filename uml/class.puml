@@ -2,23 +2,21 @@
 
 class DataChunk {
     bool get isEmpty
-    DataChunk(List<int> data)
-    DataRange extractDataRange(int length)
+    int get length
+    DataChunk(List<int> data, [int start = 0, int length])
+    int checkOneByte()
+    int extractOneByte()
+    DataChunk extractDataChunk(int length)
+    DataRange extractFixedLengthDataRange(int length)
+    DataRange extractUpToDataRange(int terminator)
 }
 
 class DataRange {
-    bool get isEmpty
-    int get start
-    int get end
+    List<int> get data
     int get length
     bool get isPending
-    List<int> get data
     DataRange(List<int> data, [int start = 0, int length])
     DataRange.pending(List<int> data, [int start = 0])
-    int checkOneByte()
-    int extractOneByte()
-    DataRange extractFixedLengthDataRange(int length)
-    DataRange extractUpToDataRange(int terminator)
     int toInt()
     String toString()
     String toUTF8String()
@@ -27,7 +25,7 @@ class DataRange {
 class ReaderBuffer {
     int get payloadLength
     bool get isAllRead
-    ReaderBuffer(List<DataRange> dataRanges, int payloadLength)
+    ReaderBuffer(List<DataChunk> chunks, int payloadLength)
     void skipByte()
     void skipBytes(int length)
     int checkOneLengthInteger()
@@ -51,6 +49,7 @@ class DataReader {
 
 DataChunk .> DataRange
 ReaderBuffer .> DataRange
+ReaderBuffer .> DataChunk
 DataReader .> DataChunk
 DataReader .> ReaderBuffer
 

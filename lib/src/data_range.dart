@@ -1,140 +1,74 @@
 // Copyright (c) 2015, <your name>. All rights reserved. Use of this source code
 // is governed by a BSD-style license that can be found in the LICENSE file.
 
-library mysql_client.data_range;
+library mysql_client.data_range2;
 
 import "dart:convert";
 
 class DataRange {
-  List<int> _data;
-  int _start;
+  final bool isPending;
+  final List<int> data;
+  final int start;
   int _length;
-  bool _isPending;
 
-  DataRange(List<int> data, [int start = 0, int length]) {
-    assert(data != null);
-    assert(
-        start == 0 || (data.isNotEmpty && start >= 0 && start < data.length));
-    assert(length == null || (length >= 0 && length <= data.length - start));
-
-    this._data = data;
-    this._start = start;
-    this._isPending = false;
-    this._length = length ?? this._data.length - this._start;
+  DataRange(this.data, [this.start = 0, this._length])
+      : this.isPending = false {
+    this._length ??= data.length - start;
   }
 
-  DataRange.pending(List<int> data, [int start = 0]) {
-    assert(data != null);
-    assert(
-        start == 0 || (data.isNotEmpty && start >= 0 && start < data.length));
-
-    this._data = data;
-    this._start = start;
-    this._isPending = true;
-    this._length = this._data.length - this._start;
+  DataRange.pending(this.data, [this.start = 0]) : this.isPending = true {
+    this._length = data.length - start;
   }
 
-  bool get isEmpty => _length == 0;
-  int get start => _start;
-  int get end => _start + _length;
   int get length => _length;
-  bool get isPending => _isPending;
-  List<int> get data => _data;
-
-  int checkOneByte() => _data[_start];
-
-  int extractOneByte() {
-    assert(_length > 0);
-
-    var value = _data[_start];
-    _start++;
-    _length--;
-    return value;
-  }
-
-  DataRange extractFixedLengthDataRange(int length) {
-    assert(length >= 0);
-
-    DataRange range = length <= _length
-        ? new DataRange(_data, _start, length)
-        : new DataRange.pending(_data, _start);
-    _start += range._length;
-    _length -= range._length;
-    return range;
-  }
-
-  DataRange extractUpToDataRange(int terminator) {
-    assert(terminator != null);
-
-    DataRange range;
-    int i = _data.indexOf(terminator, _start);
-    if (i != -1) {
-      range = new DataRange(_data, _start, i - _start);
-      // salto il terminatore
-      _start += range._length + 1;
-      _length -= range._length + 1;
-    } else {
-      range = new DataRange.pending(_data, _start);
-      _start += range._length;
-      _length -= range._length;
-    }
-    return range;
-  }
 
   int toInt() {
-    assert(_length > 0 && _length <= 8);
-
-    var i = _start;
+    var i = start;
     switch (_length) {
       case 1:
-        return _data[i++];
+        return data[i++];
       case 2:
-        return _data[i++] | _data[i++] << 8;
+        return data[i++] | data[i++] << 8;
       case 3:
-        return _data[i++] | _data[i++] << 8 | _data[i++] << 16;
+        return data[i++] | data[i++] << 8 | data[i++] << 16;
       case 4:
-        return _data[i++] |
-            _data[i++] << 8 |
-            _data[i++] << 16 |
-            _data[i++] << 24;
+        return data[i++] | data[i++] << 8 | data[i++] << 16 | data[i++] << 24;
       case 5:
-        return _data[i++] |
-            _data[i++] << 8 |
-            _data[i++] << 16 |
-            _data[i++] << 24 |
-            _data[i++] << 32;
+        return data[i++] |
+            data[i++] << 8 |
+            data[i++] << 16 |
+            data[i++] << 24 |
+            data[i++] << 32;
       case 6:
-        return _data[i++] |
-            _data[i++] << 8 |
-            _data[i++] << 16 |
-            _data[i++] << 24 |
-            _data[i++] << 32 |
-            _data[i++] << 40;
+        return data[i++] |
+            data[i++] << 8 |
+            data[i++] << 16 |
+            data[i++] << 24 |
+            data[i++] << 32 |
+            data[i++] << 40;
       case 7:
-        return _data[i++] |
-            _data[i++] << 8 |
-            _data[i++] << 16 |
-            _data[i++] << 24 |
-            _data[i++] << 32 |
-            _data[i++] << 40 |
-            _data[i++] << 48;
+        return data[i++] |
+            data[i++] << 8 |
+            data[i++] << 16 |
+            data[i++] << 24 |
+            data[i++] << 32 |
+            data[i++] << 40 |
+            data[i++] << 48;
       case 8:
-        return _data[i++] |
-            _data[i++] << 8 |
-            _data[i++] << 16 |
-            _data[i++] << 24 |
-            _data[i++] << 32 |
-            _data[i++] << 40 |
-            _data[i++] << 48 |
-            _data[i++] << 56;
+        return data[i++] |
+            data[i++] << 8 |
+            data[i++] << 16 |
+            data[i++] << 24 |
+            data[i++] << 32 |
+            data[i++] << 40 |
+            data[i++] << 48 |
+            data[i++] << 56;
     }
 
-    throw new UnsupportedError("${_data.length} length");
+    throw new UnsupportedError("${data.length} length");
   }
 
-  String toString() =>
-      new String.fromCharCodes(_data, _start, _start + _length);
+  String toString() => new String.fromCharCodes(data, start, start + _length);
 
-  String toUTF8String() =>
-      UTF8.decoder.convert(_data, _start, _start + _length);
+  String toUTF8String() => UTF8.decoder.convert(data, start, start + _length);
 }

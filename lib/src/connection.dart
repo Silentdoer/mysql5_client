@@ -95,15 +95,15 @@ class ConnectionImpl implements Connection {
         break;
       }
     }
-/*
+
     while (true) {
       var response3 = await _reader.readResultSetRowResponse();
       if (response3 is! ResultSetRowResponsePacket) {
         break;
       }
     }
-*/
-    await _reader.readResultSetRowResponses();
+
+    // await _reader.readResultSetRowResponses();
   }
 
   Future _writeHandshakeResponsePacket(String userName, String password,

@@ -44,7 +44,10 @@ class ReaderBuffer {
   int get _readLeftCount => _payloadLength - _readCount;
 
   String toString() {
-    return _dataRanges[0].data.sublist(_dataRanges[0].start, _dataRanges[0].end).toString();
+    return _dataRanges[0]
+        .data
+        .sublist(_dataRanges[0].start, _dataRanges[0].end)
+        .toString();
   }
 
   void loadChunk(DataChunk chunk) {

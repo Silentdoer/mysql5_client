@@ -9,12 +9,12 @@ import "package:sqljocky/sqljocky.dart";
 import 'package:mysql_client/mysql_client.dart';
 
 const SIMPLE_INSERTS = 1000;
-const SIMPLE_SELECTS = 100;
+const SIMPLE_SELECTS = 1000;
 
 // sudo ngrep -x -q -d lo0 '' 'port 3306'
 
 Future main() async {
-  await new SqlJockySpeedTest().run();
+  // await new SqlJockySpeedTest().run();
 
   await new MySqlClientSpeedTest().run();
 }
@@ -24,9 +24,9 @@ abstract class SpeedTest {
   Future executeQuery(String sql);
 
   Future run() async {
-    await dropTables();
-    await createTables();
-    await insertSimpleData();
+    // await dropTables();
+    // await createTables();
+    // await insertSimpleData();
     await selectSimpleData();
   }
 

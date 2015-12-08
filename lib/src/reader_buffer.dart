@@ -39,7 +39,7 @@ class ReaderBuffer {
   }
 
   void skipBytes(int length) {
-    _readFixedLengthDataRange(length);
+    readFixedLengthDataRange(length);
   }
 
   int checkOneLengthInteger() => _chunks[0].checkOneByte();
@@ -47,7 +47,7 @@ class ReaderBuffer {
   int readOneLengthInteger() => _readOneByte();
 
   int readFixedLengthInteger(int length) =>
-      _readFixedLengthDataRange(length).toInt();
+      readFixedLengthDataRange(length).toInt();
 
   int readLengthEncodedInteger() {
     var firstByte = _readOneByte();
@@ -76,17 +76,23 @@ class ReaderBuffer {
     return readFixedLengthInteger(bytesLength - 1);
   }
 
+  DataRange readNulTerminatedDataRange() =>
+      readUpToDataRange(NULL_TERMINATOR);
+
   String readNulTerminatedString() =>
-      _readUpToDataRange(NULL_TERMINATOR).toString();
+      readUpToDataRange(NULL_TERMINATOR).toString();
 
   String readNulTerminatedUTF8String() =>
-      _readUpToDataRange(NULL_TERMINATOR).toUTF8String();
+      readUpToDataRange(NULL_TERMINATOR).toUTF8String();
 
   String readFixedLengthString(int length) =>
-      _readFixedLengthDataRange(length).toString();
+      readFixedLengthDataRange(length).toString();
 
   String readFixedLengthUTF8String(int length) =>
-      _readFixedLengthDataRange(length).toUTF8String();
+      readFixedLengthDataRange(length).toUTF8String();
+
+  DataRange readLengthEncodedDataRange() =>
+      readFixedLengthDataRange(readLengthEncodedInteger());
 
   String readLengthEncodedString() =>
       readFixedLengthString(readLengthEncodedInteger());
@@ -94,21 +100,14 @@ class ReaderBuffer {
   String readLengthEncodedUTF8String() =>
       readFixedLengthUTF8String(readLengthEncodedInteger());
 
+  DataRange readRestOfPacketDataRange() => readFixedLengthDataRange(_payloadLength - _readCount);
+
   String readRestOfPacketString() => readFixedLengthString(_payloadLength - _readCount);
 
   String readRestOfPacketUTF8String() =>
       readFixedLengthUTF8String(_payloadLength - _readCount);
 
-  int _readOneByte() {
-    var byte = _chunks[0].extractOneByte();
-    if (_chunks[0].isEmpty) {
-      _chunks.removeAt(0);
-    }
-    _readCount++;
-    return byte;
-  }
-
-  DataRange _readFixedLengthDataRange(int length) {
+  DataRange readFixedLengthDataRange(int length) {
     var range = _chunks[0].extractFixedLengthDataRange(length);
     if (_chunks[0].isEmpty) {
       _chunks.removeAt(0);
@@ -138,7 +137,7 @@ class ReaderBuffer {
     return range;
   }
 
-  DataRange _readUpToDataRange(int terminator) {
+  DataRange readUpToDataRange(int terminator) {
     var range = _chunks[0].extractUpToDataRange(terminator);
     if (_chunks[0].isEmpty) {
       _chunks.removeAt(0);
@@ -163,5 +162,14 @@ class ReaderBuffer {
     // skip the terminator
     _readCount += range.length + 1;
     return range;
+  }
+
+  int _readOneByte() {
+    var byte = _chunks[0].extractOneByte();
+    if (_chunks[0].isEmpty) {
+      _chunks.removeAt(0);
+    }
+    _readCount++;
+    return byte;
   }
 }

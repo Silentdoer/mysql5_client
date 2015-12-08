@@ -325,19 +325,19 @@ class PacketReader {
       PacketBuffer buffer) {
     var packet = new ResultSetRowResponsePacket();
 
-    packet.values = [];
+    // packet.values = [];
 
     while (!buffer.payload.isAllRead) {
       var value;
       if (buffer.payload.checkOneLengthInteger() != PREFIX_NULL) {
-        value = buffer.payload.readLengthEncodedString();
-        // var fieldLength = buffer.payload.readLengthEncodedInteger();
-        // buffer.payload.skipBytes(fieldLength);
+        // value = buffer.payload.readLengthEncodedString();
+        var fieldLength = buffer.payload.readLengthEncodedInteger();
+        buffer.payload.readFixedLengthDataRange(fieldLength);
       } else {
         buffer.payload.skipByte();
         value = null;
       }
-      packet.values.add(value);
+      // packet.values.add(value);
     }
 
     return packet;

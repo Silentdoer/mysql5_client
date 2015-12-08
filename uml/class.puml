@@ -1,0 +1,58 @@
+@startuml
+
+interface DataChunkConsumer {
+    void DataChunkConsumer(List<int> data, int index, int available)
+}
+
+class DataChunk {
+    bool get isEmpty
+    DataChunk(List<int> data)
+    void consume(int length, DataChunkConsumer consumer)
+}
+
+class DataRange {
+    bool get isEmpty
+    int get start
+    int get end
+    int get length
+    bool get isPending
+    List<int> get data
+    int get first
+    DataRange(List<int> data, [int start = 0, int length])
+    DataRange.pending(List<int> data, [int start = 0])
+    int extractOneByte()
+    DataRange extractFixedLengthDataRange(int length)
+    DataRange extractUpToDataRange(int terminator)
+    int toInt()
+    String toString()
+    String toUTF8String()
+}
+
+class ReaderBuffer {
+    int get payloadLength
+    bool get isAllLoaded
+    bool get isAllRead
+    int get first
+    ReaderBuffer(int payloadLength)
+    void loadChunk(DataChunk chunk)
+    void skipByte()
+    void skipBytes(int length)
+    int readOneLengthInteger()
+    int readFixedLengthInteger(int length)
+    int readLengthEncodedInteger()
+    String readNulTerminatedString()
+    String readNulTerminatedUTF8String()
+    String readFixedLengthString(int length)
+    String readFixedLengthUTF8String(int length)
+    String readLengthEncodedString()
+    String readLengthEncodedUTF8String()
+    String readRestOfPacketString()
+    String readRestOfPacketUTF8String()
+}
+
+class DataReader {
+    DataReader(Stream<List<int>> stream)
+    Future?<ReaderBuffer> readBuffer(int length)
+}
+
+@enduml

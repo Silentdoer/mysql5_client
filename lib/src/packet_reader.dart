@@ -3,7 +3,6 @@ library mysql_client.packet_reader;
 import "dart:async";
 import 'dart:math';
 
-import "data_commons.dart";
 import "reader_buffer.dart";
 import 'data_reader.dart';
 
@@ -282,7 +281,8 @@ class PacketReader {
       PacketBuffer buffer) {
     var packet = new ResultSetColumnCountResponsePacket();
 
-    packet.columnCount = buffer.payload.readOneLengthInteger();
+    // packet.columnCount = buffer.payload.readOneLengthInteger();
+    buffer.payload.skipByte();
 
     return packet;
   }
@@ -291,6 +291,9 @@ class PacketReader {
       PacketBuffer buffer) {
     var packet = new ResultSetColumnDefinitionResponsePacket();
 
+    buffer.payload.skipBytes(buffer.payloadLength);
+
+/*
     // lenenc_str     catalog
     packet.catalog = buffer.payload.readLengthEncodedString();
     // lenenc_str     schema
@@ -317,7 +320,7 @@ class PacketReader {
     packet.decimals = buffer.payload.readOneLengthInteger();
     // 2              filler [00] [00]
     buffer.payload.skipBytes(2);
-
+*/
     return packet;
   }
 
@@ -325,8 +328,10 @@ class PacketReader {
       PacketBuffer buffer) {
     var packet = new ResultSetRowResponsePacket();
 
-    // packet.values = [];
+    buffer.payload.skipBytes(buffer.payloadLength);
 
+    // packet.values = [];
+/*
     while (!buffer.payload.isAllRead) {
       var value;
       if (buffer.payload.first != PREFIX_NULL) {
@@ -339,7 +344,7 @@ class PacketReader {
       }
       // packet.values.add(value);
     }
-
+*/
     return packet;
   }
 

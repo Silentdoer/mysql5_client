@@ -4,6 +4,7 @@ import "dart:async";
 import 'dart:math';
 
 import "reader_buffer.dart";
+import 'data_commons.dart';
 import 'data_reader.dart';
 
 const int CLIENT_PLUGIN_AUTH = 0x00080000;
@@ -99,7 +100,7 @@ class PacketBuffer {
 
   final ReaderBuffer payload;
 
-  PacketBuffer(this.sequenceId, ReaderBuffer payload) : this.payload = payload;
+  PacketBuffer(this.sequenceId, this.payload);
 
   int get header => payload.checkOneLengthInteger();
 
@@ -281,8 +282,7 @@ class PacketReader {
       PacketBuffer buffer) {
     var packet = new ResultSetColumnCountResponsePacket();
 
-    // packet.columnCount = buffer.payload.readOneLengthInteger();
-    buffer.payload.skipByte();
+    packet.columnCount = buffer.payload.readOneLengthInteger();
 
     return packet;
   }
@@ -291,9 +291,6 @@ class PacketReader {
       PacketBuffer buffer) {
     var packet = new ResultSetColumnDefinitionResponsePacket();
 
-    buffer.payload.skipBytes(buffer.payloadLength);
-
-/*
     // lenenc_str     catalog
     packet.catalog = buffer.payload.readLengthEncodedString();
     // lenenc_str     schema
@@ -320,7 +317,7 @@ class PacketReader {
     packet.decimals = buffer.payload.readOneLengthInteger();
     // 2              filler [00] [00]
     buffer.payload.skipBytes(2);
-*/
+
     return packet;
   }
 
@@ -328,23 +325,21 @@ class PacketReader {
       PacketBuffer buffer) {
     var packet = new ResultSetRowResponsePacket();
 
-    buffer.payload.skipBytes(buffer.payloadLength);
+    packet.values = [];
 
-    // packet.values = [];
-/*
     while (!buffer.payload.isAllRead) {
       var value;
-      if (buffer.payload.first != PREFIX_NULL) {
-        // value = buffer.payload.readLengthEncodedString();
-        var fieldLength = buffer.payload.readLengthEncodedInteger();
-        buffer.payload.skipBytes(fieldLength);
+      if (buffer.payload.checkOneLengthInteger() != PREFIX_NULL) {
+        value = buffer.payload.readLengthEncodedString();
+        // var fieldLength = buffer.payload.readLengthEncodedInteger();
+        // buffer.payload.skipBytes(fieldLength);
       } else {
         buffer.payload.skipByte();
         value = null;
       }
-      // packet.values.add(value);
+      packet.values.add(value);
     }
-*/
+
     return packet;
   }
 

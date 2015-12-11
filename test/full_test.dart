@@ -7,7 +7,6 @@ import "dart:async";
 
 import "package:sqljocky/sqljocky.dart";
 
-import "package:mysql_client/src/data_commons.dart";
 import 'package:mysql_client/mysql_client.dart';
 
 const SIMPLE_INSERTS = 1000;

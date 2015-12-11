@@ -422,15 +422,6 @@ class PacketReader {
     }
   }
 
-  _readPacketFromBuffer(Packet reader(PacketBuffer buffer)) {
-    var value = _readPacketBuffer();
-    if (value is Future) {
-      return value.then((buffer) => reader(buffer));
-    } else {
-      return reader(value);
-    }
-  }
-
   _readPacketBuffer() {
     var value = _reader.readBuffer(4);
     if (value is Future) {

@@ -93,17 +93,16 @@ class ResultSetColumnDefinitionResponsePacket extends Packet {
 }
 
 class ResultSetRowResponsePacket extends Packet {
-  // final List<DataRange> _dataRanges = new List<DataRange>();
+  final List<DataRange> _dataRanges = new List<DataRange>();
 
   ResultSetRowResponsePacket.fromBuffer(PacketBuffer buffer) {
     while (!buffer.payload.isAllRead) {
       if (buffer.payload.checkOneLengthInteger() != PREFIX_NULL) {
         var fieldLength = buffer.payload.readLengthEncodedInteger();
-        buffer.payload.readFixedLengthDataRange(fieldLength);
-        // _dataRanges.add(buffer.payload.readFixedLengthDataRange(fieldLength));
+        _dataRanges.add(buffer.payload.readFixedLengthDataRange(fieldLength));
       } else {
         buffer.payload.skipByte();
-        // _dataRanges.add(null);
+        _dataRanges.add(null);
       }
     }
   }
@@ -147,37 +146,6 @@ class PacketReader {
 
   Future<Packet> readResultSetRowResponse() =>
       _readSyncPacketFromBuffer(_readResultSetRowResponseInternal);
-
-  Future<List<Packet>> readResultSetRowResponses([int length]) async =>
-      _readResultSetRowResponses(new List<Packet>(), length);
-
-  _readResultSetRowResponse() =>
-      _readPacketFromBuffer(_readResultSetRowResponseInternal);
-
-  _readResultSetRowResponses(List<Packet> packets, [int length]) {
-    var value = _readResultSetRowResponse();
-    if (value is Future) {
-      return value.then((packet) =>
-          _readResultSetRowResponsesInternal(packets, packet, length));
-    } else {
-      return _readResultSetRowResponsesInternal(packets, value, length);
-    }
-  }
-
-  _readResultSetRowResponsesInternal(List<Packet> packets, Packet packet,
-      [int length]) {
-    if (packet is ResultSetRowResponsePacket) {
-      packets.add(packet);
-
-      if (length == null || packets.length < length) {
-        return _readResultSetRowResponses(packets, length);
-      } else {
-        return packets;
-      }
-    } else {
-      return packets;
-    }
-  }
 
   bool _isOkPacket(PacketBuffer buffer) =>
       buffer.header == 0 && buffer.payloadLength >= 7;
@@ -341,7 +309,6 @@ class PacketReader {
 
   ResultSetRowResponsePacket _readResultSetRowResponsePacket(
       PacketBuffer buffer) {
-    // TODO creare i data ranges qui
     return new ResultSetRowResponsePacket.fromBuffer(buffer);
   }
 

@@ -1,5 +1,34 @@
 @startuml
 
+class DataReader {
+    DataReader(Stream<List<int>> stream)
+    Future?<ReaderBuffer> readBuffer(int length)
+}
+
+class ReaderBuffer {
+    int get payloadLength
+    bool get isAllRead
+    ReaderBuffer(List<DataChunk> chunks, int payloadLength)
+    void skipByte()
+    void skipBytes(int length)
+    int checkOneLengthInteger()
+    int readOneLengthInteger()
+    int readFixedLengthInteger(int length)
+    int readLengthEncodedInteger()
+    DataRange readNulTerminatedDataRange()
+    String readNulTerminatedString()
+    String readNulTerminatedUTF8String()
+    DataRange readFixedLengthDataRange(int length)
+    String readFixedLengthString(int length)
+    String readFixedLengthUTF8String(int length)
+    DataRange readLengthEncodedDataRange()
+    String readLengthEncodedString()
+    String readLengthEncodedUTF8String()
+    DataRange readRestOfPacketDataRange()
+    String readRestOfPacketString()
+    String readRestOfPacketUTF8String()
+}
+
 class DataChunk {
     bool get isEmpty
     int get length
@@ -22,35 +51,10 @@ class DataRange {
     String toUTF8String()
 }
 
-class ReaderBuffer {
-    int get payloadLength
-    bool get isAllRead
-    ReaderBuffer(List<DataChunk> chunks, int payloadLength)
-    void skipByte()
-    void skipBytes(int length)
-    int checkOneLengthInteger()
-    int readOneLengthInteger()
-    int readFixedLengthInteger(int length)
-    int readLengthEncodedInteger()
-    String readNulTerminatedString()
-    String readNulTerminatedUTF8String()
-    String readFixedLengthString(int length)
-    String readFixedLengthUTF8String(int length)
-    String readLengthEncodedString()
-    String readLengthEncodedUTF8String()
-    String readRestOfPacketString()
-    String readRestOfPacketUTF8String()
-}
-
-class DataReader {
-    DataReader(Stream<List<int>> stream)
-    Future?<ReaderBuffer> readBuffer(int length)
-}
-
-DataChunk .> DataRange
-ReaderBuffer .> DataRange
-ReaderBuffer .> DataChunk
-DataReader .> DataChunk
-DataReader .> ReaderBuffer
+DataChunk ..> DataRange : create
+ReaderBuffer ..> DataRange : uses
+ReaderBuffer "_chunks" o--> "n" DataChunk
+DataReader ..> DataChunk : create
+DataReader ..> ReaderBuffer : create
 
 @enduml

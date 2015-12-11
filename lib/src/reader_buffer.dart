@@ -76,8 +76,7 @@ class ReaderBuffer {
     return readFixedLengthInteger(bytesLength - 1);
   }
 
-  DataRange readNulTerminatedDataRange() =>
-      readUpToDataRange(NULL_TERMINATOR);
+  DataRange readNulTerminatedDataRange() => readUpToDataRange(NULL_TERMINATOR);
 
   String readNulTerminatedString() =>
       readUpToDataRange(NULL_TERMINATOR).toString();
@@ -100,9 +99,11 @@ class ReaderBuffer {
   String readLengthEncodedUTF8String() =>
       readFixedLengthUTF8String(readLengthEncodedInteger());
 
-  DataRange readRestOfPacketDataRange() => readFixedLengthDataRange(_payloadLength - _readCount);
+  DataRange readRestOfPacketDataRange() =>
+      readFixedLengthDataRange(_payloadLength - _readCount);
 
-  String readRestOfPacketString() => readFixedLengthString(_payloadLength - _readCount);
+  String readRestOfPacketString() =>
+      readFixedLengthString(_payloadLength - _readCount);
 
   String readRestOfPacketUTF8String() =>
       readFixedLengthUTF8String(_payloadLength - _readCount);
@@ -134,6 +135,7 @@ class ReaderBuffer {
     }
 
     _readCount += range.length;
+
     return range;
   }
 

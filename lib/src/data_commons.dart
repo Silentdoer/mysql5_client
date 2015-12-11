@@ -4,6 +4,7 @@
 library mysql_client.data_commons;
 
 import "dart:math";
+import 'dart:developer';
 
 const int NULL_TERMINATOR = 0x00;
 
@@ -17,3 +18,8 @@ final int MAX_INT_3 = pow(2, 3 * 8);
 const int PREFIX_INT_3 = 0xfd;
 final int MAX_INT_8 = pow(2, 8 * 8);
 const int PREFIX_INT_8 = 0xfe;
+
+final BYTE_TAG = new UserTag('byte');
+final RANGE_FIXED_TAG = new UserTag('range fixed');
+final RANGE_UP_TO_TAG = new UserTag('range up to');
+final CHUNK_TAG = new UserTag('chunk');

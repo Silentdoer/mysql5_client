@@ -6,6 +6,7 @@ import 'dart:math';
 import "reader_buffer.dart";
 import 'data_commons.dart';
 import 'data_reader.dart';
+import 'data_range.dart';
 
 const int CLIENT_PLUGIN_AUTH = 0x00080000;
 const int CLIENT_SECURE_CONNECTION = 0x00008000;
@@ -92,7 +93,24 @@ class ResultSetColumnDefinitionResponsePacket extends Packet {
 }
 
 class ResultSetRowResponsePacket extends Packet {
-  List<String> values;
+  // final List<DataRange> _dataRanges = new List<DataRange>();
+
+  ResultSetRowResponsePacket.fromBuffer(PacketBuffer buffer) {
+    while (!buffer.payload.isAllRead) {
+      if (buffer.payload.checkOneLengthInteger() != PREFIX_NULL) {
+        var fieldLength = buffer.payload.readLengthEncodedInteger();
+        buffer.payload.readFixedLengthDataRange(fieldLength);
+        // _dataRanges.add(buffer.payload.readFixedLengthDataRange(fieldLength));
+      } else {
+        buffer.payload.skipByte();
+        // _dataRanges.add(null);
+      }
+    }
+  }
+
+  String getString(int index) => _dataRanges[index].toString();
+
+  String getUTF8String(int index) => _dataRanges[index].toUTF8String();
 }
 
 class PacketBuffer {
@@ -323,24 +341,8 @@ class PacketReader {
 
   ResultSetRowResponsePacket _readResultSetRowResponsePacket(
       PacketBuffer buffer) {
-    var packet = new ResultSetRowResponsePacket();
-
-    // packet.values = [];
-
-    while (!buffer.payload.isAllRead) {
-      var value;
-      if (buffer.payload.checkOneLengthInteger() != PREFIX_NULL) {
-        // value = buffer.payload.readLengthEncodedString();
-        var fieldLength = buffer.payload.readLengthEncodedInteger();
-        buffer.payload.readFixedLengthDataRange(fieldLength);
-      } else {
-        buffer.payload.skipByte();
-        value = null;
-      }
-      // packet.values.add(value);
-    }
-
-    return packet;
+    // TODO creare i data ranges qui
+    return new ResultSetRowResponsePacket.fromBuffer(buffer);
   }
 
   OkPacket _readOkPacket(PacketBuffer buffer) {

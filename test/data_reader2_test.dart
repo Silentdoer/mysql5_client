@@ -6,6 +6,7 @@ library mysql_client.test;
 import "dart:async";
 
 import 'package:mysql_client/src/data_reader.dart';
+import 'package:mysql_client/src/reader_buffer.dart';
 
 Future main() async {
   await run();
@@ -18,7 +19,7 @@ Future run() async {
 
   var reader = new DataReader(new Stream.fromIterable(chunks));
 
-  var buffer = await reader.readBuffer(4);
+  var buffer = await reader.readBuffer(4, new ReaderBuffer.reusable());
 
   print(buffer.readFixedLengthInteger(3));
 }

@@ -20,58 +20,28 @@ class DataReader {
     this._stream.listen(_onData);
   }
 
-  readBuffer(int length) => _readBuffer(new List<DataChunk>(), length, length);
+  readBuffer(int length, ReaderBuffer reusableBuffer) =>
+      _readBuffer(0, length, length, reusableBuffer);
 
-  readReusableBuffer(ReaderBuffer reusableBuffer, int length) =>
-      _readReusableBuffer(reusableBuffer, 0, length, length);
-
-  _readBuffer(List<DataChunk> bufferChunks, int totalLength, int leftLength) {
+  _readBuffer(int reusableChunks, int totalLength, int leftLength,
+      ReaderBuffer reusableBuffer) {
     if (_chunks.isEmpty) {
       _dataReadyCompleter = new Completer();
 
-      return _dataReadyCompleter.future.then(
-          (_) => _readBufferInternal(bufferChunks, totalLength, leftLength));
+      return _dataReadyCompleter.future.then((_) => _readBufferInternal(
+          reusableChunks, totalLength, leftLength, reusableBuffer));
     } else {
-      return _readBufferInternal(bufferChunks, totalLength, leftLength);
+      return _readBufferInternal(
+          reusableChunks, totalLength, leftLength, reusableBuffer);
     }
   }
 
-  _readBufferInternal(
-      List<DataChunk> bufferChunks, int totalLength, int leftLength) {
+  _readBufferInternal(int reusableChunks, int totalLength, int leftLength,
+      ReaderBuffer reusableBuffer) {
     var chunk = _chunks.first;
 
-    var bufferChunk = chunk.extractDataChunk(leftLength);
-    bufferChunks.add(bufferChunk);
-    leftLength -= bufferChunk.length;
-
-    if (chunk.isEmpty) {
-      _chunks.removeFirst();
-    }
-
-    return leftLength > 0
-        ? _readBuffer(bufferChunks, totalLength, leftLength)
-        : new ReaderBuffer(bufferChunks, totalLength);
-  }
-
-  _readReusableBuffer(ReaderBuffer reusableBuffer, int reusableChunks,
-      int totalLength, int leftLength) {
-    if (_chunks.isEmpty) {
-      _dataReadyCompleter = new Completer();
-
-      return _dataReadyCompleter.future.then((_) => _readReusableBufferInternal(
-          reusableBuffer, reusableChunks, totalLength, leftLength));
-    } else {
-      return _readReusableBufferInternal(
-          reusableBuffer, reusableChunks, totalLength, leftLength);
-    }
-  }
-
-  _readReusableBufferInternal(ReaderBuffer reusableBuffer, int reusableChunks,
-      int totalLength, int leftLength) {
-    var chunk = _chunks.first;
-
-    var reusableChunk = reusableBuffer.getReusableDataChunk(reusableChunks);
-    var bufferChunk = chunk.extractReusableDataChunk(reusableChunk, leftLength);
+    var reusableChunk = reusableBuffer.getReusableChunk(reusableChunks);
+    var bufferChunk = chunk.extractDataChunk(leftLength, reusableChunk);
     reusableChunks++;
     leftLength -= bufferChunk.length;
 
@@ -80,8 +50,7 @@ class DataReader {
     }
 
     return leftLength > 0
-        ? _readReusableBuffer(
-            reusableBuffer, reusableChunks, totalLength, leftLength)
+        ? _readBuffer(reusableChunks, totalLength, leftLength, reusableBuffer)
         : reusableBuffer.reuse(reusableChunks, totalLength);
   }
 

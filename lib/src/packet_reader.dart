@@ -104,8 +104,7 @@ class ResultSetRowResponsePacket extends Packet {
     while (!buffer.payload.isAllRead) {
       if (buffer.payload.checkOneLengthInteger() != PREFIX_NULL) {
         var fieldLength = buffer.payload.readLengthEncodedInteger();
-        buffer.payload
-            .readFixedLengthReusableDataRange(_dataRanges[i++], fieldLength);
+        buffer.payload.readFixedLengthDataRange(fieldLength, _dataRanges[i++]);
       } else {
         buffer.payload.skipByte();
         _dataRanges[i++].reuseNil();
@@ -166,21 +165,29 @@ class PacketReader {
 
   PacketReader(this._reader, {this.clientCapabilityFlags: 0});
 
-  Future<Packet> readInitialHandshakeResponse() =>
-      _readSyncPacketFromBuffer(_readInitialHandshakeResponseInternal);
+  Future<Packet> readInitialHandshakeResponse() => _readPacketFromBufferAsync(
+      _readInitialHandshakeResponseInternal, new PacketBuffer.reusable());
 
-  Future<Packet> readCommandResponse() =>
-      _readSyncPacketFromBuffer(_readCommandResponseInternal);
+  Future<Packet> readCommandResponse() => _readPacketFromBufferAsync(
+      _readCommandResponseInternal, new PacketBuffer.reusable());
 
-  Future<Packet> readCommandQueryResponse() =>
-      _readSyncPacketFromBuffer(_readCommandQueryResponseInternal);
+  Future<Packet> readCommandQueryResponse() => _readPacketFromBufferAsync(
+      _readCommandQueryResponseInternal, new PacketBuffer.reusable());
 
   Future<Packet> readResultSetColumnDefinitionResponse() =>
-      _readSyncPacketFromBuffer(_readResultSetColumnDefinitionResponseInternal);
+      _readPacketFromBufferAsync(_readResultSetColumnDefinitionResponseInternal,
+          new PacketBuffer.reusable());
+/*
+  readResultSetRowResponse(ResultSetRowResponsePacket reusablePacket,
+          PacketBuffer reusablePacketBuffer) =>
+      _readPacketFromBuffer(
+          (buffer) => _readResultSetRowResponseInternal(buffer, reusablePacket),
+          reusablePacketBuffer);
+*/
 
-  readResultSetRowResponse(PacketBuffer reusablePacketBuffer,
-      ResultSetRowResponsePacket reusablePacket) {
-    var value = _readReusablePacketBuffer(reusablePacketBuffer);
+  readResultSetRowResponse(ResultSetRowResponsePacket reusablePacket,
+      PacketBuffer reusablePacketBuffer) {
+    var value = _readPacketBuffer(reusablePacketBuffer);
     if (value is Future) {
       return value.then((buffer) =>
           _readResultSetRowResponseInternal(buffer, reusablePacket));
@@ -455,56 +462,41 @@ class PacketReader {
     }
   }
 
-  Future<Packet> _readSyncPacketFromBuffer(Packet reader(PacketBuffer buffer)) {
-    var value = _readPacketBuffer();
+  Future<Packet> _readPacketFromBufferAsync(
+      Packet reader(PacketBuffer buffer), PacketBuffer reusablePacketBuffer) {
+    var value = _readPacketFromBuffer(reader, reusablePacketBuffer);
+    return value is Future ? value : new Future.value(value);
+  }
+
+  _readPacketFromBuffer(
+      Packet reader(PacketBuffer buffer), PacketBuffer reusablePacketBuffer) {
+    var value = _readPacketBuffer(reusablePacketBuffer);
     if (value is Future) {
       return value.then((buffer) => reader(buffer));
     } else {
-      return new Future.value(reader(value));
+      return reader(value);
     }
   }
 
-  _readPacketBuffer() {
-    var value = _reader.readBuffer(4);
-    if (value is Future) {
-      return value.then((header) => _readPacketBufferInternal(header));
-    } else {
-      return _readPacketBufferInternal(value);
-    }
-  }
-
-  _readPacketBufferInternal(ReaderBuffer header) {
-    var payloadLength = header.readFixedLengthInteger(3);
-    var sequenceId = header.readOneLengthInteger();
-
-    var value = _reader.readBuffer(payloadLength);
-    if (value is Future) {
-      return value.then((payload) => new PacketBuffer(sequenceId, payload));
-    } else {
-      return new PacketBuffer(sequenceId, value);
-    }
-  }
-
-  _readReusablePacketBuffer(PacketBuffer reusablePacketBuffer) {
-    var value = _reader.readReusableBuffer(_reusableHeaderReaderBuffer, 4);
+  _readPacketBuffer(PacketBuffer reusablePacketBuffer) {
+    var value = _reader.readBuffer(4, _reusableHeaderReaderBuffer);
     if (value is Future) {
       return value.then((headerReaderBuffer) =>
-          _readReusablePacketBufferInternal(reusablePacketBuffer));
+          _readPacketBufferInternal(reusablePacketBuffer));
     } else {
-      return _readReusablePacketBufferInternal(reusablePacketBuffer);
+      return _readPacketBufferInternal(reusablePacketBuffer);
     }
   }
 
-  _readReusablePacketBufferInternal(PacketBuffer reusablePacketBuffer) {
+  _readPacketBufferInternal(PacketBuffer reusablePacketBuffer) {
     var payloadLength = _reusableHeaderReaderBuffer
-        .readFixedLengthReusableDataRange(_reusablePayloadLengthDataRange, 3)
+        .readFixedLengthDataRange(3, _reusablePayloadLengthDataRange)
         .toInt();
     var sequenceId = _reusableHeaderReaderBuffer.readOneLengthInteger();
     _reusableHeaderReaderBuffer.free();
     _reusablePayloadLengthDataRange.free();
 
-    var value =
-        _reader.readReusableBuffer(reusablePacketBuffer.payload, payloadLength);
+    var value = _reader.readBuffer(payloadLength, reusablePacketBuffer.payload);
     if (value is Future) {
       return value.then((payloadReaderBuffer) =>
           reusablePacketBuffer.reuse(sequenceId, payloadReaderBuffer));

@@ -99,16 +99,30 @@ class ConnectionImpl implements Connection {
     }
 
     var reusablePacketBuffer = new PacketBuffer.reusable();
-    var reusablePacket = new ResultSetRowResponsePacket.reusable(columnCount);
+/*
+    var reusableColumnPacket = new ResultSetColumnDefinitionResponsePacket.reusable();
+    while (true) {
+      var response2 = _reader.readResultSetColumnDefinitionResponse(reusableResultSetPacket, reusablePacketBuffer);
+      response2 = response2 is Future ? await response2 : response2;
+      if (response2 is! ResultSetColumnDefinitionResponsePacket) {
+        break;
+      }
+    }
+    reusableResultSetPacket.free();
+*/
+
+    var reusableResultSetPacket =
+        new ResultSetRowResponsePacket.reusable(columnCount);
     while (true) {
       var response3 = _reader.readResultSetRowResponse(
-          reusablePacketBuffer, reusablePacket);
+          reusableResultSetPacket, reusablePacketBuffer);
       response3 = response3 is Future ? await response3 : response3;
       if (response3 is! ResultSetRowResponsePacket) {
         break;
       }
     }
-    reusablePacket.free();
+    reusableResultSetPacket.free();
+
     reusablePacketBuffer.free();
   }
 

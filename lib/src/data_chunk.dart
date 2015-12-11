@@ -42,15 +42,7 @@ class DataChunk {
     return value;
   }
 
-  DataChunk extractDataChunk(int length) {
-    length = min(_length, length);
-    var chunk = new DataChunk(_data, _start, length);
-    _start += length;
-    _length -= length;
-    return chunk;
-  }
-
-  DataChunk extractReusableDataChunk(DataChunk reusableChunk, int length) {
+  DataChunk extractDataChunk(int length, DataChunk reusableChunk) {
     length = min(_length, length);
     var chunk = reusableChunk.reuse(_data, _start, length);
     _start += length;
@@ -58,22 +50,7 @@ class DataChunk {
     return chunk;
   }
 
-  DataRange extractFixedLengthDataRange(int length) {
-    DataRange range;
-    if (length <= _length) {
-      range = new DataRange(_data, _start, length);
-      _start += length;
-      _length -= length;
-    } else {
-      range = new DataRange.pending(_data, _start);
-      _start += range.length;
-      _length -= range.length;
-    }
-    return range;
-  }
-
-  DataRange extractFixedLengthReusableDataRange(
-      DataRange reusableRange, int length) {
+  DataRange extractFixedLengthDataRange(int length, DataRange reusableRange) {
     DataRange range;
     if (length <= _length) {
       range = reusableRange.reuse(_data, _start, length);
@@ -87,25 +64,7 @@ class DataChunk {
     return range;
   }
 
-  DataRange extractUpToDataRange(int terminator) {
-    DataRange range;
-    int i = _data.indexOf(terminator, _start);
-    if (i != -1) {
-      var length = i - _start;
-      range = new DataRange(_data, _start, length);
-      // skip the terminator
-      _start += length + 1;
-      _length -= length + 1;
-    } else {
-      range = new DataRange.pending(_data, _start);
-      _start += range.length;
-      _length -= range.length;
-    }
-    return range;
-  }
-
-  DataRange extractUpToReusableDataRange(
-      DataRange reusableRange, int terminator) {
+  DataRange extractUpToDataRange(int terminator, DataRange reusableRange) {
     DataRange range;
     int i = _data.indexOf(terminator, _start);
     if (i != -1) {

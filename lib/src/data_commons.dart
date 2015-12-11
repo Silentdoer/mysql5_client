@@ -4,7 +4,6 @@
 library mysql_client.data_commons;
 
 import "dart:math";
-import 'dart:developer';
 
 const int NULL_TERMINATOR = 0x00;
 

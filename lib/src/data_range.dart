@@ -13,11 +13,39 @@ class DataRange {
 
   DataRange(this._data, [this._start = 0, this._length])
       : this._isPending = false {
-    this._length ??= _data.length - _start;
+    _length ??= _data.length - _start;
   }
 
   DataRange.pending(this._data, [this._start = 0]) : this._isPending = true {
-    this._length = _data.length - _start;
+    _length = _data.length - _start;
+  }
+
+  DataRange.nil();
+
+  DataRange.reusable();
+
+  DataRange reuse(List<int> data, [int start = 0, int length]) {
+    _isPending = false;
+    _data = data;
+    _start = start;
+    _length = length ?? _data.length - _start;
+    return this;
+  }
+
+  DataRange reusePending(List<int> data, [int start = 0]) {
+    _isPending = true;
+    _data = data;
+    _start = start;
+    _length = _data.length - _start;
+    return this;
+  }
+
+  DataRange reuseNil() {
+    _isPending = null;
+    _data = null;
+    _start = null;
+    _length = null;
+    return this;
   }
 
   void free() {
@@ -33,6 +61,9 @@ class DataRange {
   int get length => _length;
 
   int toInt() {
+    if (_data == null) {
+      return null;
+    }
     var i = _start;
     switch (_length) {
       case 1:
@@ -42,7 +73,10 @@ class DataRange {
       case 3:
         return _data[i++] | _data[i++] << 8 | _data[i++] << 16;
       case 4:
-        return _data[i++] | _data[i++] << 8 | _data[i++] << 16 | _data[i++] << 24;
+        return _data[i++] |
+            _data[i++] << 8 |
+            _data[i++] << 16 |
+            _data[i++] << 24;
       case 5:
         return _data[i++] |
             _data[i++] << 8 |
@@ -78,7 +112,11 @@ class DataRange {
     throw new UnsupportedError("${_data.length} length");
   }
 
-  String toString() => new String.fromCharCodes(_data, _start, _start + _length);
+  String toString() => _data != null
+      ? new String.fromCharCodes(_data, _start, _start + _length)
+      : null;
 
-  String toUTF8String() => UTF8.decoder.convert(_data, _start, _start + _length);
+  String toUTF8String() => _data != null
+      ? UTF8.decoder.convert(_data, _start, _start + _length)
+      : null;
 }

@@ -95,31 +95,20 @@ class ResultSetColumnDefinitionResponsePacket extends Packet {
 class ResultSetRowResponsePacket extends Packet {
   final List<DataRange> _dataRanges;
 
-  ResultSetRowResponsePacket.fromBuffer(PacketBuffer buffer)
-      : _dataRanges = new List<DataRange>() {
-    while (!buffer.payload.isAllRead) {
-      if (buffer.payload.checkOneLengthInteger() != PREFIX_NULL) {
-        var fieldLength = buffer.payload.readLengthEncodedInteger();
-        _dataRanges.add(buffer.payload.readFixedLengthDataRange(fieldLength));
-      } else {
-        buffer.payload.skipByte();
-        _dataRanges.add(null);
-      }
-    }
-  }
-
   ResultSetRowResponsePacket.reusable(int columnCount)
-      : _dataRanges = new List<DataRange>(columnCount);
+      : _dataRanges =
+            new List<DataRange>.filled(columnCount, new DataRange.reusable());
 
   ResultSetRowResponsePacket reuse(PacketBuffer buffer) {
     var i = 0;
     while (!buffer.payload.isAllRead) {
       if (buffer.payload.checkOneLengthInteger() != PREFIX_NULL) {
         var fieldLength = buffer.payload.readLengthEncodedInteger();
-        _dataRanges[i++] = buffer.payload.readFixedLengthDataRange(fieldLength);
+        buffer.payload
+            .readFixedLengthReusableDataRange(_dataRanges[i++], fieldLength);
       } else {
         buffer.payload.skipByte();
-        _dataRanges[i++] = null;
+        _dataRanges[i++].reuseNil();
       }
     }
     return this;
@@ -170,6 +159,7 @@ class PacketReader {
   final DataReader _reader;
 
   final ReaderBuffer _reusableHeaderReaderBuffer = new ReaderBuffer.reusable();
+  final DataRange _reusablePayloadLengthDataRange = new DataRange.reusable();
 
   int serverCapabilityFlags;
   final int clientCapabilityFlags;
@@ -192,7 +182,8 @@ class PacketReader {
       ResultSetRowResponsePacket reusablePacket) {
     var value = _readReusablePacketBuffer(reusablePacketBuffer);
     if (value is Future) {
-      return value.then((buffer) => _readResultSetRowResponseInternal(buffer, reusablePacket));
+      return value.then((buffer) =>
+          _readResultSetRowResponseInternal(buffer, reusablePacket));
     } else {
       return _readResultSetRowResponseInternal(value, reusablePacket);
     }
@@ -473,30 +464,6 @@ class PacketReader {
     }
   }
 
-  Future<Packet> _readSyncReusablePacketFromBuffer(
-      PacketBuffer reusablePacketBuffer,
-      Packet reusablePacket,
-      Packet reader(PacketBuffer buffer, Packet reusablePacket)) {
-    var value = _readReusablePacketBuffer(reusablePacketBuffer);
-    if (value is Future) {
-      return value.then((buffer) => reader(buffer, reusablePacket));
-    } else {
-      return new Future.value(reader(value, reusablePacket));
-    }
-  }
-
-  _readReusablePacketFromBuffer(
-      PacketBuffer reusablePacketBuffer,
-      Packet reusablePacket,
-      Packet reader(PacketBuffer buffer, Packet reusablePacket)) {
-    var value = _readReusablePacketBuffer(reusablePacketBuffer);
-    if (value is Future) {
-      return value.then((buffer) => reader(buffer, reusablePacket));
-    } else {
-      return reader(value, reusablePacket);
-    }
-  }
-
   _readPacketBuffer() {
     var value = _reader.readBuffer(4);
     if (value is Future) {
@@ -522,18 +489,19 @@ class PacketReader {
     var value = _reader.readReusableBuffer(_reusableHeaderReaderBuffer, 4);
     if (value is Future) {
       return value.then((headerReaderBuffer) =>
-          _readReusablePacketBufferInternal(
-              reusablePacketBuffer, headerReaderBuffer));
+          _readReusablePacketBufferInternal(reusablePacketBuffer));
     } else {
-      return _readReusablePacketBufferInternal(reusablePacketBuffer, value);
+      return _readReusablePacketBufferInternal(reusablePacketBuffer);
     }
   }
 
-  _readReusablePacketBufferInternal(
-      PacketBuffer reusablePacketBuffer, ReaderBuffer headerReaderBuffer) {
-    var payloadLength = headerReaderBuffer.readFixedLengthInteger(3);
-    var sequenceId = headerReaderBuffer.readOneLengthInteger();
-    headerReaderBuffer.free();
+  _readReusablePacketBufferInternal(PacketBuffer reusablePacketBuffer) {
+    var payloadLength = _reusableHeaderReaderBuffer
+        .readFixedLengthReusableDataRange(_reusablePayloadLengthDataRange, 3)
+        .toInt();
+    var sequenceId = _reusableHeaderReaderBuffer.readOneLengthInteger();
+    _reusableHeaderReaderBuffer.free();
+    _reusablePayloadLengthDataRange.free();
 
     var value =
         _reader.readReusableBuffer(reusablePacketBuffer.payload, payloadLength);

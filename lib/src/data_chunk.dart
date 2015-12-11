@@ -4,7 +4,6 @@
 library mysql_client.data_chunk;
 
 import 'dart:math';
-import 'data_commons.dart';
 import 'data_range.dart';
 
 class DataChunk {
@@ -73,6 +72,21 @@ class DataChunk {
     return range;
   }
 
+  DataRange extractFixedLengthReusableDataRange(
+      DataRange reusableRange, int length) {
+    DataRange range;
+    if (length <= _length) {
+      range = reusableRange.reuse(_data, _start, length);
+      _start += length;
+      _length -= length;
+    } else {
+      range = reusableRange.reusePending(_data, _start);
+      _start += range.length;
+      _length -= range.length;
+    }
+    return range;
+  }
+
   DataRange extractUpToDataRange(int terminator) {
     DataRange range;
     int i = _data.indexOf(terminator, _start);
@@ -84,6 +98,24 @@ class DataChunk {
       _length -= length + 1;
     } else {
       range = new DataRange.pending(_data, _start);
+      _start += range.length;
+      _length -= range.length;
+    }
+    return range;
+  }
+
+  DataRange extractUpToReusableDataRange(
+      DataRange reusableRange, int terminator) {
+    DataRange range;
+    int i = _data.indexOf(terminator, _start);
+    if (i != -1) {
+      var length = i - _start;
+      range = reusableRange.reuse(_data, _start, length);
+      // skip the terminator
+      _start += length + 1;
+      _length -= length + 1;
+    } else {
+      range = reusableRange.reusePending(_data, _start);
       _start += range.length;
       _length -= range.length;
     }

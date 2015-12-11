@@ -174,6 +174,42 @@ class ReaderBuffer {
     return range;
   }
 
+  DataRange readFixedLengthReusableDataRange(
+      DataRange reusableRange, int length) {
+    var chunk = _chunks[_chunkIndex];
+    var range =
+        chunk.extractFixedLengthReusableDataRange(reusableRange, length);
+    if (chunk.isEmpty) {
+      _chunkIndex++;
+    }
+
+    if (range.isPending) {
+      // devo costruire un range da zero
+      var data = new List(length);
+      data.setRange(0, range.length, range.data, range.start);
+      var start = range.length;
+      var leftLength = length - range.length;
+      do {
+        chunk = _chunks[_chunkIndex];
+        range = chunk.extractFixedLengthReusableDataRange(
+            reusableRange, leftLength);
+        if (chunk.isEmpty) {
+          _chunkIndex++;
+        }
+        var end = start + range.length;
+        data.setRange(start, end, range.data, range.start);
+        start = end;
+        leftLength -= range.length;
+      } while (range.isPending);
+
+      range = reusableRange.reuse(data);
+    }
+
+    _readCount += range.length;
+
+    return range;
+  }
+
   DataRange readUpToDataRange(int terminator) {
     var chunk = _chunks[_chunkIndex];
     var range = chunk.extractUpToDataRange(terminator);
@@ -196,6 +232,35 @@ class ReaderBuffer {
       } while (range.isPending);
 
       range = new DataRange(builder.takeBytes());
+    }
+
+    // skip the terminator
+    _readCount += range.length + 1;
+    return range;
+  }
+
+  DataRange readUpToReusableDataRange(DataRange reusableRange, int terminator) {
+    var chunk = _chunks[_chunkIndex];
+    var range = chunk.extractUpToReusableDataRange(reusableRange, terminator);
+    if (chunk.isEmpty) {
+      _chunks.removeAt(0);
+    }
+
+    if (range.isPending) {
+      // devo costruire un range da zero
+      var builder = new BytesBuilder();
+      builder.add(range.data.sublist(range.start, range.start + range.length));
+      do {
+        chunk = _chunks[_chunkIndex];
+        range = chunk.extractUpToReusableDataRange(reusableRange, terminator);
+        if (chunk.isEmpty) {
+          _chunkIndex++;
+        }
+        builder
+            .add(range.data.sublist(range.start, range.start + range.length));
+      } while (range.isPending);
+
+      range = reusableRange.reuse(builder.takeBytes());
     }
 
     // skip the terminator

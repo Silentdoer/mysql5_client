@@ -101,7 +101,8 @@ class ConnectionImpl implements Connection {
     var reusablePacketBuffer = new PacketBuffer.reusable();
     var reusablePacket = new ResultSetRowResponsePacket.reusable(columnCount);
     while (true) {
-      var response3 = _reader.readResultSetRowResponse(reusablePacketBuffer, reusablePacket);
+      var response3 = _reader.readResultSetRowResponse(
+          reusablePacketBuffer, reusablePacket);
       response3 = response3 is Future ? await response3 : response3;
       if (response3 is! ResultSetRowResponsePacket) {
         break;

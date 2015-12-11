@@ -37,46 +37,29 @@ class DataChunk {
   int checkOneByte() => _data[_start];
 
   int extractOneByte() {
-    var previousTag = BYTE_TAG.makeCurrent();
-
     var value = _data[_start];
     _start++;
     _length--;
-
-    previousTag.makeCurrent();
-
     return value;
   }
 
   DataChunk extractDataChunk(int length) {
-    var previousTag = CHUNK_TAG.makeCurrent();
-
     length = min(_length, length);
     var chunk = new DataChunk(_data, _start, length);
     _start += length;
     _length -= length;
-
-    previousTag.makeCurrent();
-
     return chunk;
   }
 
   DataChunk extractReusableDataChunk(DataChunk reusableChunk, int length) {
-    var previousTag = CHUNK_TAG.makeCurrent();
-
     length = min(_length, length);
     var chunk = reusableChunk.reuse(_data, _start, length);
     _start += length;
     _length -= length;
-
-    previousTag.makeCurrent();
-
     return chunk;
   }
 
   DataRange extractFixedLengthDataRange(int length) {
-    var previousTag = RANGE_FIXED_TAG.makeCurrent();
-
     DataRange range;
     if (length <= _length) {
       range = new DataRange(_data, _start, length);
@@ -87,15 +70,10 @@ class DataChunk {
       _start += range.length;
       _length -= range.length;
     }
-
-    previousTag.makeCurrent();
-
     return range;
   }
 
   DataRange extractUpToDataRange(int terminator) {
-    var previousTag = RANGE_UP_TO_TAG.makeCurrent();
-
     DataRange range;
     int i = _data.indexOf(terminator, _start);
     if (i != -1) {
@@ -109,9 +87,6 @@ class DataChunk {
       _start += range.length;
       _length -= range.length;
     }
-
-    previousTag.makeCurrent();
-
     return range;
   }
 }

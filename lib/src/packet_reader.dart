@@ -188,15 +188,15 @@ class PacketReader {
   Future<Packet> readResultSetColumnDefinitionResponse() =>
       _readSyncPacketFromBuffer(_readResultSetColumnDefinitionResponseInternal);
 
-  Future<Packet> readResultSetRowResponse(PacketBuffer reusablePacketBuffer,
-          ResultSetRowResponsePacket reusablePacket) =>
-      _readSyncReusablePacketFromBuffer(
-          reusablePacketBuffer, reusablePacket, _readResultSetRowResponseInternal);
-
-  readResultSetRowResponse2(PacketBuffer reusablePacketBuffer,
-      ResultSetRowResponsePacket reusablePacket) =>
-      _readReusablePacketFromBuffer(
-          reusablePacketBuffer, reusablePacket, _readResultSetRowResponseInternal);
+  readResultSetRowResponse(PacketBuffer reusablePacketBuffer,
+      ResultSetRowResponsePacket reusablePacket) {
+    var value = _readReusablePacketBuffer(reusablePacketBuffer);
+    if (value is Future) {
+      return value.then((buffer) => _readResultSetRowResponseInternal(buffer, reusablePacket));
+    } else {
+      return _readResultSetRowResponseInternal(value, reusablePacket);
+    }
+  }
 
   bool _isOkPacket(PacketBuffer buffer) =>
       buffer.header == 0 && buffer.payloadLength >= 7;

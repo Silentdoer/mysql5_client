@@ -93,9 +93,10 @@ class ResultSetColumnDefinitionResponsePacket extends Packet {
 }
 
 class ResultSetRowResponsePacket extends Packet {
-  final List<DataRange> _dataRanges = new List<DataRange>();
+  final List<DataRange> _dataRanges;
 
-  ResultSetRowResponsePacket.fromBuffer(PacketBuffer buffer) {
+  ResultSetRowResponsePacket.fromBuffer(PacketBuffer buffer)
+      : _dataRanges = new List<DataRange>() {
     while (!buffer.payload.isAllRead) {
       if (buffer.payload.checkOneLengthInteger() != PREFIX_NULL) {
         var fieldLength = buffer.payload.readLengthEncodedInteger();
@@ -107,25 +108,68 @@ class ResultSetRowResponsePacket extends Packet {
     }
   }
 
+  ResultSetRowResponsePacket.reusable(int columnCount)
+      : _dataRanges = new List<DataRange>(columnCount);
+
+  ResultSetRowResponsePacket reuse(PacketBuffer buffer) {
+    var i = 0;
+    while (!buffer.payload.isAllRead) {
+      if (buffer.payload.checkOneLengthInteger() != PREFIX_NULL) {
+        var fieldLength = buffer.payload.readLengthEncodedInteger();
+        _dataRanges[i++] = buffer.payload.readFixedLengthDataRange(fieldLength);
+      } else {
+        buffer.payload.skipByte();
+        _dataRanges[i++] = null;
+      }
+    }
+    return this;
+  }
+
+  void free() {
+    for (var range in _dataRanges) {
+      range?.free();
+    }
+  }
+
   String getString(int index) => _dataRanges[index].toString();
 
   String getUTF8String(int index) => _dataRanges[index].toUTF8String();
 }
 
 class PacketBuffer {
-  final int sequenceId;
+  int _sequenceId;
 
-  final ReaderBuffer payload;
+  ReaderBuffer _payload;
 
-  PacketBuffer(this.sequenceId, this.payload);
+  PacketBuffer(this._sequenceId, this._payload);
 
-  int get header => payload.checkOneLengthInteger();
+  PacketBuffer.reusable() : this._payload = new ReaderBuffer.reusable();
 
-  int get payloadLength => this.payload.payloadLength;
+  PacketBuffer reuse(int sequenceId, ReaderBuffer payload) {
+    _sequenceId = sequenceId;
+    _payload = payload;
+
+    return this;
+  }
+
+  void free() {
+    _payload.free();
+    _sequenceId = null;
+  }
+
+  int get sequenceId => _sequenceId;
+
+  ReaderBuffer get payload => _payload;
+
+  int get header => _payload.checkOneLengthInteger();
+
+  int get payloadLength => _payload.payloadLength;
 }
 
 class PacketReader {
   final DataReader _reader;
+
+  final ReaderBuffer _reusableHeaderReaderBuffer = new ReaderBuffer.reusable();
 
   int serverCapabilityFlags;
   final int clientCapabilityFlags;
@@ -144,8 +188,15 @@ class PacketReader {
   Future<Packet> readResultSetColumnDefinitionResponse() =>
       _readSyncPacketFromBuffer(_readResultSetColumnDefinitionResponseInternal);
 
-  Future<Packet> readResultSetRowResponse() =>
-      _readSyncPacketFromBuffer(_readResultSetRowResponseInternal);
+  Future<Packet> readResultSetRowResponse(PacketBuffer reusablePacketBuffer,
+          ResultSetRowResponsePacket reusablePacket) =>
+      _readSyncReusablePacketFromBuffer(
+          reusablePacketBuffer, reusablePacket, _readResultSetRowResponseInternal);
+
+  readResultSetRowResponse2(PacketBuffer reusablePacketBuffer,
+      ResultSetRowResponsePacket reusablePacket) =>
+      _readReusablePacketFromBuffer(
+          reusablePacketBuffer, reusablePacket, _readResultSetRowResponseInternal);
 
   bool _isOkPacket(PacketBuffer buffer) =>
       buffer.header == 0 && buffer.payloadLength >= 7;
@@ -197,13 +248,14 @@ class PacketReader {
     }
   }
 
-  Packet _readResultSetRowResponseInternal(PacketBuffer buffer) {
+  Packet _readResultSetRowResponseInternal(
+      PacketBuffer buffer, ResultSetRowResponsePacket reusablePacket) {
     if (_isErrorPacket(buffer)) {
       return _readErrorPacket(buffer);
     } else if (_isEOFPacket(buffer)) {
       return _readEOFPacket(buffer);
     } else {
-      return _readResultSetRowResponsePacket(buffer);
+      return _readResultSetRowResponsePacket(buffer, reusablePacket);
     }
   }
 
@@ -308,9 +360,8 @@ class PacketReader {
   }
 
   ResultSetRowResponsePacket _readResultSetRowResponsePacket(
-      PacketBuffer buffer) {
-    return new ResultSetRowResponsePacket.fromBuffer(buffer);
-  }
+          PacketBuffer buffer, ResultSetRowResponsePacket reusablePacket) =>
+      reusablePacket.reuse(buffer);
 
   OkPacket _readOkPacket(PacketBuffer buffer) {
     var packet = new OkPacket();
@@ -422,6 +473,30 @@ class PacketReader {
     }
   }
 
+  Future<Packet> _readSyncReusablePacketFromBuffer(
+      PacketBuffer reusablePacketBuffer,
+      Packet reusablePacket,
+      Packet reader(PacketBuffer buffer, Packet reusablePacket)) {
+    var value = _readReusablePacketBuffer(reusablePacketBuffer);
+    if (value is Future) {
+      return value.then((buffer) => reader(buffer, reusablePacket));
+    } else {
+      return new Future.value(reader(value, reusablePacket));
+    }
+  }
+
+  _readReusablePacketFromBuffer(
+      PacketBuffer reusablePacketBuffer,
+      Packet reusablePacket,
+      Packet reader(PacketBuffer buffer, Packet reusablePacket)) {
+    var value = _readReusablePacketBuffer(reusablePacketBuffer);
+    if (value is Future) {
+      return value.then((buffer) => reader(buffer, reusablePacket));
+    } else {
+      return reader(value, reusablePacket);
+    }
+  }
+
   _readPacketBuffer() {
     var value = _reader.readBuffer(4);
     if (value is Future) {
@@ -436,11 +511,37 @@ class PacketReader {
     var sequenceId = header.readOneLengthInteger();
 
     var value = _reader.readBuffer(payloadLength);
-
     if (value is Future) {
       return value.then((payload) => new PacketBuffer(sequenceId, payload));
     } else {
       return new PacketBuffer(sequenceId, value);
+    }
+  }
+
+  _readReusablePacketBuffer(PacketBuffer reusablePacketBuffer) {
+    var value = _reader.readReusableBuffer(_reusableHeaderReaderBuffer, 4);
+    if (value is Future) {
+      return value.then((headerReaderBuffer) =>
+          _readReusablePacketBufferInternal(
+              reusablePacketBuffer, headerReaderBuffer));
+    } else {
+      return _readReusablePacketBufferInternal(reusablePacketBuffer, value);
+    }
+  }
+
+  _readReusablePacketBufferInternal(
+      PacketBuffer reusablePacketBuffer, ReaderBuffer headerReaderBuffer) {
+    var payloadLength = headerReaderBuffer.readFixedLengthInteger(3);
+    var sequenceId = headerReaderBuffer.readOneLengthInteger();
+    headerReaderBuffer.free();
+
+    var value =
+        _reader.readReusableBuffer(reusablePacketBuffer.payload, payloadLength);
+    if (value is Future) {
+      return value.then((payloadReaderBuffer) =>
+          reusablePacketBuffer.reuse(sequenceId, payloadReaderBuffer));
+    } else {
+      return reusablePacketBuffer.reuse(sequenceId, value);
     }
   }
 }

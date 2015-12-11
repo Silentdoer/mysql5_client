@@ -6,69 +6,79 @@ library mysql_client.data_range2;
 import "dart:convert";
 
 class DataRange {
-  final bool isPending;
-  final List<int> data;
-  final int start;
+  bool _isPending;
+  List<int> _data;
+  int _start;
   int _length;
 
-  DataRange(this.data, [this.start = 0, this._length])
-      : this.isPending = false {
-    this._length ??= data.length - start;
+  DataRange(this._data, [this._start = 0, this._length])
+      : this._isPending = false {
+    this._length ??= _data.length - _start;
   }
 
-  DataRange.pending(this.data, [this.start = 0]) : this.isPending = true {
-    this._length = data.length - start;
+  DataRange.pending(this._data, [this._start = 0]) : this._isPending = true {
+    this._length = _data.length - _start;
   }
 
+  void free() {
+    _isPending = null;
+    _data = null;
+    _start = null;
+    _length = null;
+  }
+
+  bool get isPending => _isPending;
+  List<int> get data => _data;
+  int get start => _start;
   int get length => _length;
 
   int toInt() {
-    var i = start;
+    var i = _start;
     switch (_length) {
       case 1:
-        return data[i++];
+        return _data[i++];
       case 2:
-        return data[i++] | data[i++] << 8;
+        return _data[i++] | _data[i++] << 8;
       case 3:
-        return data[i++] | data[i++] << 8 | data[i++] << 16;
+        return _data[i++] | _data[i++] << 8 | _data[i++] << 16;
       case 4:
-        return data[i++] | data[i++] << 8 | data[i++] << 16 | data[i++] << 24;
+        return _data[i++] | _data[i++] << 8 | _data[i++] << 16 | _data[i++] << 24;
       case 5:
-        return data[i++] |
-            data[i++] << 8 |
-            data[i++] << 16 |
-            data[i++] << 24 |
-            data[i++] << 32;
+        return _data[i++] |
+            _data[i++] << 8 |
+            _data[i++] << 16 |
+            _data[i++] << 24 |
+            _data[i++] << 32;
       case 6:
-        return data[i++] |
-            data[i++] << 8 |
-            data[i++] << 16 |
-            data[i++] << 24 |
-            data[i++] << 32 |
-            data[i++] << 40;
+        return _data[i++] |
+            _data[i++] << 8 |
+            _data[i++] << 16 |
+            _data[i++] << 24 |
+            _data[i++] << 32 |
+            _data[i++] << 40;
       case 7:
-        return data[i++] |
-            data[i++] << 8 |
-            data[i++] << 16 |
-            data[i++] << 24 |
-            data[i++] << 32 |
-            data[i++] << 40 |
-            data[i++] << 48;
+        return _data[i++] |
+            _data[i++] << 8 |
+            _data[i++] << 16 |
+            _data[i++] << 24 |
+            _data[i++] << 32 |
+            _data[i++] << 40 |
+            _data[i++] << 48;
       case 8:
-        return data[i++] |
-            data[i++] << 8 |
-            data[i++] << 16 |
-            data[i++] << 24 |
-            data[i++] << 32 |
-            data[i++] << 40 |
-            data[i++] << 48 |
-            data[i++] << 56;
+        return _data[i++] |
+            _data[i++] << 8 |
+            _data[i++] << 16 |
+            _data[i++] << 24 |
+            _data[i++] << 32 |
+            _data[i++] << 40 |
+            _data[i++] << 48 |
+            _data[i++] << 56;
     }
 
-    throw new UnsupportedError("${data.length} length");
+    throw new UnsupportedError("${_data.length} length");
   }
 
-  String toString() => new String.fromCharCodes(data, start, start + _length);
+  String toString() => new String.fromCharCodes(_data, _start, _start + _length);
 
-  String toUTF8String() => UTF8.decoder.convert(data, start, start + _length);
+  String toUTF8String() => UTF8.decoder.convert(_data, _start, _start + _length);
 }

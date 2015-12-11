@@ -89,6 +89,8 @@ class ConnectionImpl implements Connection {
       throw new SqlError();
     }
 
+    var columnCount = response1.columnCount;
+
     while (true) {
       var response2 = await _reader.readResultSetColumnDefinitionResponse();
       if (response2 is! ResultSetColumnDefinitionResponsePacket) {
@@ -96,14 +98,17 @@ class ConnectionImpl implements Connection {
       }
     }
 
+    var reusablePacketBuffer = new PacketBuffer.reusable();
+    var reusablePacket = new ResultSetRowResponsePacket.reusable(columnCount);
     while (true) {
-      var response3 = await _reader.readResultSetRowResponse();
+      var response3 = _reader.readResultSetRowResponse2(reusablePacketBuffer, reusablePacket);
+      response3 = response3 is Future ? await response3 : response3;
       if (response3 is! ResultSetRowResponsePacket) {
         break;
       }
     }
-
-    // await _reader.readResultSetRowResponses();
+    reusablePacket.free();
+    reusablePacketBuffer.free();
   }
 
   Future _writeHandshakeResponsePacket(String userName, String password,

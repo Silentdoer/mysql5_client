@@ -21,13 +21,46 @@ class EOFError extends Error {
 }
 
 class ReaderBuffer {
-  final List<DataChunk> _chunks;
-  final int _payloadLength;
+  List<DataChunk> _chunks;
+  int _payloadLength;
 
+  int _chunkIndex;
   int _readCount;
 
   ReaderBuffer(this._chunks, this._payloadLength) {
+    _chunkIndex = 0;
     _readCount = 0;
+  }
+
+  ReaderBuffer.reusable() : this._chunks = new List<DataChunk>();
+
+  ReaderBuffer reuse(int reusableChunks, int payloadLength) {
+    for (var i = reusableChunks; i < _chunks.length; i++) {
+      _chunks[i].free();
+    }
+    _payloadLength = payloadLength;
+    _chunkIndex = 0;
+    _readCount = 0;
+    return this;
+  }
+
+  void free() {
+    for (var chunk in _chunks) {
+      chunk.free();
+    }
+    _payloadLength = null;
+    _chunkIndex = null;
+    _readCount = null;
+  }
+
+  DataChunk getReusableDataChunk(int index) {
+    if (_chunks.length > index) {
+      return _chunks[index];
+    } else {
+      var chunk = new DataChunk.reusable();
+      _chunks.add(chunk);
+      return chunk;
+    }
   }
 
   int get payloadLength => _payloadLength;
@@ -42,7 +75,7 @@ class ReaderBuffer {
     readFixedLengthDataRange(length);
   }
 
-  int checkOneLengthInteger() => _chunks[0].checkOneByte();
+  int checkOneLengthInteger() => _chunks[_chunkIndex].checkOneByte();
 
   int readOneLengthInteger() => _readOneByte();
 
@@ -109,9 +142,10 @@ class ReaderBuffer {
       readFixedLengthUTF8String(_payloadLength - _readCount);
 
   DataRange readFixedLengthDataRange(int length) {
-    var range = _chunks[0].extractFixedLengthDataRange(length);
-    if (_chunks[0].isEmpty) {
-      _chunks.removeAt(0);
+    var chunk = _chunks[_chunkIndex];
+    var range = chunk.extractFixedLengthDataRange(length);
+    if (chunk.isEmpty) {
+      _chunkIndex++;
     }
 
     if (range.isPending) {
@@ -121,9 +155,10 @@ class ReaderBuffer {
       var start = range.length;
       var leftLength = length - range.length;
       do {
-        range = _chunks[0].extractFixedLengthDataRange(leftLength);
-        if (_chunks[0].isEmpty) {
-          _chunks.removeAt(0);
+        chunk = _chunks[_chunkIndex];
+        range = chunk.extractFixedLengthDataRange(leftLength);
+        if (chunk.isEmpty) {
+          _chunkIndex++;
         }
         var end = start + range.length;
         data.setRange(start, end, range.data, range.start);
@@ -140,8 +175,9 @@ class ReaderBuffer {
   }
 
   DataRange readUpToDataRange(int terminator) {
-    var range = _chunks[0].extractUpToDataRange(terminator);
-    if (_chunks[0].isEmpty) {
+    var chunk = _chunks[_chunkIndex];
+    var range = chunk.extractUpToDataRange(terminator);
+    if (chunk.isEmpty) {
       _chunks.removeAt(0);
     }
 
@@ -150,9 +186,10 @@ class ReaderBuffer {
       var builder = new BytesBuilder();
       builder.add(range.data.sublist(range.start, range.start + range.length));
       do {
-        range = _chunks[0].extractUpToDataRange(terminator);
-        if (_chunks[0].isEmpty) {
-          _chunks.removeAt(0);
+        chunk = _chunks[_chunkIndex];
+        range = chunk.extractUpToDataRange(terminator);
+        if (chunk.isEmpty) {
+          _chunkIndex++;
         }
         builder
             .add(range.data.sublist(range.start, range.start + range.length));
@@ -167,9 +204,10 @@ class ReaderBuffer {
   }
 
   int _readOneByte() {
-    var byte = _chunks[0].extractOneByte();
-    if (_chunks[0].isEmpty) {
-      _chunks.removeAt(0);
+    var chunk = _chunks[_chunkIndex];
+    var byte = chunk.extractOneByte();
+    if (chunk.isEmpty) {
+      _chunkIndex++;
     }
     _readCount++;
     return byte;

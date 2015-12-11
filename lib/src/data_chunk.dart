@@ -8,12 +8,27 @@ import 'data_commons.dart';
 import 'data_range.dart';
 
 class DataChunk {
-  final List<int> _data;
+  List<int> _data;
   int _start;
   int _length;
 
   DataChunk(this._data, [this._start = 0, this._length]) {
-    this._length ??= this._data.length - this._start;
+    _length ??= _data.length - _start;
+  }
+
+  DataChunk.reusable();
+
+  DataChunk reuse(List<int> data, [int start = 0, int length]) {
+    _data = data;
+    _start = start;
+    _length = length ?? _data.length - _start;
+    return this;
+  }
+
+  void free() {
+    _data = null;
+    _start = null;
+    _length = null;
   }
 
   bool get isEmpty => _length == 0;
@@ -38,6 +53,19 @@ class DataChunk {
 
     length = min(_length, length);
     var chunk = new DataChunk(_data, _start, length);
+    _start += length;
+    _length -= length;
+
+    previousTag.makeCurrent();
+
+    return chunk;
+  }
+
+  DataChunk extractReusableDataChunk(DataChunk reusableChunk, int length) {
+    var previousTag = CHUNK_TAG.makeCurrent();
+
+    length = min(_length, length);
+    var chunk = reusableChunk.reuse(_data, _start, length);
     _start += length;
     _length -= length;
 

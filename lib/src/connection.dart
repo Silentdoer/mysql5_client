@@ -91,25 +91,27 @@ class ConnectionImpl implements Connection {
 
     var columnCount = response1.columnCount;
 
+/*
     while (true) {
       var response2 = await _reader.readResultSetColumnDefinitionResponse();
       if (response2 is! ResultSetColumnDefinitionResponsePacket) {
         break;
       }
     }
-
+*/
     var reusablePacketBuffer = new PacketBuffer.reusable();
-/*
-    var reusableColumnPacket = new ResultSetColumnDefinitionResponsePacket.reusable();
+
+    var reusableColumnPacket =
+        new ResultSetColumnDefinitionResponsePacket.reusable();
     while (true) {
-      var response2 = _reader.readResultSetColumnDefinitionResponse(reusableResultSetPacket, reusablePacketBuffer);
+      var response2 = _reader.readResultSetColumnDefinitionResponse(
+          reusableColumnPacket, reusablePacketBuffer);
       response2 = response2 is Future ? await response2 : response2;
       if (response2 is! ResultSetColumnDefinitionResponsePacket) {
         break;
       }
     }
-    reusableResultSetPacket.free();
-*/
+    reusableColumnPacket.free();
 
     var reusableResultSetPacket =
         new ResultSetRowResponsePacket.reusable(columnCount);

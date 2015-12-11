@@ -82,32 +82,8 @@ class ReaderBuffer {
   int readFixedLengthInteger(int length) =>
       readFixedLengthDataRange(length, new DataRange.reusable()).toInt();
 
-  int readLengthEncodedInteger() {
-    var firstByte = _readOneByte();
-    var bytesLength;
-    switch (firstByte) {
-      case PREFIX_INT_2:
-        bytesLength = 3;
-        break;
-      case PREFIX_INT_3:
-        bytesLength = 4;
-        break;
-      case PREFIX_INT_8:
-        if (_payloadLength - _readCount >= 8) {
-          bytesLength = 9;
-        } else {
-          throw new EOFError();
-        }
-        break;
-      case PREFIX_NULL:
-        throw new NullError();
-      case PREFIX_UNDEFINED:
-        throw new UndefinedError();
-      default:
-        return firstByte;
-    }
-    return readFixedLengthInteger(bytesLength - 1);
-  }
+  int readLengthEncodedInteger() =>
+      readLengthEncodedDataRange(new DataRange.reusable()).toInt();
 
   DataRange readNulTerminatedDataRange() =>
       readUpToDataRange(NULL_TERMINATOR, new DataRange.reusable());
@@ -124,9 +100,6 @@ class ReaderBuffer {
 
   String readFixedLengthUTF8String(int length) =>
       readFixedLengthDataRange(length, new DataRange.reusable()).toUTF8String();
-
-  DataRange readLengthEncodedDataRange() => readFixedLengthDataRange(
-      readLengthEncodedInteger(), new DataRange.reusable());
 
   String readLengthEncodedString() =>
       readFixedLengthString(readLengthEncodedInteger());
@@ -203,6 +176,33 @@ class ReaderBuffer {
     // skip the terminator
     _readCount += range.length + 1;
     return range;
+  }
+
+  DataRange readLengthEncodedDataRange(DataRange reusableRange) {
+    var firstByte = _readOneByte();
+    var bytesLength;
+    switch (firstByte) {
+      case PREFIX_INT_2:
+        bytesLength = 3;
+        break;
+      case PREFIX_INT_3:
+        bytesLength = 4;
+        break;
+      case PREFIX_INT_8:
+        if (_payloadLength - _readCount >= 8) {
+          bytesLength = 9;
+        } else {
+          throw new EOFError();
+        }
+        break;
+      case PREFIX_NULL:
+        throw new NullError();
+      case PREFIX_UNDEFINED:
+        throw new UndefinedError();
+      default:
+        return reusableRange.reuseByte(firstByte);
+    }
+    return readFixedLengthDataRange(bytesLength - 1, reusableRange);
   }
 
   int _readOneByte() {

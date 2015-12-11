@@ -78,18 +78,78 @@ class ResultSetColumnCountResponsePacket extends Packet {
 }
 
 class ResultSetColumnDefinitionResponsePacket extends Packet {
-  String catalog;
-  String schema;
-  String table;
-  String orgTable;
-  String name;
-  String orgName;
-  int fieldsLength;
-  int characterSet;
-  int columnLength;
-  int type;
-  int flags;
-  int decimals;
+  final List<DataRange> _dataRanges;
+
+  ResultSetColumnDefinitionResponsePacket.reusable()
+      : _dataRanges = new List<DataRange>.filled(13, new DataRange.reusable());
+
+  ResultSetColumnDefinitionResponsePacket reuse(PacketBuffer buffer) {
+    var i = 0;
+
+    // lenenc_str     catalog
+    buffer.payload.readFixedLengthDataRange(
+        buffer.payload.readLengthEncodedDataRange(_dataRanges[i++]).toInt(),
+        _dataRanges[i]);
+    // lenenc_str     schema
+    buffer.payload.readFixedLengthDataRange(
+        buffer.payload.readLengthEncodedDataRange(_dataRanges[i++]).toInt(),
+        _dataRanges[i]);
+    // lenenc_str     table
+    buffer.payload.readFixedLengthDataRange(
+        buffer.payload.readLengthEncodedDataRange(_dataRanges[i++]).toInt(),
+        _dataRanges[i]);
+    // lenenc_str     org_table
+    buffer.payload.readFixedLengthDataRange(
+        buffer.payload.readLengthEncodedDataRange(_dataRanges[i++]).toInt(),
+        _dataRanges[i]);
+    // lenenc_str     name
+    buffer.payload.readFixedLengthDataRange(
+        buffer.payload.readLengthEncodedDataRange(_dataRanges[i++]).toInt(),
+        _dataRanges[i]);
+    // lenenc_str     org_name
+    buffer.payload.readFixedLengthDataRange(
+        buffer.payload.readLengthEncodedDataRange(_dataRanges[i++]).toInt(),
+        _dataRanges[i]);
+    // lenenc_int     length of fixed-length fields [0c]
+    buffer.payload.readLengthEncodedDataRange(_dataRanges[i++]);
+    // 2              character set
+    buffer.payload.readFixedLengthDataRange(2, _dataRanges[i++]);
+    // 4              column length
+    buffer.payload.readFixedLengthDataRange(4, _dataRanges[i++]);
+    // 1              type
+    buffer.payload.readFixedLengthDataRange(1, _dataRanges[i++]);
+    // 2              flags
+    buffer.payload.readFixedLengthDataRange(2, _dataRanges[i++]);
+    // 1              decimals
+    buffer.payload.readFixedLengthDataRange(1, _dataRanges[i++]);
+    // 2              filler [00] [00]
+    buffer.payload.readFixedLengthDataRange(2, _dataRanges[i++]);
+
+    return this;
+  }
+
+  void free() {
+    for (var range in _dataRanges) {
+      range?.free();
+    }
+  }
+
+  String get catalog => _getString(0);
+  String get schema => _getString(1);
+  String get table => _getString(2);
+  String get orgTable => _getString(3);
+  String get name => _getString(4);
+  String get orgName => _getString(5);
+  int get fieldsLength => _getInt(6);
+  int get characterSet => _getInt(7);
+  int get columnLength => _getInt(8);
+  int get type => _getInt(9);
+  int get flags => _getInt(10);
+  int get decimals => _getInt(11);
+
+  int _getInt(int index) => _dataRanges[index].toInt();
+
+  String _getString(int index) => _dataRanges[index].toString();
 }
 
 class ResultSetRowResponsePacket extends Packet {
@@ -174,16 +234,19 @@ class PacketReader {
   Future<Packet> readCommandQueryResponse() => _readPacketFromBufferAsync(
       _readCommandQueryResponseInternal, new PacketBuffer.reusable());
 
-  Future<Packet> readResultSetColumnDefinitionResponse() =>
-      _readPacketFromBufferAsync(_readResultSetColumnDefinitionResponseInternal,
-          new PacketBuffer.reusable());
-/*
-  readResultSetRowResponse(ResultSetRowResponsePacket reusablePacket,
-          PacketBuffer reusablePacketBuffer) =>
-      _readPacketFromBuffer(
-          (buffer) => _readResultSetRowResponseInternal(buffer, reusablePacket),
-          reusablePacketBuffer);
-*/
+  readResultSetColumnDefinitionResponse(
+      ResultSetColumnDefinitionResponsePacket reusablePacket,
+      PacketBuffer reusablePacketBuffer) {
+    var value = _readPacketBuffer(reusablePacketBuffer);
+    if (value is Future) {
+      return value.then((buffer) =>
+          _readResultSetColumnDefinitionResponseInternal(
+              buffer, reusablePacket));
+    } else {
+      return _readResultSetColumnDefinitionResponseInternal(
+          value, reusablePacket);
+    }
+  }
 
   readResultSetRowResponse(ResultSetRowResponsePacket reusablePacket,
       PacketBuffer reusablePacketBuffer) {
@@ -236,13 +299,15 @@ class PacketReader {
     }
   }
 
-  Packet _readResultSetColumnDefinitionResponseInternal(PacketBuffer buffer) {
+  Packet _readResultSetColumnDefinitionResponseInternal(PacketBuffer buffer,
+      ResultSetColumnDefinitionResponsePacket reusablePacket) {
     if (_isErrorPacket(buffer)) {
       return _readErrorPacket(buffer);
     } else if (_isEOFPacket(buffer)) {
       return _readEOFPacket(buffer);
     } else {
-      return _readResultSetColumnDefinitionResponsePacket(buffer);
+      return _readResultSetColumnDefinitionResponsePacket(
+          buffer, reusablePacket);
     }
   }
 
@@ -324,38 +389,9 @@ class PacketReader {
   }
 
   ResultSetColumnDefinitionResponsePacket _readResultSetColumnDefinitionResponsePacket(
-      PacketBuffer buffer) {
-    var packet = new ResultSetColumnDefinitionResponsePacket();
-
-    // lenenc_str     catalog
-    packet.catalog = buffer.payload.readLengthEncodedString();
-    // lenenc_str     schema
-    packet.schema = buffer.payload.readLengthEncodedString();
-    // lenenc_str     table
-    packet.table = buffer.payload.readLengthEncodedString();
-    // lenenc_str     org_table
-    packet.orgTable = buffer.payload.readLengthEncodedString();
-    // lenenc_str     name
-    packet.name = buffer.payload.readLengthEncodedString();
-    // lenenc_str     org_name
-    packet.orgName = buffer.payload.readLengthEncodedString();
-    // lenenc_int     length of fixed-length fields [0c]
-    packet.fieldsLength = buffer.payload.readLengthEncodedInteger();
-    // 2              character set
-    packet.characterSet = buffer.payload.readFixedLengthInteger(2);
-    // 4              column length
-    packet.columnLength = buffer.payload.readFixedLengthInteger(4);
-    // 1              type
-    packet.type = buffer.payload.readOneLengthInteger();
-    // 2              flags
-    packet.flags = buffer.payload.readFixedLengthInteger(2);
-    // 1              decimals
-    packet.decimals = buffer.payload.readOneLengthInteger();
-    // 2              filler [00] [00]
-    buffer.payload.skipBytes(2);
-
-    return packet;
-  }
+          PacketBuffer buffer,
+          ResultSetColumnDefinitionResponsePacket reusablePacket) =>
+      reusablePacket.reuse(buffer);
 
   ResultSetRowResponsePacket _readResultSetRowResponsePacket(
           PacketBuffer buffer, ResultSetRowResponsePacket reusablePacket) =>

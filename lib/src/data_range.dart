@@ -40,6 +40,14 @@ class DataRange {
     return this;
   }
 
+  DataRange reuseByte(int byte) {
+    _isPending = null;
+    _data = null;
+    _start = byte;
+    _length = null;
+    return this;
+  }
+
   DataRange reuseNil() {
     _isPending = null;
     _data = null;
@@ -62,7 +70,7 @@ class DataRange {
 
   int toInt() {
     if (_data == null) {
-      return null;
+      return _start;
     }
     var i = _start;
     switch (_length) {

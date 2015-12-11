@@ -15,9 +15,9 @@ const SIMPLE_SELECTS = 1000;
 // sudo ngrep -x -q -d lo0 '' 'port 3306'
 
 Future main() async {
-  // await new SqlJockySpeedTest().run();
-
   await new MySqlClientSpeedTest().run();
+
+  // await new SqlJockySpeedTest().run();
 }
 
 abstract class SpeedTest {

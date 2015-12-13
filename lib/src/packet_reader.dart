@@ -77,62 +77,32 @@ class ResultSetColumnCountResponsePacket extends Packet {
   int columnCount;
 }
 
-class ResultSetColumnDefinitionResponsePacket extends Packet {
+class Packet2 extends Packet {
   final List<DataRange> _dataRanges;
 
-  ResultSetColumnDefinitionResponsePacket.reusable()
-      : _dataRanges = new List<DataRange>.filled(13, new DataRange.reusable());
+  Packet2.reusable(int rangeCount)
+      : _dataRanges =
+            new List<DataRange>.filled(rangeCount, new DataRange.reusable());
 
-  ResultSetColumnDefinitionResponsePacket reuse(PacketBuffer buffer) {
-    var i = 0;
+  DataRange getReusableRange(int i) => _dataRanges[i];
 
-    // lenenc_str     catalog
-    buffer.payload.readFixedLengthDataRange(
-        buffer.payload.readLengthEncodedDataRange(_dataRanges[i++]).toInt(),
-        _dataRanges[i]);
-    // lenenc_str     schema
-    buffer.payload.readFixedLengthDataRange(
-        buffer.payload.readLengthEncodedDataRange(_dataRanges[i++]).toInt(),
-        _dataRanges[i]);
-    // lenenc_str     table
-    buffer.payload.readFixedLengthDataRange(
-        buffer.payload.readLengthEncodedDataRange(_dataRanges[i++]).toInt(),
-        _dataRanges[i]);
-    // lenenc_str     org_table
-    buffer.payload.readFixedLengthDataRange(
-        buffer.payload.readLengthEncodedDataRange(_dataRanges[i++]).toInt(),
-        _dataRanges[i]);
-    // lenenc_str     name
-    buffer.payload.readFixedLengthDataRange(
-        buffer.payload.readLengthEncodedDataRange(_dataRanges[i++]).toInt(),
-        _dataRanges[i]);
-    // lenenc_str     org_name
-    buffer.payload.readFixedLengthDataRange(
-        buffer.payload.readLengthEncodedDataRange(_dataRanges[i++]).toInt(),
-        _dataRanges[i]);
-    // lenenc_int     length of fixed-length fields [0c]
-    buffer.payload.readLengthEncodedDataRange(_dataRanges[i++]);
-    // 2              character set
-    buffer.payload.readFixedLengthDataRange(2, _dataRanges[i++]);
-    // 4              column length
-    buffer.payload.readFixedLengthDataRange(4, _dataRanges[i++]);
-    // 1              type
-    buffer.payload.readFixedLengthDataRange(1, _dataRanges[i++]);
-    // 2              flags
-    buffer.payload.readFixedLengthDataRange(2, _dataRanges[i++]);
-    // 1              decimals
-    buffer.payload.readFixedLengthDataRange(1, _dataRanges[i++]);
-    // 2              filler [00] [00]
-    buffer.payload.readFixedLengthDataRange(2, _dataRanges[i++]);
-
-    return this;
-  }
+  Packet2 reuse() => this;
 
   void free() {
     for (var range in _dataRanges) {
       range?.free();
     }
   }
+
+  int _getInt(int index) => _dataRanges[index].toInt();
+
+  String _getString(int index) => _dataRanges[index].toString();
+
+  String _getUTF8String(int index) => _dataRanges[index].toUTF8String();
+}
+
+class ResultSetColumnDefinitionResponsePacket extends Packet2 {
+  ResultSetColumnDefinitionResponsePacket.reusable() : super.reusable(13);
 
   String get catalog => _getString(0);
   String get schema => _getString(1);
@@ -146,42 +116,15 @@ class ResultSetColumnDefinitionResponsePacket extends Packet {
   int get type => _getInt(9);
   int get flags => _getInt(10);
   int get decimals => _getInt(11);
-
-  int _getInt(int index) => _dataRanges[index].toInt();
-
-  String _getString(int index) => _dataRanges[index].toString();
 }
 
-class ResultSetRowResponsePacket extends Packet {
-  final List<DataRange> _dataRanges;
-
+class ResultSetRowResponsePacket extends Packet2 {
   ResultSetRowResponsePacket.reusable(int columnCount)
-      : _dataRanges =
-            new List<DataRange>.filled(columnCount, new DataRange.reusable());
+      : super.reusable(columnCount);
 
-  ResultSetRowResponsePacket reuse(PacketBuffer buffer) {
-    var i = 0;
-    while (!buffer.payload.isAllRead) {
-      if (buffer.payload.checkOneLengthInteger() != PREFIX_NULL) {
-        var fieldLength = buffer.payload.readLengthEncodedInteger();
-        buffer.payload.readFixedLengthDataRange(fieldLength, _dataRanges[i++]);
-      } else {
-        buffer.payload.skipByte();
-        _dataRanges[i++].reuseNil();
-      }
-    }
-    return this;
-  }
+  String getString(int index) => _getString(index);
 
-  void free() {
-    for (var range in _dataRanges) {
-      range?.free();
-    }
-  }
-
-  String getString(int index) => _dataRanges[index].toString();
-
-  String getUTF8String(int index) => _dataRanges[index].toUTF8String();
+  String getUTF8String(int index) => _getUTF8String(index);
 }
 
 class PacketBuffer {
@@ -389,13 +332,81 @@ class PacketReader {
   }
 
   ResultSetColumnDefinitionResponsePacket _readResultSetColumnDefinitionResponsePacket(
-          PacketBuffer buffer,
-          ResultSetColumnDefinitionResponsePacket reusablePacket) =>
-      reusablePacket.reuse(buffer);
+      PacketBuffer buffer,
+      ResultSetColumnDefinitionResponsePacket reusablePacket) {
+    var dataRange;
+    var i = 0;
+    // lenenc_str     catalog
+    dataRange = reusablePacket.getReusableRange(i++);
+    buffer.payload.readFixedLengthDataRange(
+        buffer.payload.readLengthEncodedDataRange(dataRange).toInt(),
+        dataRange);
+    // lenenc_str     schema
+    dataRange = reusablePacket.getReusableRange(i++);
+    buffer.payload.readFixedLengthDataRange(
+        buffer.payload.readLengthEncodedDataRange(dataRange).toInt(),
+        dataRange);
+    // lenenc_str     table
+    dataRange = reusablePacket.getReusableRange(i++);
+    buffer.payload.readFixedLengthDataRange(
+        buffer.payload.readLengthEncodedDataRange(dataRange).toInt(),
+        dataRange);
+    // lenenc_str     org_table
+    dataRange = reusablePacket.getReusableRange(i++);
+    buffer.payload.readFixedLengthDataRange(
+        buffer.payload.readLengthEncodedDataRange(dataRange).toInt(),
+        dataRange);
+    // lenenc_str     name
+    dataRange = reusablePacket.getReusableRange(i++);
+    buffer.payload.readFixedLengthDataRange(
+        buffer.payload.readLengthEncodedDataRange(dataRange).toInt(),
+        dataRange);
+    // lenenc_str     org_name
+    dataRange = reusablePacket.getReusableRange(i++);
+    buffer.payload.readFixedLengthDataRange(
+        buffer.payload.readLengthEncodedDataRange(dataRange).toInt(),
+        dataRange);
+    // lenenc_int     length of fixed-length fields [0c]
+    dataRange = reusablePacket.getReusableRange(i++);
+    buffer.payload.readLengthEncodedDataRange(dataRange);
+    // 2              character set
+    dataRange = reusablePacket.getReusableRange(i++);
+    buffer.payload.readFixedLengthDataRange(2, dataRange);
+    // 4              column length
+    dataRange = reusablePacket.getReusableRange(i++);
+    buffer.payload.readFixedLengthDataRange(4, dataRange);
+    // 1              type
+    dataRange = reusablePacket.getReusableRange(i++);
+    buffer.payload.readFixedLengthDataRange(1, dataRange);
+    // 2              flags
+    dataRange = reusablePacket.getReusableRange(i++);
+    buffer.payload.readFixedLengthDataRange(2, dataRange);
+    // 1              decimals
+    dataRange = reusablePacket.getReusableRange(i++);
+    buffer.payload.readFixedLengthDataRange(1, dataRange);
+    // 2              filler [00] [00]
+    dataRange = reusablePacket.getReusableRange(i++);
+    buffer.payload.readFixedLengthDataRange(2, dataRange);
+
+    return reusablePacket.reuse();
+  }
 
   ResultSetRowResponsePacket _readResultSetRowResponsePacket(
-          PacketBuffer buffer, ResultSetRowResponsePacket reusablePacket) =>
-      reusablePacket.reuse(buffer);
+      PacketBuffer buffer, ResultSetRowResponsePacket reusablePacket) {
+    var i = 0;
+    while (!buffer.payload.isAllRead) {
+      if (buffer.payload.checkOneLengthInteger() != PREFIX_NULL) {
+        var fieldLength = buffer.payload.readLengthEncodedInteger();
+        buffer.payload.readFixedLengthDataRange(
+            fieldLength, reusablePacket.getReusableRange(i++));
+      } else {
+        buffer.payload.skipByte();
+        reusablePacket.getReusableRange(i++).reuseNil();
+      }
+    }
+
+    return reusablePacket.reuse();
+  }
 
   OkPacket _readOkPacket(PacketBuffer buffer) {
     var packet = new OkPacket();

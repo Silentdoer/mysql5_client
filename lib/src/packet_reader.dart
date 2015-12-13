@@ -465,20 +465,14 @@ class PacketReader {
 
   _readPacketFromBuffer(Packet reader()) {
     var value = _readPacketBuffer();
-    if (value is Future) {
-      return value.then((_) => reader());
-    } else {
-      return reader();
-    }
+    return value is Future ? value.then((_) => reader()) : reader();
   }
 
   _readPacketBuffer() {
     var value = _reader.readBuffer(4, _reusableHeaderReaderBuffer);
-    if (value is Future) {
-      return value.then((headerReaderBuffer) => _readPacketBufferInternal());
-    } else {
-      return _readPacketBufferInternal();
-    }
+    return value is Future
+        ? value.then((headerReaderBuffer) => _readPacketBufferInternal())
+        : _readPacketBufferInternal();
   }
 
   _readPacketBufferInternal() {

@@ -34,7 +34,6 @@ class PacketReader {
 
   final PacketBuffer _reusablePacketBuffer = new PacketBuffer.reusable();
   final ReaderBuffer _reusableHeaderReaderBuffer = new ReaderBuffer.reusable();
-  final DataRange _reusablePayloadLengthDataRange = new DataRange.reusable();
   final DataRange _reusableDataRange = new DataRange.reusable();
 
   int serverCapabilityFlags;
@@ -43,41 +42,34 @@ class PacketReader {
   PacketReader(this._reader, {this.clientCapabilityFlags: 0});
 
   Future<Packet> readInitialHandshakeResponse() => _readPacketFromBufferAsync(
-      _readInitialHandshakeResponseInternal,
-      _reusablePacketBuffer,
-      _reusableDataRange);
+      _readInitialHandshakeResponseInternal, _reusablePacketBuffer);
 
   Future<Packet> readCommandResponse() => _readPacketFromBufferAsync(
-      _readCommandResponseInternal, _reusablePacketBuffer, _reusableDataRange);
+      _readCommandResponseInternal, _reusablePacketBuffer);
 
   Future<Packet> readCommandQueryResponse() => _readPacketFromBufferAsync(
-      _readCommandQueryResponseInternal,
-      _reusablePacketBuffer,
-      _reusableDataRange);
+      _readCommandQueryResponseInternal, _reusablePacketBuffer);
 
   readResultSetColumnDefinitionResponse(
-      ResultSetColumnDefinitionResponsePacket reusablePacket,
-      PacketBuffer reusablePacketBuffer) {
-    var value = _readPacketBuffer(reusablePacketBuffer);
+      ResultSetColumnDefinitionResponsePacket reusablePacket) {
+    var value = _readPacketBuffer(_reusablePacketBuffer);
     if (value is Future) {
       return value.then((buffer) =>
           _readResultSetColumnDefinitionResponseInternal(
-              buffer, reusablePacket, _reusableDataRange));
+              buffer, reusablePacket));
     } else {
       return _readResultSetColumnDefinitionResponseInternal(
-          value, reusablePacket, _reusableDataRange);
+          value, reusablePacket);
     }
   }
 
-  readResultSetRowResponse(ResultSetRowResponsePacket reusablePacket,
-      PacketBuffer reusablePacketBuffer) {
-    var value = _readPacketBuffer(reusablePacketBuffer);
+  readResultSetRowResponse(ResultSetRowResponsePacket reusablePacket) {
+    var value = _readPacketBuffer(_reusablePacketBuffer);
     if (value is Future) {
-      return value.then((buffer) => _readResultSetRowResponseInternal(
-          buffer, reusablePacket, _reusableDataRange));
+      return value.then((buffer) =>
+          _readResultSetRowResponseInternal(buffer, reusablePacket));
     } else {
-      return _readResultSetRowResponseInternal(
-          value, reusablePacket, _reusableDataRange);
+      return _readResultSetRowResponseInternal(value, reusablePacket);
     }
   }
 
@@ -91,76 +83,71 @@ class PacketReader {
 
   bool _isLocalInFilePacket(PacketBuffer buffer) => buffer.header == 0xfb;
 
-  Packet _readCommandResponseInternal(
-      PacketBuffer buffer, DataRange reusableDataRange) {
+  Packet _readCommandResponseInternal(PacketBuffer buffer) {
     if (_isOkPacket(buffer)) {
-      return _readOkPacket(buffer, reusableDataRange);
+      return _readOkPacket(buffer);
     } else if (_isErrorPacket(buffer)) {
-      return _readErrorPacket(buffer, reusableDataRange);
+      return _readErrorPacket(buffer);
     } else {
       throw new UnsupportedError("header: ${buffer.header}");
     }
   }
 
-  Packet _readInitialHandshakeResponseInternal(
-      PacketBuffer buffer, DataRange reusableDataRange) {
+  Packet _readInitialHandshakeResponseInternal(PacketBuffer buffer) {
     if (_isErrorPacket(buffer)) {
-      return _readErrorPacket(buffer, reusableDataRange);
+      return _readErrorPacket(buffer);
     } else {
-      return _readInitialHandshakePacket(buffer, reusableDataRange);
+      return _readInitialHandshakePacket(buffer);
     }
   }
 
-  Packet _readCommandQueryResponseInternal(
-      PacketBuffer buffer, DataRange reusableDataRange) {
+  Packet _readCommandQueryResponseInternal(PacketBuffer buffer) {
     if (_isOkPacket(buffer)) {
-      return _readOkPacket(buffer, reusableDataRange);
+      return _readOkPacket(buffer);
     } else if (_isErrorPacket(buffer)) {
-      return _readErrorPacket(buffer, reusableDataRange);
+      return _readErrorPacket(buffer);
     } else if (_isLocalInFilePacket(buffer)) {
       throw new UnsupportedError("Protocol::LOCAL_INFILE_Data");
     } else {
-      return _readResultSetColumnCountResponsePacket(buffer, reusableDataRange);
+      return _readResultSetColumnCountResponsePacket(buffer);
     }
   }
 
-  Packet _readResultSetColumnDefinitionResponseInternal(
-      PacketBuffer buffer,
-      ResultSetColumnDefinitionResponsePacket reusablePacket,
-      DataRange reusableDataRange) {
+  Packet _readResultSetColumnDefinitionResponseInternal(PacketBuffer buffer,
+      ResultSetColumnDefinitionResponsePacket reusablePacket) {
     if (_isErrorPacket(buffer)) {
-      return _readErrorPacket(buffer, reusableDataRange);
+      return _readErrorPacket(buffer);
     } else if (_isEOFPacket(buffer)) {
-      return _readEOFPacket(buffer, reusableDataRange);
+      return _readEOFPacket(buffer);
     } else {
       return _readResultSetColumnDefinitionResponsePacket(
           buffer, reusablePacket);
     }
   }
 
-  Packet _readResultSetRowResponseInternal(PacketBuffer buffer,
-      ResultSetRowResponsePacket reusablePacket, DataRange reusableDataRange) {
+  Packet _readResultSetRowResponseInternal(
+      PacketBuffer buffer, ResultSetRowResponsePacket reusablePacket) {
     if (_isErrorPacket(buffer)) {
-      return _readErrorPacket(buffer, reusableDataRange);
+      return _readErrorPacket(buffer);
     } else if (_isEOFPacket(buffer)) {
-      return _readEOFPacket(buffer, reusableDataRange);
+      return _readEOFPacket(buffer);
     } else {
       return _readResultSetRowResponsePacket(buffer, reusablePacket);
     }
   }
 
-  OkPacket _readOkPacket(PacketBuffer buffer, DataRange reusableDataRange) {
+  OkPacket _readOkPacket(PacketBuffer buffer) {
     var packet = new OkPacket();
 
     packet.sequenceId = buffer.sequenceId;
     packet.payloadLength = buffer.payloadLength;
 
-    _completeSuccessResponsePacket(packet, buffer, reusableDataRange);
+    _completeSuccessResponsePacket(packet, buffer);
 
     return packet;
   }
 
-  EOFPacket _readEOFPacket(PacketBuffer buffer, DataRange reusableDataRange) {
+  EOFPacket _readEOFPacket(PacketBuffer buffer) {
     var packet = new EOFPacket();
 
     packet.sequenceId = buffer.sequenceId;
@@ -170,18 +157,18 @@ class PacketReader {
     bool isEOFDeprecated = false;
 
     if (isEOFDeprecated) {
-      _completeSuccessResponsePacket(packet, buffer, reusableDataRange);
+      _completeSuccessResponsePacket(packet, buffer);
     } else {
       // EOF packet
       // if capabilities & CLIENT_PROTOCOL_41 {
       if (serverCapabilityFlags & CLIENT_PROTOCOL_41 != 0) {
         // int<2>	warnings	number of warnings
         packet.warnings = buffer.payload
-            .readFixedLengthDataRange(2, reusableDataRange)
+            .readFixedLengthDataRange(2, _reusableDataRange)
             .toInt();
         // int<2>	status_flags	Status Flags
         packet.statusFlags = buffer.payload
-            .readFixedLengthDataRange(2, reusableDataRange)
+            .readFixedLengthDataRange(2, _reusableDataRange)
             .toInt();
       }
     }
@@ -189,8 +176,7 @@ class PacketReader {
     return packet;
   }
 
-  ErrorPacket _readErrorPacket(
-      PacketBuffer buffer, DataRange reusableDataRange) {
+  ErrorPacket _readErrorPacket(PacketBuffer buffer) {
     var packet = new ErrorPacket();
 
     packet.sequenceId = buffer.sequenceId;
@@ -198,50 +184,54 @@ class PacketReader {
 
     // int<2>	error_code	error-code
     packet.errorCode =
-        buffer.payload.readFixedLengthDataRange(2, reusableDataRange).toInt();
+        buffer.payload.readFixedLengthDataRange(2, _reusableDataRange).toInt();
     // if capabilities & CLIENT_PROTOCOL_41 {
     if (serverCapabilityFlags & CLIENT_PROTOCOL_41 != 0) {
       // string[1]	sql_state_marker	# marker of the SQL State
       packet.sqlStateMarker = buffer.payload
-          .readFixedLengthDataRange(1, reusableDataRange)
+          .readFixedLengthDataRange(1, _reusableDataRange)
           .toString();
       // string[5]	sql_state	SQL State
       packet.sqlState = buffer.payload
-          .readFixedLengthDataRange(5, reusableDataRange)
+          .readFixedLengthDataRange(5, _reusableDataRange)
           .toString();
     }
     // string<EOF>	error_message	human readable error message
-    packet.errorMessage =
-        buffer.payload.readNulTerminatedDataRange(reusableDataRange).toString();
+    packet.errorMessage = buffer.payload
+        .readNulTerminatedDataRange(_reusableDataRange)
+        .toString();
 
     return packet;
   }
 
-  void _completeSuccessResponsePacket(SuccessResponsePacket packet,
-      PacketBuffer buffer, DataRange reusableDataRange) {
+  void _completeSuccessResponsePacket(
+      SuccessResponsePacket packet, PacketBuffer buffer) {
     // int<1>	header	[00] or [fe] the OK packet header
     packet.header =
-        buffer.payload.readFixedLengthDataRange(1, reusableDataRange).toInt();
+        buffer.payload.readFixedLengthDataRange(1, _reusableDataRange).toInt();
     // int<lenenc>	affected_rows	affected rows
     packet.affectedRows =
-        buffer.payload.readLengthEncodedDataRange(reusableDataRange).toInt();
+        buffer.payload.readLengthEncodedDataRange(_reusableDataRange).toInt();
     // int<lenenc>	last_insert_id	last insert-id
     packet.lastInsertId =
-        buffer.payload.readLengthEncodedDataRange(reusableDataRange).toInt();
+        buffer.payload.readLengthEncodedDataRange(_reusableDataRange).toInt();
 
     // if capabilities & CLIENT_PROTOCOL_41 {
     if (serverCapabilityFlags & CLIENT_PROTOCOL_41 != 0) {
       // int<2>	status_flags	Status Flags
-      packet.statusFlags =
-          buffer.payload.readFixedLengthDataRange(2, reusableDataRange).toInt();
+      packet.statusFlags = buffer.payload
+          .readFixedLengthDataRange(2, _reusableDataRange)
+          .toInt();
       // int<2>	warnings	number of warnings
-      packet.warnings =
-          buffer.payload.readFixedLengthDataRange(2, reusableDataRange).toInt();
+      packet.warnings = buffer.payload
+          .readFixedLengthDataRange(2, _reusableDataRange)
+          .toInt();
       // } elseif capabilities & CLIENT_TRANSACTIONS {
     } else if (serverCapabilityFlags & CLIENT_TRANSACTIONS != 0) {
       // int<2>	status_flags	Status Flags
-      packet.statusFlags =
-          buffer.payload.readFixedLengthDataRange(2, reusableDataRange).toInt();
+      packet.statusFlags = buffer.payload
+          .readFixedLengthDataRange(2, _reusableDataRange)
+          .toInt();
     } else {
       packet.statusFlags = 0;
     }
@@ -253,9 +243,9 @@ class PacketReader {
         packet.info = buffer.payload
             .readFixedLengthDataRange(
                 buffer.payload
-                    .readLengthEncodedDataRange(reusableDataRange)
+                    .readLengthEncodedDataRange(_reusableDataRange)
                     .toInt(),
-                reusableDataRange)
+                _reusableDataRange)
             .toString();
       }
 
@@ -266,9 +256,9 @@ class PacketReader {
           packet.sessionStateChanges = buffer.payload
               .readFixedLengthDataRange(
                   buffer.payload
-                      .readLengthEncodedDataRange(reusableDataRange)
+                      .readLengthEncodedDataRange(_reusableDataRange)
                       .toInt(),
-                  reusableDataRange)
+                  _reusableDataRange)
               .toString();
         }
       }
@@ -276,65 +266,68 @@ class PacketReader {
     } else {
       // string<EOF>	info	human readable status information
       packet.info = buffer.payload
-          .readNulTerminatedDataRange(reusableDataRange)
+          .readNulTerminatedDataRange(_reusableDataRange)
           .toString();
     }
   }
 
-  InitialHandshakePacket _readInitialHandshakePacket(
-      PacketBuffer buffer, DataRange reusableDataRange) {
+  InitialHandshakePacket _readInitialHandshakePacket(PacketBuffer buffer) {
     var packet = new InitialHandshakePacket();
 
     // 1              [0a] protocol version
     packet._protocolVersion =
-        buffer.payload.readFixedLengthDataRange(1, reusableDataRange).toInt();
+        buffer.payload.readFixedLengthDataRange(1, _reusableDataRange).toInt();
     // string[NUL]    server version
-    packet._serverVersion =
-        buffer.payload.readNulTerminatedDataRange(reusableDataRange).toString();
+    packet._serverVersion = buffer.payload
+        .readNulTerminatedDataRange(_reusableDataRange)
+        .toString();
     // 4              connection id
     packet._connectionId =
-        buffer.payload.readFixedLengthDataRange(4, reusableDataRange).toInt();
+        buffer.payload.readFixedLengthDataRange(4, _reusableDataRange).toInt();
     // string[8]      auth-plugin-data-part-1
     packet._authPluginDataPart1 = buffer.payload
-        .readFixedLengthDataRange(8, reusableDataRange)
+        .readFixedLengthDataRange(8, _reusableDataRange)
         .toString();
     // 1              [00] filler
-    buffer.payload.readFixedLengthDataRange(1, reusableDataRange);
+    buffer.payload.readFixedLengthDataRange(1, _reusableDataRange);
     // 2              capability flags (lower 2 bytes)
     packet._capabilityFlags1 =
-        buffer.payload.readFixedLengthDataRange(2, reusableDataRange).toInt();
+        buffer.payload.readFixedLengthDataRange(2, _reusableDataRange).toInt();
     // if more data in the packet:
     if (!buffer.payload.isAllRead) {
       // 1              character set
-      packet._characterSet =
-          buffer.payload.readFixedLengthDataRange(1, reusableDataRange).toInt();
+      packet._characterSet = buffer.payload
+          .readFixedLengthDataRange(1, _reusableDataRange)
+          .toInt();
       // 2              status flags
-      packet._statusFlags =
-          buffer.payload.readFixedLengthDataRange(2, reusableDataRange).toInt();
+      packet._statusFlags = buffer.payload
+          .readFixedLengthDataRange(2, _reusableDataRange)
+          .toInt();
       // 2              capability flags (upper 2 bytes)
-      packet._capabilityFlags2 =
-          buffer.payload.readFixedLengthDataRange(2, reusableDataRange).toInt();
+      packet._capabilityFlags2 = buffer.payload
+          .readFixedLengthDataRange(2, _reusableDataRange)
+          .toInt();
       packet._serverCapabilityFlags =
           packet.capabilityFlags1 | (packet.capabilityFlags2 << 16);
       // if capabilities & CLIENT_PLUGIN_AUTH {
       if (packet._serverCapabilityFlags & CLIENT_PLUGIN_AUTH != 0) {
         // 1              length of auth-plugin-data
         packet._authPluginDataLength = buffer.payload
-            .readFixedLengthDataRange(1, reusableDataRange)
+            .readFixedLengthDataRange(1, _reusableDataRange)
             .toInt();
       } else {
         // 1              [00]
-        buffer.payload.readFixedLengthDataRange(1, reusableDataRange);
+        buffer.payload.readFixedLengthDataRange(1, _reusableDataRange);
         packet._authPluginDataLength = 0;
       }
       // string[10]     reserved (all [00])
-      buffer.payload.readFixedLengthDataRange(10, reusableDataRange);
+      buffer.payload.readFixedLengthDataRange(10, _reusableDataRange);
       // if capabilities & CLIENT_SECURE_CONNECTION {
       if (packet._serverCapabilityFlags & CLIENT_SECURE_CONNECTION != 0) {
         // string[$len]   auth-plugin-data-part-2 ($len=MAX(13, length of auth-plugin-data - 8))
         var len = max(packet._authPluginDataLength - 8, 13);
         packet._authPluginDataPart2 = buffer.payload
-            .readFixedLengthDataRange(len, reusableDataRange)
+            .readFixedLengthDataRange(len, _reusableDataRange)
             .toString();
       } else {
         packet.authPluginDataPart2 = "";
@@ -346,7 +339,7 @@ class PacketReader {
       if (packet._serverCapabilityFlags & CLIENT_PLUGIN_AUTH != 0) {
         // string[NUL]    auth-plugin name
         packet._authPluginName = buffer.payload
-            .readNulTerminatedDataRange(reusableDataRange)
+            .readNulTerminatedDataRange(_reusableDataRange)
             .toString();
       }
     }
@@ -355,12 +348,12 @@ class PacketReader {
   }
 
   ResultSetColumnCountResponsePacket _readResultSetColumnCountResponsePacket(
-      PacketBuffer buffer, DataRange reusableDataRange) {
+      PacketBuffer buffer) {
     var packet = new ResultSetColumnCountResponsePacket();
 
     // A packet containing a Protocol::LengthEncodedInteger column_count
     packet._columnCount =
-        buffer.payload.readFixedLengthDataRange(1, reusableDataRange).toInt();
+        buffer.payload.readFixedLengthDataRange(1, _reusableDataRange).toInt();
 
     return packet;
   }
@@ -444,23 +437,18 @@ class PacketReader {
   }
 
   Future<Packet> _readPacketFromBufferAsync(
-      Packet reader(PacketBuffer buffer, DataRange reusableDataRange),
-      PacketBuffer reusablePacketBuffer,
-      DataRange reusableDataRange) {
-    var value =
-        _readPacketFromBuffer(reader, reusablePacketBuffer, reusableDataRange);
+      Packet reader(PacketBuffer buffer), PacketBuffer reusablePacketBuffer) {
+    var value = _readPacketFromBuffer(reader, reusablePacketBuffer);
     return value is Future ? value : new Future.value(value);
   }
 
   _readPacketFromBuffer(
-      Packet reader(PacketBuffer buffer, DataRange reusableDataRange),
-      PacketBuffer reusablePacketBuffer,
-      DataRange reusableDataRange) {
+      Packet reader(PacketBuffer buffer), PacketBuffer reusablePacketBuffer) {
     var value = _readPacketBuffer(reusablePacketBuffer);
     if (value is Future) {
-      return value.then((buffer) => reader(buffer, reusableDataRange));
+      return value.then((buffer) => reader(buffer));
     } else {
-      return reader(value, reusableDataRange);
+      return reader(value);
     }
   }
 
@@ -476,11 +464,9 @@ class PacketReader {
 
   _readPacketBufferInternal(PacketBuffer reusablePacketBuffer) {
     var payloadLength = _reusableHeaderReaderBuffer
-        .readFixedLengthDataRange(3, _reusablePayloadLengthDataRange)
+        .readFixedLengthDataRange(3, _reusableDataRange)
         .toInt();
     var sequenceId = _reusableHeaderReaderBuffer.readOneLengthInteger();
-    _reusableHeaderReaderBuffer.free();
-    _reusablePayloadLengthDataRange.free();
 
     var value = _reader.readBuffer(payloadLength, reusablePacketBuffer.payload);
     if (value is Future) {

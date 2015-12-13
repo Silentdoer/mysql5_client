@@ -92,35 +92,28 @@ class ConnectionImpl implements Connection {
 
     var columnCount = response.columnCount;
 
-    var reusablePacketBuffer = new PacketBuffer.reusable();
-
     var reusableColumnPacket =
         new ResultSetColumnDefinitionResponsePacket.reusable();
-
     while (true) {
-      var response2 = _reader.readResultSetColumnDefinitionResponse(
-          reusableColumnPacket, reusablePacketBuffer);
+      var response2 =
+          _reader.readResultSetColumnDefinitionResponse(reusableColumnPacket);
       response2 = response2 is Future ? await response2 : response2;
       if (response2 is! ResultSetColumnDefinitionResponsePacket) {
         break;
       }
     }
-
     reusableColumnPacket.free();
 
     var reusableResultSetPacket =
         new ResultSetRowResponsePacket.reusable(columnCount);
     while (true) {
-      response = _reader.readResultSetRowResponse(
-          reusableResultSetPacket, reusablePacketBuffer);
+      response = _reader.readResultSetRowResponse(reusableResultSetPacket);
       response = response is Future ? await response : response;
       if (response is! ResultSetRowResponsePacket) {
         break;
       }
     }
     reusableResultSetPacket.free();
-
-    reusablePacketBuffer.free();
   }
 
   Future _writeHandshakeResponsePacket(String userName, String password,

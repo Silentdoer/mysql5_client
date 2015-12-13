@@ -11,7 +11,6 @@ import "package:mysql_client/src/data_reader.dart";
 import "package:mysql_client/src/data_writer.dart";
 
 import "package:mysql_client/src/packet_reader.dart";
-import "package:mysql_client/src/packet_buffer.dart";
 
 class SqlError extends Error {}
 

@@ -134,10 +134,8 @@ class PacketReader {
   }
 
   OkPacket _readOkPacket() {
-    var packet = new OkPacket();
-
-    packet.sequenceId = _reusablePacketBuffer.sequenceId;
-    packet.payloadLength = _reusablePacketBuffer.payloadLength;
+    var packet = new OkPacket(
+        _reusablePacketBuffer.sequenceId, _reusablePacketBuffer.payloadLength);
 
     _completeSuccessResponsePacket(packet);
 
@@ -145,10 +143,8 @@ class PacketReader {
   }
 
   EOFPacket _readEOFPacket() {
-    var packet = new EOFPacket();
-
-    packet.sequenceId = _reusablePacketBuffer.sequenceId;
-    packet.payloadLength = _reusablePacketBuffer.payloadLength;
+    var packet = new EOFPacket(
+        _reusablePacketBuffer.sequenceId, _reusablePacketBuffer.payloadLength);
 
     // check CLIENT_DEPRECATE_EOF flag
     bool isEOFDeprecated = false;
@@ -160,11 +156,11 @@ class PacketReader {
       // if capabilities & CLIENT_PROTOCOL_41 {
       if (serverCapabilityFlags & CLIENT_PROTOCOL_41 != 0) {
         // int<2>	warnings	number of warnings
-        packet.warnings = _reusablePacketBuffer.payload
+        packet._warnings = _reusablePacketBuffer.payload
             .readFixedLengthDataRange(2, _reusableDataRange)
             .toInt();
         // int<2>	status_flags	Status Flags
-        packet.statusFlags = _reusablePacketBuffer.payload
+        packet._statusFlags = _reusablePacketBuffer.payload
             .readFixedLengthDataRange(2, _reusableDataRange)
             .toInt();
       }
@@ -174,28 +170,26 @@ class PacketReader {
   }
 
   ErrorPacket _readErrorPacket() {
-    var packet = new ErrorPacket();
-
-    packet.sequenceId = _reusablePacketBuffer.sequenceId;
-    packet.payloadLength = _reusablePacketBuffer.payloadLength;
+    var packet = new ErrorPacket(
+        _reusablePacketBuffer.sequenceId, _reusablePacketBuffer.payloadLength);
 
     // int<2>	error_code	error-code
-    packet.errorCode = _reusablePacketBuffer.payload
+    packet._errorCode = _reusablePacketBuffer.payload
         .readFixedLengthDataRange(2, _reusableDataRange)
         .toInt();
     // if capabilities & CLIENT_PROTOCOL_41 {
     if (serverCapabilityFlags & CLIENT_PROTOCOL_41 != 0) {
       // string[1]	sql_state_marker	# marker of the SQL State
-      packet.sqlStateMarker = _reusablePacketBuffer.payload
+      packet._sqlStateMarker = _reusablePacketBuffer.payload
           .readFixedLengthDataRange(1, _reusableDataRange)
           .toString();
       // string[5]	sql_state	SQL State
-      packet.sqlState = _reusablePacketBuffer.payload
+      packet._sqlState = _reusablePacketBuffer.payload
           .readFixedLengthDataRange(5, _reusableDataRange)
           .toString();
     }
     // string<EOF>	error_message	human readable error message
-    packet.errorMessage = _reusablePacketBuffer.payload
+    packet._errorMessage = _reusablePacketBuffer.payload
         .readNulTerminatedDataRange(_reusableDataRange)
         .toString();
 
@@ -204,43 +198,43 @@ class PacketReader {
 
   void _completeSuccessResponsePacket(SuccessResponsePacket packet) {
     // int<1>	header	[00] or [fe] the OK packet header
-    packet.header = _reusablePacketBuffer.payload
+    packet._header = _reusablePacketBuffer.payload
         .readFixedLengthDataRange(1, _reusableDataRange)
         .toInt();
     // int<lenenc>	affected_rows	affected rows
-    packet.affectedRows = _reusablePacketBuffer.payload
+    packet._affectedRows = _reusablePacketBuffer.payload
         .readLengthEncodedDataRange(_reusableDataRange)
         .toInt();
     // int<lenenc>	last_insert_id	last insert-id
-    packet.lastInsertId = _reusablePacketBuffer.payload
+    packet._lastInsertId = _reusablePacketBuffer.payload
         .readLengthEncodedDataRange(_reusableDataRange)
         .toInt();
 
     // if capabilities & CLIENT_PROTOCOL_41 {
     if (serverCapabilityFlags & CLIENT_PROTOCOL_41 != 0) {
       // int<2>	status_flags	Status Flags
-      packet.statusFlags = _reusablePacketBuffer.payload
+      packet._statusFlags = _reusablePacketBuffer.payload
           .readFixedLengthDataRange(2, _reusableDataRange)
           .toInt();
       // int<2>	warnings	number of warnings
-      packet.warnings = _reusablePacketBuffer.payload
+      packet._warnings = _reusablePacketBuffer.payload
           .readFixedLengthDataRange(2, _reusableDataRange)
           .toInt();
       // } elseif capabilities & CLIENT_TRANSACTIONS {
     } else if (serverCapabilityFlags & CLIENT_TRANSACTIONS != 0) {
       // int<2>	status_flags	Status Flags
-      packet.statusFlags = _reusablePacketBuffer.payload
+      packet._statusFlags = _reusablePacketBuffer.payload
           .readFixedLengthDataRange(2, _reusableDataRange)
           .toInt();
     } else {
-      packet.statusFlags = 0;
+      packet._statusFlags = 0;
     }
 
     // if capabilities & CLIENT_SESSION_TRACK {
     if (serverCapabilityFlags & CLIENT_SESSION_TRACK != 0) {
       // string<lenenc>	info	human readable status information
       if (!_reusablePacketBuffer.payload.isAllRead) {
-        packet.info = _reusablePacketBuffer.payload
+        packet._info = _reusablePacketBuffer.payload
             .readFixedLengthDataRange(
                 _reusablePacketBuffer.payload
                     .readLengthEncodedDataRange(_reusableDataRange)
@@ -253,7 +247,7 @@ class PacketReader {
       if (packet.statusFlags & SERVER_SESSION_STATE_CHANGED != 0) {
         // string<lenenc>	session_state_changes	session state info
         if (!_reusablePacketBuffer.payload.isAllRead) {
-          packet.sessionStateChanges = _reusablePacketBuffer.payload
+          packet._sessionStateChanges = _reusablePacketBuffer.payload
               .readFixedLengthDataRange(
                   _reusablePacketBuffer.payload
                       .readLengthEncodedDataRange(_reusableDataRange)
@@ -265,14 +259,15 @@ class PacketReader {
       // } else {
     } else {
       // string<EOF>	info	human readable status information
-      packet.info = _reusablePacketBuffer.payload
+      packet._info = _reusablePacketBuffer.payload
           .readNulTerminatedDataRange(_reusableDataRange)
           .toString();
     }
   }
 
   InitialHandshakePacket _readInitialHandshakePacket() {
-    var packet = new InitialHandshakePacket();
+    var packet = new InitialHandshakePacket(
+        _reusablePacketBuffer.sequenceId, _reusablePacketBuffer.payloadLength);
 
     // 1              [0a] protocol version
     packet._protocolVersion = _reusablePacketBuffer.payload
@@ -354,7 +349,8 @@ class PacketReader {
   }
 
   ResultSetColumnCountResponsePacket _readResultSetColumnCountResponsePacket() {
-    var packet = new ResultSetColumnCountResponsePacket();
+    var packet = new ResultSetColumnCountResponsePacket(
+        _reusablePacketBuffer.sequenceId, _reusablePacketBuffer.payloadLength);
 
     // A packet containing a Protocol::LengthEncodedInteger column_count
     packet._columnCount = _reusablePacketBuffer.payload
@@ -366,6 +362,9 @@ class PacketReader {
 
   ResultSetColumnDefinitionResponsePacket _readResultSetColumnDefinitionResponsePacket(
       ResultSetColumnDefinitionResponsePacket reusablePacket) {
+    var packet = reusablePacket.reuse(
+        _reusablePacketBuffer.sequenceId, _reusablePacketBuffer.payloadLength);
+
     var dataRange;
     var i = 0;
     // lenenc_str     catalog
@@ -432,11 +431,14 @@ class PacketReader {
     dataRange = reusablePacket.getReusableRange(i++);
     _reusablePacketBuffer.payload.readFixedLengthDataRange(2, dataRange);
 
-    return reusablePacket.reuse();
+    return packet;
   }
 
   ResultSetRowResponsePacket _readResultSetRowResponsePacket(
       ResultSetRowResponsePacket reusablePacket) {
+    var packet = reusablePacket.reuse(
+        _reusablePacketBuffer.sequenceId, _reusablePacketBuffer.payloadLength);
+
     var i = 0;
     while (!_reusablePacketBuffer.payload.isAllRead) {
       var reusableRange = reusablePacket.getReusableRange(i++);
@@ -453,7 +455,7 @@ class PacketReader {
       }
     }
 
-    return reusablePacket.reuse();
+    return packet;
   }
 
   Future<Packet> _readPacketFromBufferAsync(Packet reader()) {
@@ -497,8 +499,13 @@ class PacketReader {
 }
 
 abstract class Packet {
-  int payloadLength;
-  int sequenceId;
+  int _payloadLength;
+  int _sequenceId;
+
+  Packet(this._payloadLength, this._sequenceId);
+
+  int get payloadLength => _payloadLength;
+  int get sequenceId => _sequenceId;
 }
 
 class ReusablePacket extends Packet {
@@ -506,7 +513,14 @@ class ReusablePacket extends Packet {
 
   ReusablePacket.reusable(int rangeCount)
       : _dataRanges =
-            new List<DataRange>.filled(rangeCount, new DataRange.reusable());
+            new List<DataRange>.filled(rangeCount, new DataRange.reusable()),
+        super(null, null);
+
+  ReusablePacket _reuse(int payloadLength, int sequenceId) {
+    _payloadLength = payloadLength;
+    _sequenceId = sequenceId;
+    return this;
+  }
 
   DataRange getReusableRange(int i) => _dataRanges[i];
 
@@ -524,27 +538,56 @@ class ReusablePacket extends Packet {
 }
 
 abstract class GenericResponsePacket extends Packet {
-  int header;
-  String info;
-  String sessionStateChanges;
+  int _header;
+  String _info;
+  String _sessionStateChanges;
+
+  GenericResponsePacket(int payloadLength, int sequenceId)
+      : super(payloadLength, sequenceId);
+
+  int get header => _header;
+  String get info => _info;
+  String get sessionStateChanges => _sessionStateChanges;
 }
 
 abstract class SuccessResponsePacket extends GenericResponsePacket {
-  int affectedRows;
-  int lastInsertId;
-  int statusFlags;
-  int warnings;
+  int _affectedRows;
+  int _lastInsertId;
+  int _statusFlags;
+  int _warnings;
+
+  SuccessResponsePacket(int payloadLength, int sequenceId)
+      : super(payloadLength, sequenceId);
+
+  int get affectedRows => _affectedRows;
+  int get lastInsertId => _lastInsertId;
+  int get statusFlags => _statusFlags;
+  int get warnings => _warnings;
 }
 
-class OkPacket extends SuccessResponsePacket {}
+class OkPacket extends SuccessResponsePacket {
+  OkPacket(int payloadLength, int sequenceId)
+      : super(payloadLength, sequenceId);
+}
 
-class EOFPacket extends SuccessResponsePacket {}
+class EOFPacket extends SuccessResponsePacket {
+  EOFPacket(int payloadLength, int sequenceId)
+      : super(payloadLength, sequenceId);
+}
 
 class ErrorPacket extends GenericResponsePacket {
-  int errorCode;
-  String sqlStateMarker;
-  String sqlState;
-  String errorMessage;
+  int _errorCode;
+  String _sqlStateMarker;
+  String _sqlState;
+  String _errorMessage;
+
+  ErrorPacket(int payloadLength, int sequenceId)
+      : super(payloadLength, sequenceId);
+
+  int get errorCode => _errorCode;
+  String get sqlStateMarker => _sqlStateMarker;
+  String get sqlState => _sqlState;
+  String get errorMessage => _errorMessage;
 }
 
 class InitialHandshakePacket extends Packet {
@@ -561,6 +604,9 @@ class InitialHandshakePacket extends Packet {
   String _authPluginDataPart2;
   String _authPluginData;
   String _authPluginName;
+
+  InitialHandshakePacket(int payloadLength, int sequenceId)
+      : super(payloadLength, sequenceId);
 
   int get protocolVersion => _protocolVersion;
   String get serverVersion => _serverVersion;
@@ -580,13 +626,18 @@ class InitialHandshakePacket extends Packet {
 class ResultSetColumnCountResponsePacket extends Packet {
   int _columnCount;
 
+  ResultSetColumnCountResponsePacket(int payloadLength, int sequenceId)
+      : super(payloadLength, sequenceId);
+
   int get columnCount => _columnCount;
 }
 
 class ResultSetColumnDefinitionResponsePacket extends ReusablePacket {
   ResultSetColumnDefinitionResponsePacket.reusable() : super.reusable(13);
 
-  ResultSetColumnDefinitionResponsePacket reuse() => this;
+  ResultSetColumnDefinitionResponsePacket reuse(
+          int payloadLength, int sequenceId) =>
+      _reuse(payloadLength, sequenceId);
 
   String get catalog => _getString(0);
   String get schema => _getString(1);
@@ -606,7 +657,8 @@ class ResultSetRowResponsePacket extends ReusablePacket {
   ResultSetRowResponsePacket.reusable(int columnCount)
       : super.reusable(columnCount);
 
-  ResultSetRowResponsePacket reuse() => this;
+  ResultSetRowResponsePacket reuse(int payloadLength, int sequenceId) =>
+      _reuse(payloadLength, sequenceId);
 
   String getString(int index) => _getString(index);
 

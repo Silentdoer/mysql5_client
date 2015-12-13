@@ -57,26 +57,6 @@ class ErrorPacket extends GenericResponsePacket {
   String errorMessage;
 }
 
-class InitialHandshakePacket extends Packet {
-  int protocolVersion;
-  String serverVersion;
-  int connectionId;
-  String authPluginDataPart1;
-  int capabilityFlags1;
-  int characterSet;
-  int statusFlags;
-  int capabilityFlags2;
-  int serverCapabilityFlags;
-  int authPluginDataLength;
-  String authPluginDataPart2;
-  String authPluginData;
-  String authPluginName;
-}
-
-class ResultSetColumnCountResponsePacket extends Packet {
-  int columnCount;
-}
-
 class Packet2 extends Packet {
   final List<DataRange> _dataRanges;
 
@@ -99,6 +79,28 @@ class Packet2 extends Packet {
   String _getString(int index) => _dataRanges[index].toString();
 
   String _getUTF8String(int index) => _dataRanges[index].toUTF8String();
+}
+
+class InitialHandshakePacket extends Packet {
+  int protocolVersion;
+  String serverVersion;
+  int connectionId;
+  String authPluginDataPart1;
+  int capabilityFlags1;
+  int characterSet;
+  int statusFlags;
+  int capabilityFlags2;
+  int serverCapabilityFlags;
+  int authPluginDataLength;
+  String authPluginDataPart2;
+  String authPluginData;
+  String authPluginName;
+}
+
+class ResultSetColumnCountResponsePacket extends Packet2 {
+  ResultSetColumnCountResponsePacket.reusable() : super.reusable(1);
+
+  int get columnCount => _getInt(0);
 }
 
 class ResultSetColumnDefinitionResponsePacket extends Packet2 {
@@ -238,7 +240,8 @@ class PacketReader {
     } else if (_isLocalInFilePacket(buffer)) {
       throw new UnsupportedError("Protocol::LOCAL_INFILE_Data");
     } else {
-      return _readResultSetColumnCountResponsePacket(buffer);
+      return _readResultSetColumnCountResponsePacket(
+          buffer, new ResultSetColumnCountResponsePacket.reusable());
     }
   }
 
@@ -323,12 +326,14 @@ class PacketReader {
   }
 
   ResultSetColumnCountResponsePacket _readResultSetColumnCountResponsePacket(
-      PacketBuffer buffer) {
-    var packet = new ResultSetColumnCountResponsePacket();
+      PacketBuffer buffer, ResultSetColumnCountResponsePacket reusablePacket) {
+    var dataRange;
+    var i = 0;
+    // A packet containing a Protocol::LengthEncodedInteger column_count
+    dataRange = reusablePacket.getReusableRange(i++);
+    buffer.payload.readFixedLengthDataRange(1, dataRange);
 
-    packet.columnCount = buffer.payload.readOneLengthInteger();
-
-    return packet;
+    return reusablePacket.reuse();
   }
 
   ResultSetColumnDefinitionResponsePacket _readResultSetColumnDefinitionResponsePacket(

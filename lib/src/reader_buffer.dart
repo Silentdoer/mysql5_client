@@ -3,9 +3,9 @@
 
 library mysql_client.data_buffer;
 
-import "package:mysql_client/src/data_chunk.dart";
-import "package:mysql_client/src/data_range.dart";
-import "package:mysql_client/src/data_commons.dart";
+import "data_chunk.dart";
+import "data_range.dart";
+import "data_commons.dart";
 import 'dart:io';
 
 class NullError extends Error {
@@ -121,32 +121,26 @@ class ReaderBuffer {
   DataRange readFixedLengthDataRange(int length, DataRange reusableRange) {
     var chunk = _chunks[_chunkIndex];
     var range = chunk.extractFixedLengthDataRange(length, reusableRange);
+    _readCount += range.length;
     if (chunk.isEmpty) {
       _chunkIndex++;
     }
 
     if (range.isPending) {
-      // devo costruire un range da zero
-      var data = new List(length);
-      data.setRange(0, range.length, range.data, range.start);
-      var start = range.length;
       var leftLength = length - range.length;
+      DataRange range2;
       do {
         chunk = _chunks[_chunkIndex];
-        range = chunk.extractFixedLengthDataRange(leftLength, reusableRange);
+        range2 = chunk.extractFixedLengthDataRange(
+            leftLength, new DataRange.reusable());
+        _readCount += range2.length;
         if (chunk.isEmpty) {
           _chunkIndex++;
         }
-        var end = start + range.length;
-        data.setRange(start, end, range.data, range.start);
-        start = end;
-        leftLength -= range.length;
-      } while (range.isPending);
-
-      range = reusableRange.reuse(data);
+        leftLength -= range2.length;
+        range.addExtraRange(range2);
+      } while (range2.isPending);
     }
-
-    _readCount += range.length;
 
     return range;
   }
@@ -154,29 +148,27 @@ class ReaderBuffer {
   DataRange readUpToDataRange(int terminator, DataRange reusableRange) {
     var chunk = _chunks[_chunkIndex];
     var range = chunk.extractUpToDataRange(terminator, reusableRange);
+    _readCount += range.length;
     if (chunk.isEmpty) {
       _chunkIndex++;
     }
 
     if (range.isPending) {
-      // devo costruire un range da zero
-      var builder = new BytesBuilder();
-      builder.add(range.data.sublist(range.start, range.start + range.length));
+      DataRange range2;
       do {
         chunk = _chunks[_chunkIndex];
-        range = chunk.extractUpToDataRange(terminator, reusableRange);
+        range2 =
+            chunk.extractUpToDataRange(terminator, new DataRange.reusable());
+        _readCount += range2.length;
         if (chunk.isEmpty) {
           _chunkIndex++;
         }
-        builder
-            .add(range.data.sublist(range.start, range.start + range.length));
-      } while (range.isPending);
-
-      range = reusableRange.reuse(builder.takeBytes());
+        range.addExtraRange(range2);
+      } while (range2.isPending);
     }
 
     // skip the terminator
-    _readCount += range.length + 1;
+    _readCount++;
     return range;
   }
 

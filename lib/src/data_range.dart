@@ -10,6 +10,8 @@ class DataRange {
   List<int> _data;
   int _start;
   int _length;
+  List<DataRange> _extraRanges;
+  int _mergeLength;
 
   DataRange(this._data, [this._start = 0, this._length])
       : this._isPending = false {
@@ -31,6 +33,8 @@ class DataRange {
     _data = data;
     _start = start;
     _length = length ?? _data.length - _start;
+    _extraRanges = null;
+    _mergeLength = null;
     return this;
   }
 
@@ -39,6 +43,8 @@ class DataRange {
     _data = data;
     _start = start;
     _length = _data.length - _start;
+    _extraRanges = null;
+    _mergeLength = null;
     return this;
   }
 
@@ -47,6 +53,8 @@ class DataRange {
     _data = null;
     _start = null;
     _length = byte;
+    _extraRanges = null;
+    _mergeLength = null;
     return this;
   }
 
@@ -55,6 +63,8 @@ class DataRange {
     _data = null;
     _start = null;
     _length = null;
+    _extraRanges = null;
+    _mergeLength = null;
     return this;
   }
 
@@ -63,6 +73,8 @@ class DataRange {
     _data = null;
     _start = null;
     _length = null;
+    _extraRanges = null;
+    _mergeLength = null;
   }
 
   bool get isPending => _isPending;
@@ -70,10 +82,22 @@ class DataRange {
   int get start => _start;
   int get length => _length;
 
+  void addExtraRange(DataRange extraRange) {
+    if (_extraRanges == null) {
+      _extraRanges = new List<DataRange>();
+      _mergeLength = _length;
+    }
+    _extraRanges.add(extraRange);
+    _mergeLength += extraRange._length;
+  }
+
   int toInt() {
     if (_data == null) {
       return _length;
     }
+
+    _mergeExtraRanges();
+
     var i = _start;
     switch (_length) {
       case 1:
@@ -122,11 +146,48 @@ class DataRange {
     throw new UnsupportedError("${_data.length} length");
   }
 
-  String toString() => _data != null
-      ? new String.fromCharCodes(_data, _start, _start + _length)
-      : null;
+  String toString() {
+    if (_data != null) {
+      _mergeExtraRanges();
 
-  String toUTF8String() => _data != null
-      ? UTF8.decoder.convert(_data, _start, _start + _length)
-      : null;
+      return new String.fromCharCodes(_data, _start, _start + _length);
+    } else {
+      return null;
+    }
+  }
+
+  String toUTF8String() {
+    if (_data != null) {
+      _mergeExtraRanges();
+
+      return UTF8.decoder.convert(_data, _start, _start + _length);
+    } else {
+      return null;
+    }
+  }
+
+  void _mergeExtraRanges() {
+    if (_extraRanges != null) {
+      var range = this;
+
+      var data = new List(_mergeLength);
+      data.setRange(0, range.length, range.data, range.start);
+      var start = range.length;
+      var leftLength = _mergeLength - range.length;
+
+      do {
+        var end = start + _length;
+        data.setRange(start, end, range.data, range.start);
+        start = end;
+        leftLength -= range.length;
+      } while (leftLength > 0);
+
+      _isPending = false;
+      _data = data;
+      _start = 0;
+      _length = _mergeLength;
+      _extraRanges = null;
+      _mergeLength = null;
+    }
+  }
 }

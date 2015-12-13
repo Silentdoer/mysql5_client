@@ -23,12 +23,6 @@ const int SERVER_SESSION_STATE_CHANGED = 0x4000;
 
 const int COM_QUERY = 0x03;
 
-class ResponseError extends Error {
-  final ErrorPacket packet;
-
-  ResponseError(this.packet);
-}
-
 class PacketReader {
   final DataReader _reader;
 

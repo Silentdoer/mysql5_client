@@ -6,7 +6,7 @@ library mysql_client.writer_buffer;
 import "dart:convert";
 import "dart:io";
 
-import "data_commons.dart";
+import "package:mysql_client/src/data_commons.dart";
 
 abstract class WriterBuffer {
 

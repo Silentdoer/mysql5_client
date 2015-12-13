@@ -3,10 +3,11 @@ library mysql_client.packet_reader;
 import "dart:async";
 import 'dart:math';
 
-import "reader_buffer.dart";
-import 'data_commons.dart';
-import 'data_reader.dart';
-import 'data_range.dart';
+import 'package:mysql_client/src/data_commons.dart';
+import 'package:mysql_client/src/data_range.dart';
+import "package:mysql_client/src/reader_buffer.dart";
+import 'package:mysql_client/src/data_reader.dart';
+import "package:mysql_client/src/packet_buffer.dart";
 
 const int CLIENT_PLUGIN_AUTH = 0x00080000;
 const int CLIENT_SECURE_CONNECTION = 0x00008000;
@@ -26,153 +27,6 @@ class ResponseError extends Error {
   final ErrorPacket packet;
 
   ResponseError(this.packet);
-}
-
-abstract class Packet {
-  int payloadLength;
-  int sequenceId;
-}
-
-class ReusablePacket extends Packet {
-  final List<DataRange> _dataRanges;
-
-  ReusablePacket.reusable(int rangeCount)
-      : _dataRanges =
-            new List<DataRange>.filled(rangeCount, new DataRange.reusable());
-
-  DataRange getReusableRange(int i) => _dataRanges[i];
-
-  void free() {
-    for (var range in _dataRanges) {
-      range?.free();
-    }
-  }
-
-  int _getInt(int index) => _dataRanges[index].toInt();
-
-  String _getString(int index) => _dataRanges[index].toString();
-
-  String _getUTF8String(int index) => _dataRanges[index].toUTF8String();
-}
-
-abstract class GenericResponsePacket extends Packet {
-  int header;
-  String info;
-  String sessionStateChanges;
-}
-
-abstract class SuccessResponsePacket extends GenericResponsePacket {
-  int affectedRows;
-  int lastInsertId;
-  int statusFlags;
-  int warnings;
-}
-
-class OkPacket extends SuccessResponsePacket {}
-
-class EOFPacket extends SuccessResponsePacket {}
-
-class ErrorPacket extends GenericResponsePacket {
-  int errorCode;
-  String sqlStateMarker;
-  String sqlState;
-  String errorMessage;
-}
-
-class InitialHandshakePacket extends Packet {
-  int _protocolVersion;
-  String _serverVersion;
-  int _connectionId;
-  String _authPluginDataPart1;
-  int _capabilityFlags1;
-  int _characterSet;
-  int _statusFlags;
-  int _capabilityFlags2;
-  int _serverCapabilityFlags;
-  int _authPluginDataLength;
-  String _authPluginDataPart2;
-  String _authPluginData;
-  String _authPluginName;
-
-  int get protocolVersion => _protocolVersion;
-  String get serverVersion => _serverVersion;
-  int get connectionId => _connectionId;
-  String get authPluginDataPart1 => _authPluginDataPart1;
-  int get capabilityFlags1 => _capabilityFlags1;
-  int get characterSet => _characterSet;
-  int get statusFlags => _statusFlags;
-  int get capabilityFlags2 => _capabilityFlags2;
-  int get serverCapabilityFlags => _serverCapabilityFlags;
-  int get authPluginDataLength => _authPluginDataLength;
-  String get authPluginDataPart2 => _authPluginDataPart2;
-  String get authPluginData => _authPluginData;
-  String get authPluginName => _authPluginName;
-}
-
-class ResultSetColumnCountResponsePacket extends Packet {
-  int _columnCount;
-
-  int get columnCount => _columnCount;
-}
-
-class ResultSetColumnDefinitionResponsePacket extends ReusablePacket {
-  ResultSetColumnDefinitionResponsePacket.reusable() : super.reusable(13);
-
-  ResultSetColumnDefinitionResponsePacket reuse() => this;
-
-  String get catalog => _getString(0);
-  String get schema => _getString(1);
-  String get table => _getString(2);
-  String get orgTable => _getString(3);
-  String get name => _getString(4);
-  String get orgName => _getString(5);
-  int get fieldsLength => _getInt(6);
-  int get characterSet => _getInt(7);
-  int get columnLength => _getInt(8);
-  int get type => _getInt(9);
-  int get flags => _getInt(10);
-  int get decimals => _getInt(11);
-}
-
-class ResultSetRowResponsePacket extends ReusablePacket {
-  ResultSetRowResponsePacket.reusable(int columnCount)
-      : super.reusable(columnCount);
-
-  ResultSetRowResponsePacket reuse() => this;
-
-  String getString(int index) => _getString(index);
-
-  String getUTF8String(int index) => _getUTF8String(index);
-}
-
-class PacketBuffer {
-  int _sequenceId;
-
-  ReaderBuffer _payload;
-
-  PacketBuffer(this._sequenceId, this._payload);
-
-  PacketBuffer.reusable() : this._payload = new ReaderBuffer.reusable();
-
-  PacketBuffer reuse(int sequenceId, ReaderBuffer payload) {
-    _sequenceId = sequenceId;
-    _payload = payload;
-
-    return this;
-  }
-
-  void free() {
-    _payload.free();
-    _sequenceId = null;
-  }
-
-  int get sequenceId => _sequenceId;
-
-  ReaderBuffer get payload => _payload;
-
-  int get header => _payload.checkOneLengthInteger();
-
-  int get payloadLength => _payload.payloadLength;
 }
 
 class PacketReader {
@@ -637,4 +491,122 @@ class PacketReader {
       return reusablePacketBuffer.reuse(sequenceId, value);
     }
   }
+}
+
+
+abstract class Packet {
+  int payloadLength;
+  int sequenceId;
+}
+
+class ReusablePacket extends Packet {
+  final List<DataRange> _dataRanges;
+
+  ReusablePacket.reusable(int rangeCount)
+      : _dataRanges =
+  new List<DataRange>.filled(rangeCount, new DataRange.reusable());
+
+  DataRange getReusableRange(int i) => _dataRanges[i];
+
+  void free() {
+    for (var range in _dataRanges) {
+      range?.free();
+    }
+  }
+
+  int _getInt(int index) => _dataRanges[index].toInt();
+
+  String _getString(int index) => _dataRanges[index].toString();
+
+  String _getUTF8String(int index) => _dataRanges[index].toUTF8String();
+}
+
+abstract class GenericResponsePacket extends Packet {
+  int header;
+  String info;
+  String sessionStateChanges;
+}
+
+abstract class SuccessResponsePacket extends GenericResponsePacket {
+  int affectedRows;
+  int lastInsertId;
+  int statusFlags;
+  int warnings;
+}
+
+class OkPacket extends SuccessResponsePacket {}
+
+class EOFPacket extends SuccessResponsePacket {}
+
+class ErrorPacket extends GenericResponsePacket {
+  int errorCode;
+  String sqlStateMarker;
+  String sqlState;
+  String errorMessage;
+}
+
+class InitialHandshakePacket extends Packet {
+  int _protocolVersion;
+  String _serverVersion;
+  int _connectionId;
+  String _authPluginDataPart1;
+  int _capabilityFlags1;
+  int _characterSet;
+  int _statusFlags;
+  int _capabilityFlags2;
+  int _serverCapabilityFlags;
+  int _authPluginDataLength;
+  String _authPluginDataPart2;
+  String _authPluginData;
+  String _authPluginName;
+
+  int get protocolVersion => _protocolVersion;
+  String get serverVersion => _serverVersion;
+  int get connectionId => _connectionId;
+  String get authPluginDataPart1 => _authPluginDataPart1;
+  int get capabilityFlags1 => _capabilityFlags1;
+  int get characterSet => _characterSet;
+  int get statusFlags => _statusFlags;
+  int get capabilityFlags2 => _capabilityFlags2;
+  int get serverCapabilityFlags => _serverCapabilityFlags;
+  int get authPluginDataLength => _authPluginDataLength;
+  String get authPluginDataPart2 => _authPluginDataPart2;
+  String get authPluginData => _authPluginData;
+  String get authPluginName => _authPluginName;
+}
+
+class ResultSetColumnCountResponsePacket extends Packet {
+  int _columnCount;
+
+  int get columnCount => _columnCount;
+}
+
+class ResultSetColumnDefinitionResponsePacket extends ReusablePacket {
+  ResultSetColumnDefinitionResponsePacket.reusable() : super.reusable(13);
+
+  ResultSetColumnDefinitionResponsePacket reuse() => this;
+
+  String get catalog => _getString(0);
+  String get schema => _getString(1);
+  String get table => _getString(2);
+  String get orgTable => _getString(3);
+  String get name => _getString(4);
+  String get orgName => _getString(5);
+  int get fieldsLength => _getInt(6);
+  int get characterSet => _getInt(7);
+  int get columnLength => _getInt(8);
+  int get type => _getInt(9);
+  int get flags => _getInt(10);
+  int get decimals => _getInt(11);
+}
+
+class ResultSetRowResponsePacket extends ReusablePacket {
+  ResultSetRowResponsePacket.reusable(int columnCount)
+      : super.reusable(columnCount);
+
+  ResultSetRowResponsePacket reuse() => this;
+
+  String getString(int index) => _getString(index);
+
+  String getUTF8String(int index) => _getUTF8String(index);
 }

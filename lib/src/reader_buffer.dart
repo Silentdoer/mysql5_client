@@ -3,9 +3,9 @@
 
 library mysql_client.data_buffer;
 
-import "data_chunk.dart";
-import "data_range.dart";
-import "data_commons.dart";
+import "package:mysql_client/src/data_chunk.dart";
+import "package:mysql_client/src/data_range.dart";
+import "package:mysql_client/src/data_commons.dart";
 import 'dart:io';
 
 class NullError extends Error {

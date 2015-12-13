@@ -6,8 +6,8 @@ library mysql_client.data_reader;
 import "dart:async";
 import "dart:collection";
 
-import "data_chunk.dart";
-import "reader_buffer.dart";
+import "package:mysql_client/src/data_chunk.dart";
+import "package:mysql_client/src/reader_buffer.dart";
 
 class DataReader {
   final Queue<DataChunk> _chunks = new Queue();

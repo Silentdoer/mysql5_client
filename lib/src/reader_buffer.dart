@@ -6,7 +6,6 @@ library mysql_client.data_buffer;
 import "data_chunk.dart";
 import "data_range.dart";
 import "data_commons.dart";
-import 'dart:io';
 
 class NullError extends Error {
   String toString() => "Null value";
@@ -65,8 +64,6 @@ class ReaderBuffer {
 
   int get payloadLength => _payloadLength;
 
-  int get available => _payloadLength - _readCount;
-
   bool get isAllRead => _payloadLength == _readCount;
 
   void skipByte() {
@@ -87,9 +84,6 @@ class ReaderBuffer {
   int readLengthEncodedInteger() =>
       readLengthEncodedDataRange(new DataRange.reusable()).toInt();
 
-  DataRange readNulTerminatedDataRange() =>
-      readUpToDataRange(NULL_TERMINATOR, new DataRange.reusable());
-
   String readNulTerminatedString() =>
       readUpToDataRange(NULL_TERMINATOR, new DataRange.reusable()).toString();
 
@@ -109,14 +103,17 @@ class ReaderBuffer {
   String readLengthEncodedUTF8String() =>
       readFixedLengthUTF8String(readLengthEncodedInteger());
 
-  DataRange readRestOfPacketDataRange() => readFixedLengthDataRange(
-      _payloadLength - _readCount, new DataRange.reusable());
-
   String readRestOfPacketString() =>
       readFixedLengthString(_payloadLength - _readCount);
 
   String readRestOfPacketUTF8String() =>
       readFixedLengthUTF8String(_payloadLength - _readCount);
+
+  DataRange readNulTerminatedDataRange(DataRange reusableRange) =>
+      readUpToDataRange(NULL_TERMINATOR, reusableRange);
+
+  DataRange readRestOfPacketDataRange(DataRange reusableRange) =>
+      readFixedLengthDataRange(_payloadLength - _readCount, reusableRange);
 
   DataRange readFixedLengthDataRange(int length, DataRange reusableRange) {
     var chunk = _chunks[_chunkIndex];

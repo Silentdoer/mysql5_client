@@ -32,8 +32,10 @@ class ResponseError extends Error {
 class PacketReader {
   final DataReader _reader;
 
+  final PacketBuffer _reusablePacketBuffer = new PacketBuffer.reusable();
   final ReaderBuffer _reusableHeaderReaderBuffer = new ReaderBuffer.reusable();
   final DataRange _reusablePayloadLengthDataRange = new DataRange.reusable();
+  final DataRange _reusableDataRange = new DataRange.reusable();
 
   int serverCapabilityFlags;
   final int clientCapabilityFlags;
@@ -42,18 +44,16 @@ class PacketReader {
 
   Future<Packet> readInitialHandshakeResponse() => _readPacketFromBufferAsync(
       _readInitialHandshakeResponseInternal,
-      new PacketBuffer.reusable(),
-      new DataRange.reusable());
+      _reusablePacketBuffer,
+      _reusableDataRange);
 
   Future<Packet> readCommandResponse() => _readPacketFromBufferAsync(
-      _readCommandResponseInternal,
-      new PacketBuffer.reusable(),
-      new DataRange.reusable());
+      _readCommandResponseInternal, _reusablePacketBuffer, _reusableDataRange);
 
   Future<Packet> readCommandQueryResponse() => _readPacketFromBufferAsync(
       _readCommandQueryResponseInternal,
-      new PacketBuffer.reusable(),
-      new DataRange.reusable());
+      _reusablePacketBuffer,
+      _reusableDataRange);
 
   readResultSetColumnDefinitionResponse(
       ResultSetColumnDefinitionResponsePacket reusablePacket,
@@ -62,10 +62,10 @@ class PacketReader {
     if (value is Future) {
       return value.then((buffer) =>
           _readResultSetColumnDefinitionResponseInternal(
-              buffer, reusablePacket, new DataRange.reusable()));
+              buffer, reusablePacket, _reusableDataRange));
     } else {
       return _readResultSetColumnDefinitionResponseInternal(
-          value, reusablePacket, new DataRange.reusable());
+          value, reusablePacket, _reusableDataRange);
     }
   }
 
@@ -74,10 +74,10 @@ class PacketReader {
     var value = _readPacketBuffer(reusablePacketBuffer);
     if (value is Future) {
       return value.then((buffer) => _readResultSetRowResponseInternal(
-          buffer, reusablePacket, new DataRange.reusable()));
+          buffer, reusablePacket, _reusableDataRange));
     } else {
       return _readResultSetRowResponseInternal(
-          value, reusablePacket, new DataRange.reusable());
+          value, reusablePacket, _reusableDataRange);
     }
   }
 
@@ -211,9 +211,8 @@ class PacketReader {
           .toString();
     }
     // string<EOF>	error_message	human readable error message
-    packet.errorMessage = buffer.payload
-        .readFixedLengthDataRange(buffer.payload.available, reusableDataRange)
-        .toString();
+    packet.errorMessage =
+        buffer.payload.readNulTerminatedDataRange(reusableDataRange).toString();
 
     return packet;
   }
@@ -277,7 +276,7 @@ class PacketReader {
     } else {
       // string<EOF>	info	human readable status information
       packet.info = buffer.payload
-          .readFixedLengthDataRange(buffer.payload.available, reusableDataRange)
+          .readNulTerminatedDataRange(reusableDataRange)
           .toString();
     }
   }
@@ -290,9 +289,8 @@ class PacketReader {
     packet._protocolVersion =
         buffer.payload.readFixedLengthDataRange(1, reusableDataRange).toInt();
     // string[NUL]    server version
-    packet._serverVersion = buffer.payload
-        .readUpToDataRange(NULL_TERMINATOR, reusableDataRange)
-        .toString();
+    packet._serverVersion =
+        buffer.payload.readNulTerminatedDataRange(reusableDataRange).toString();
     // 4              connection id
     packet._connectionId =
         buffer.payload.readFixedLengthDataRange(4, reusableDataRange).toInt();
@@ -348,7 +346,7 @@ class PacketReader {
       if (packet._serverCapabilityFlags & CLIENT_PLUGIN_AUTH != 0) {
         // string[NUL]    auth-plugin name
         packet._authPluginName = buffer.payload
-            .readUpToDataRange(NULL_TERMINATOR, reusableDataRange)
+            .readNulTerminatedDataRange(reusableDataRange)
             .toString();
       }
     }
@@ -431,13 +429,14 @@ class PacketReader {
       PacketBuffer buffer, ResultSetRowResponsePacket reusablePacket) {
     var i = 0;
     while (!buffer.payload.isAllRead) {
+      var reusableRange = reusablePacket.getReusableRange(i++);
       if (buffer.payload.checkOneLengthInteger() != PREFIX_NULL) {
-        var fieldLength = buffer.payload.readLengthEncodedInteger();
         buffer.payload.readFixedLengthDataRange(
-            fieldLength, reusablePacket.getReusableRange(i++));
+            buffer.payload.readLengthEncodedDataRange(reusableRange).toInt(),
+            reusableRange);
       } else {
         buffer.payload.skipByte();
-        reusablePacket.getReusableRange(i++).reuseNil();
+        reusableRange.reuseNil();
       }
     }
 
@@ -493,7 +492,6 @@ class PacketReader {
   }
 }
 
-
 abstract class Packet {
   int payloadLength;
   int sequenceId;
@@ -504,7 +502,7 @@ class ReusablePacket extends Packet {
 
   ReusablePacket.reusable(int rangeCount)
       : _dataRanges =
-  new List<DataRange>.filled(rangeCount, new DataRange.reusable());
+            new List<DataRange>.filled(rangeCount, new DataRange.reusable());
 
   DataRange getReusableRange(int i) => _dataRanges[i];
 

@@ -79,30 +79,23 @@ class ConnectionImpl implements Connection {
   Future executeQuery(String query) async {
     await _writeCommandQueryPacket(query);
 
-    var response1 = await _reader.readCommandQueryResponse();
+    var response = await _reader.readCommandQueryResponse();
 
-    if (response1 is OkPacket) {
+    if (response is OkPacket) {
       return;
     }
 
-    if (response1 is! ResultSetColumnCountResponsePacket) {
+    if (response is! ResultSetColumnCountResponsePacket) {
       throw new SqlError();
     }
 
-    var columnCount = response1.columnCount;
+    var columnCount = response.columnCount;
 
-/*
-    while (true) {
-      var response2 = await _reader.readResultSetColumnDefinitionResponse();
-      if (response2 is! ResultSetColumnDefinitionResponsePacket) {
-        break;
-      }
-    }
-*/
     var reusablePacketBuffer = new PacketBuffer.reusable();
 
     var reusableColumnPacket =
         new ResultSetColumnDefinitionResponsePacket.reusable();
+
     while (true) {
       var response2 = _reader.readResultSetColumnDefinitionResponse(
           reusableColumnPacket, reusablePacketBuffer);
@@ -111,15 +104,16 @@ class ConnectionImpl implements Connection {
         break;
       }
     }
+
     reusableColumnPacket.free();
 
     var reusableResultSetPacket =
         new ResultSetRowResponsePacket.reusable(columnCount);
     while (true) {
-      var response3 = _reader.readResultSetRowResponse(
+      response = _reader.readResultSetRowResponse(
           reusableResultSetPacket, reusablePacketBuffer);
-      response3 = response3 is Future ? await response3 : response3;
-      if (response3 is! ResultSetRowResponsePacket) {
+      response = response is Future ? await response : response;
+      if (response is! ResultSetRowResponsePacket) {
         break;
       }
     }

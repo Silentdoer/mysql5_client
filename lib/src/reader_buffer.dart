@@ -65,6 +65,8 @@ class ReaderBuffer {
 
   int get payloadLength => _payloadLength;
 
+  int get available => _payloadLength - _readCount;
+
   bool get isAllRead => _payloadLength == _readCount;
 
   void skipByte() {

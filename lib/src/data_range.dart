@@ -6,6 +6,8 @@ library mysql_client.data_range2;
 import "dart:convert";
 
 class DataRange {
+  static const String _EMPTY_STRING = "";
+
   bool _isPending;
   List<int> _data;
   int _start;
@@ -43,8 +45,8 @@ class DataRange {
   DataRange reuseByte(int byte) {
     _isPending = null;
     _data = null;
-    _start = byte;
-    _length = null;
+    _start = null;
+    _length = byte;
     return this;
   }
 
@@ -70,7 +72,7 @@ class DataRange {
 
   int toInt() {
     if (_data == null) {
-      return _start;
+      return _length;
     }
     var i = _start;
     switch (_length) {
@@ -122,9 +124,9 @@ class DataRange {
 
   String toString() => _data != null
       ? new String.fromCharCodes(_data, _start, _start + _length)
-      : null;
+      : (_length != null ? _EMPTY_STRING : null);
 
   String toUTF8String() => _data != null
       ? UTF8.decoder.convert(_data, _start, _start + _length)
-      : null;
+      : (_length != null ? _EMPTY_STRING : null);
 }

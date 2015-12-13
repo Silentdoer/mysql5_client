@@ -124,9 +124,9 @@ class DataRange {
 
   String toString() => _data != null
       ? new String.fromCharCodes(_data, _start, _start + _length)
-      : (_length != null ? _EMPTY_STRING : null);
+      : null;
 
   String toUTF8String() => _data != null
       ? UTF8.decoder.convert(_data, _start, _start + _length)
-      : (_length != null ? _EMPTY_STRING : null);
+      : null;
 }

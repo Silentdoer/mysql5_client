@@ -94,10 +94,10 @@ class ConnectionImpl implements Connection {
     var reusableColumnPacket =
         new ResultSetColumnDefinitionResponsePacket.reusable();
     while (true) {
-      var response2 =
+      response =
           _reader.readResultSetColumnDefinitionResponse(reusableColumnPacket);
-      response2 = response2 is Future ? await response2 : response2;
-      if (response2 is! ResultSetColumnDefinitionResponsePacket) {
+      response = response is Future ? await response : response;
+      if (response is! ResultSetColumnDefinitionResponsePacket) {
         break;
       }
     }

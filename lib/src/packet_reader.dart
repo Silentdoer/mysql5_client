@@ -26,8 +26,8 @@ const int COM_QUERY = 0x03;
 class PacketReader {
   final DataReader _reader;
 
-  final PacketBuffer _reusablePacketBuffer = new PacketBuffer.reusable();
   final ReaderBuffer _reusableHeaderReaderBuffer = new ReaderBuffer.reusable();
+  final PacketBuffer _reusablePacketBuffer = new PacketBuffer.reusable();
   final DataRange _reusableDataRange = new DataRange.reusable();
 
   int serverCapabilityFlags;
@@ -35,34 +35,44 @@ class PacketReader {
 
   PacketReader(this._reader, {this.clientCapabilityFlags: 0});
 
-  Future<Packet> readInitialHandshakeResponse() =>
-      _readPacketFromBufferAsync(_readInitialHandshakeResponseInternal);
+  Future<Packet> readInitialHandshakeResponse() {
+    var value = _readPacketBuffer();
+    var value2 = value is Future
+        ? value.then((_) => _readInitialHandshakeResponseInternal())
+        : _readInitialHandshakeResponseInternal();
+    return value2 is Future ? value2 : new Future.value(value2);
+  }
 
-  Future<Packet> readCommandResponse() =>
-      _readPacketFromBufferAsync(_readCommandResponseInternal);
+  Future<Packet> readCommandResponse() {
+    var value = _readPacketBuffer();
+    var value2 = value is Future
+        ? value.then((_) => _readCommandResponseInternal())
+        : _readCommandResponseInternal();
+    return value2 is Future ? value2 : new Future.value(value2);
+  }
 
-  Future<Packet> readCommandQueryResponse() =>
-      _readPacketFromBufferAsync(_readCommandQueryResponseInternal);
+  Future<Packet> readCommandQueryResponse() {
+    var value = _readPacketBuffer();
+    var value2 = value is Future
+        ? value.then((_) => _readCommandQueryResponseInternal())
+        : _readCommandQueryResponseInternal();
+    return value2 is Future ? value2 : new Future.value(value2);
+  }
 
   readResultSetColumnDefinitionResponse(
       ResultSetColumnDefinitionResponsePacket reusablePacket) {
     var value = _readPacketBuffer();
-    if (value is Future) {
-      return value.then((_) =>
-          _readResultSetColumnDefinitionResponseInternal(reusablePacket));
-    } else {
-      return _readResultSetColumnDefinitionResponseInternal(reusablePacket);
-    }
+    return value is Future
+        ? value.then((_) =>
+            _readResultSetColumnDefinitionResponseInternal(reusablePacket))
+        : _readResultSetColumnDefinitionResponseInternal(reusablePacket);
   }
 
   readResultSetRowResponse(ResultSetRowResponsePacket reusablePacket) {
     var value = _readPacketBuffer();
-    if (value is Future) {
-      return value
-          .then((_) => _readResultSetRowResponseInternal(reusablePacket));
-    } else {
-      return _readResultSetRowResponseInternal(reusablePacket);
-    }
+    return value is Future
+        ? value.then((_) => _readResultSetRowResponseInternal(reusablePacket))
+        : _readResultSetRowResponseInternal(reusablePacket);
   }
 
   bool _isOkPacket() => _reusablePacketBuffer.header == 0 &&
@@ -133,6 +143,9 @@ class PacketReader {
 
     _completeSuccessResponsePacket(packet);
 
+    _reusablePacketBuffer.free();
+    _reusableDataRange.free();
+
     return packet;
   }
 
@@ -140,7 +153,7 @@ class PacketReader {
     var packet = new EOFPacket(
         _reusablePacketBuffer.sequenceId, _reusablePacketBuffer.payloadLength);
 
-    // check CLIENT_DEPRECATE_EOF flag
+    // TODO check CLIENT_DEPRECATE_EOF flag
     bool isEOFDeprecated = false;
 
     if (isEOFDeprecated) {
@@ -159,6 +172,9 @@ class PacketReader {
             .toInt();
       }
     }
+
+    _reusablePacketBuffer.free();
+    _reusableDataRange.free();
 
     return packet;
   }
@@ -186,6 +202,9 @@ class PacketReader {
     packet._errorMessage = _reusablePacketBuffer.payload
         .readNulTerminatedDataRange(_reusableDataRange)
         .toString();
+
+    _reusablePacketBuffer.free();
+    _reusableDataRange.free();
 
     return packet;
   }
@@ -339,6 +358,9 @@ class PacketReader {
       }
     }
 
+    _reusablePacketBuffer.free();
+    _reusableDataRange.free();
+
     return packet;
   }
 
@@ -350,6 +372,9 @@ class PacketReader {
     packet._columnCount = _reusablePacketBuffer.payload
         .readFixedLengthDataRange(1, _reusableDataRange)
         .toInt();
+
+    _reusablePacketBuffer.free();
+    _reusableDataRange.free();
 
     return packet;
   }
@@ -425,6 +450,9 @@ class PacketReader {
     dataRange = reusablePacket.getReusableRange(i++);
     _reusablePacketBuffer.payload.readFixedLengthDataRange(2, dataRange);
 
+    _reusablePacketBuffer.free();
+    _reusableDataRange.free();
+
     return packet;
   }
 
@@ -449,17 +477,10 @@ class PacketReader {
       }
     }
 
+    _reusablePacketBuffer.free();
+    _reusableDataRange.free();
+
     return packet;
-  }
-
-  Future<Packet> _readPacketFromBufferAsync(Packet reader()) {
-    var value = _readPacketFromBuffer(reader);
-    return value is Future ? value : new Future.value(value);
-  }
-
-  _readPacketFromBuffer(Packet reader()) {
-    var value = _readPacketBuffer();
-    return value is Future ? value.then((_) => reader()) : reader();
   }
 
   _readPacketBuffer() {
@@ -474,6 +495,9 @@ class PacketReader {
         .readFixedLengthDataRange(3, _reusableDataRange)
         .toInt();
     var sequenceId = _reusableHeaderReaderBuffer.readOneLengthInteger();
+
+    _reusableHeaderReaderBuffer.free();
+    _reusableDataRange.free();
 
     var value =
         _reader.readBuffer(payloadLength, _reusablePacketBuffer.payload);

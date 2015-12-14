@@ -11,11 +11,14 @@ import "package:mysql_client/src/data_reader.dart";
 import "package:mysql_client/src/data_writer.dart";
 
 import "package:mysql_client/src/packet_reader.dart";
+import "package:mysql_client/src/protocol.dart";
 
 class SqlError extends Error {}
 
 abstract class Connection {
   Future executeQuery(String query);
+
+  Future<QueryResult> executeQuery2(String query);
 
   Future close();
 }
@@ -112,6 +115,13 @@ class ConnectionImpl implements Connection {
       }
     }
     reusableResultSetPacket.free();
+  }
+
+  @override
+  Future executeQuery2(String query) async {
+    var protocol = new QueryCommandTextProtocol(_writer, _reader);
+
+    return protocol.executeQuery(query);
   }
 
   Future _writeHandshakeResponsePacket(String userName, String password,

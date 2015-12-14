@@ -542,8 +542,9 @@ class ReusablePacket extends Packet {
   final List<DataRange> _dataRanges;
 
   ReusablePacket.reusable(int rangeCount)
-      : _dataRanges =
-            new List<DataRange>.filled(rangeCount, new DataRange.reusable()),
+      : _dataRanges = new List<DataRange>.generate(
+            rangeCount, (_) => new DataRange.reusable(),
+            growable: false),
         super(null, null);
 
   ReusablePacket _reuse(int payloadLength, int sequenceId) {

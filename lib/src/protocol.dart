@@ -13,6 +13,10 @@ abstract class Protocol {
   final PacketReader _reader;
 
   Protocol(this._writer, this._reader);
+
+  Future<Packet> _readCommandResponse() => _reader.readCommandResponse();
+
+  Future<Packet> _readEOFResponse() => _reader.readEOFResponse();
 }
 
 class QueryCommandTextProtocol extends Protocol {
@@ -22,28 +26,30 @@ class QueryCommandTextProtocol extends Protocol {
   Future<QueryResult> executeQuery(String query) async {
     await _writeCommandQueryPacket(query);
 
-    var response = await _reader.readCommandQueryResponse();
+    var response = await _readCommandQueryResponse();
 
     if (response is OkPacket) {
-      print("ok");
-
-      print("affectedRows: ${response.affectedRows}");
-      print("info: ${response.info}");
-      print("lastInsertId: ${response.lastInsertId}");
-      print("sessionStateChanges: ${response.sessionStateChanges}");
-      print("warnings: ${response.warnings}");
-
-      return new QueryResult.ok();
+      return new QueryResult.ok(response.affectedRows);
     }
 
     if (response is! ResultSetColumnCountResponsePacket) {
       throw new QueryError();
     }
 
-    var result = new QueryResult.resultSet(response.columnCount, _reader);
+    var result = new QueryResult.resultSet(response.columnCount, this);
 
     return result;
   }
+
+  Future<Packet> _readCommandQueryResponse() =>
+      _reader.readCommandQueryResponse();
+
+  _readResultSetColumnDefinitionResponse(
+          ResultSetColumnDefinitionResponsePacket reusablePacket) =>
+      _reader.readResultSetColumnDefinitionResponse(reusablePacket);
+
+  _readResultSetRowResponse(ResultSetRowResponsePacket reusablePacket) =>
+      _reader.readResultSetRowResponse(reusablePacket);
 
   Future _writeCommandQueryPacket(String query) async {
     WriterBuffer buffer = _writer.createBuffer();
@@ -67,24 +73,27 @@ class QueryCommandTextProtocol extends Protocol {
 }
 
 class QueryResult {
+  final int affectedRows;
+
   final int columnCount;
 
-  final PacketReader _reader;
+  final QueryCommandTextProtocol _protocol;
 
   QueryColumnSetReader _columnSetReader;
 
   QueryRowSetReader _rowSetReader;
 
-  QueryResult.resultSet(this.columnCount, this._reader);
+  QueryResult.resultSet(this.columnCount, this._protocol)
+      : this.affectedRows = 0;
 
-  QueryResult.ok()
+  QueryResult.ok(this.affectedRows)
       : this.columnCount = 0,
-        this._reader = null;
+        this._protocol = null;
 
   QueryColumnSetReader get columnSetReader {
     // TODO check dello stato
 
-    _columnSetReader = new QueryColumnSetReader(columnCount, _reader);
+    _columnSetReader = new QueryColumnSetReader(columnCount, _protocol);
 
     return _columnSetReader;
   }
@@ -92,7 +101,7 @@ class QueryResult {
   QueryRowSetReader get rowSetReader {
     // TODO check dello stato
 
-    _rowSetReader = new QueryRowSetReader(columnCount, _reader);
+    _rowSetReader = new QueryRowSetReader(columnCount, _protocol);
 
     return _rowSetReader;
   }
@@ -118,11 +127,11 @@ abstract class SetReader {
 class QueryColumnSetReader extends SetReader {
   final int _columnCount;
 
-  final PacketReader _reader;
+  final QueryCommandTextProtocol _protocol;
 
   final ResultSetColumnDefinitionResponsePacket _reusableColumnPacket;
 
-  QueryColumnSetReader(this._columnCount, this._reader)
+  QueryColumnSetReader(this._columnCount, this._protocol)
       : this._reusableColumnPacket =
             new ResultSetColumnDefinitionResponsePacket.reusable();
 
@@ -135,7 +144,7 @@ class QueryColumnSetReader extends SetReader {
     // TODO check dello stato
 
     var response =
-        _reader.readResultSetColumnDefinitionResponse(_reusableColumnPacket);
+        _protocol._readResultSetColumnDefinitionResponse(_reusableColumnPacket);
 
     return response is Future
         ? response.then(
@@ -155,11 +164,11 @@ class QueryColumnSetReader extends SetReader {
 class QueryRowSetReader extends SetReader {
   final int _columnCount;
 
-  final PacketReader _reader;
+  final QueryCommandTextProtocol _protocol;
 
   final ResultSetRowResponsePacket _reusableRowPacket;
 
-  QueryRowSetReader(int columnCount, this._reader)
+  QueryRowSetReader(int columnCount, this._protocol)
       : this._columnCount = columnCount,
         this._reusableRowPacket =
             new ResultSetRowResponsePacket.reusable(columnCount);
@@ -172,7 +181,7 @@ class QueryRowSetReader extends SetReader {
   internalNext() {
     // TODO check dello stato
 
-    var response = _reader.readResultSetRowResponse(_reusableRowPacket);
+    var response = _protocol._readResultSetRowResponse(_reusableRowPacket);
 
     return response is Future
         ? response.then((response) => response is ResultSetRowResponsePacket)

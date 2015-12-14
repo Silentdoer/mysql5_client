@@ -17,10 +17,8 @@ Future test3() async {
   try {
     await connection.connect("localhost", 3306, "root", "mysql", "test");
 
-    var queryResult =
-        await connection.executeQuery2("INSERT INTO people(name, age) VALUES('roby', 42)");
-
-
+    var queryResult = await connection
+        .executeQuery("INSERT INTO people(name, age) VALUES('roby', 42)");
 
     queryResult.close();
   } finally {
@@ -35,7 +33,7 @@ Future test1() async {
     await connection.connect("localhost", 3306, "root", "mysql", "test");
 
     var queryResult =
-        await connection.executeQuery2("SELECT * FROM people LIMIT 10");
+        await connection.executeQuery("SELECT * FROM people LIMIT 10");
 
     // column count
     var columnCount = queryResult.columnCount;
@@ -47,7 +45,7 @@ Future test1() async {
       var next = await columnSetReader.next();
 /*
       var next = columnSetReader.internalNext();
-      next = next is Future ? await next() : next;
+      next = next is Future ? await next : next;
 */
       if (!next) {
         break;

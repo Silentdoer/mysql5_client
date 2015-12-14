@@ -21,8 +21,7 @@ Future main() async {
 }
 
 abstract class SpeedTest {
-
-  Future executeQuery(String sql);
+  Future<QueryResult> executeQuery(String sql);
 
   Future run() async {
     // await dropTables();
@@ -35,13 +34,11 @@ abstract class SpeedTest {
     print("dropping tables");
     try {
       await executeQuery("DROP TABLE pets");
-    } catch(e) {
-    }
+    } catch (e) {}
 
     try {
       await executeQuery("DROP TABLE people");
-    } catch(e) {
-    }
+    } catch (e) {}
   }
 
   Future createTables() async {
@@ -73,7 +70,8 @@ abstract class SpeedTest {
     print("inserting simple data");
     var sw = new Stopwatch()..start();
     for (var i = 0; i < SIMPLE_INSERTS; i++) {
-      await executeQuery("insert into people (name, age) values ('person$i', $i)");
+      await executeQuery(
+          "insert into people (name, age) values ('person$i', $i)");
     }
     logTime("simple insertions", sw);
   }
@@ -82,7 +80,33 @@ abstract class SpeedTest {
     print("selecting simple data");
     var sw = new Stopwatch()..start();
     for (var i = 0; i < SIMPLE_SELECTS; i++) {
-      await executeQuery("select * from people");
+      var queryResult = await executeQuery("select * from people");
+
+      // column definitions
+      var columnSetReader = queryResult.columnSetReader;
+      while (true) {
+        // var next = await columnSetReader.next();
+        var next = columnSetReader.internalNext();
+        next = next is Future ? await next : next;
+        if (!next) {
+          break;
+        }
+      }
+      columnSetReader.close();
+
+      // rows
+      var rowSetReader = queryResult.rowSetReader;
+      while (true) {
+        // var next = await rowSetReader.next();
+        var next = rowSetReader.internalNext();
+        next = next is Future ? await next : next;
+        if (!next) {
+          break;
+        }
+      }
+      rowSetReader.close();
+
+      queryResult.close();
     }
     logTime("simple selects", sw);
   }
@@ -117,9 +141,12 @@ class SqlJockySpeedTest extends SpeedTest {
 
   Future run() async {
     pool = new ConnectionPool(
-        host: 'localhost', port: 3306,
-        user: 'root', password: 'mysql',
-        db: 'test', max: 1);
+        host: 'localhost',
+        port: 3306,
+        user: 'root',
+        password: 'mysql',
+        db: 'test',
+        max: 1);
 
     await super.run();
 

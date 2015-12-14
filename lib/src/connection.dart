@@ -93,15 +93,14 @@ class ConnectionImpl implements Connection {
 
     var reusableColumnPacket =
         new ResultSetColumnDefinitionResponsePacket.reusable();
-    while (true) {
+    for (var i = 0; i < columnCount; i++) {
       response =
           _reader.readResultSetColumnDefinitionResponse(reusableColumnPacket);
       response = response is Future ? await response : response;
-      if (response is! ResultSetColumnDefinitionResponsePacket) {
-        break;
-      }
     }
     reusableColumnPacket.free();
+
+    response = _reader.readEOFResponse();
 
     var reusableResultSetPacket =
         new ResultSetRowResponsePacket.reusable(columnCount);

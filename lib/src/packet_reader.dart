@@ -51,6 +51,14 @@ class PacketReader {
     return value2 is Future ? value2 : new Future.value(value2);
   }
 
+  Future<Packet> readEOFResponse() {
+    var value = _readPacketBuffer();
+    var value2 = value is Future
+        ? value.then((_) => _readEOFResponseInternal())
+        : _readEOFResponseInternal();
+    return value2 is Future ? value2 : new Future.value(value2);
+  }
+
   Future<Packet> readCommandQueryResponse() {
     var value = _readPacketBuffer();
     var value2 = value is Future
@@ -88,6 +96,16 @@ class PacketReader {
   Packet _readCommandResponseInternal() {
     if (_isOkPacket()) {
       return _readOkPacket();
+    } else if (_isErrorPacket()) {
+      return _readErrorPacket();
+    } else {
+      throw new UnsupportedError("header: ${_reusablePacketBuffer.header}");
+    }
+  }
+
+  Packet _readEOFResponseInternal() {
+    if (_isEOFPacket()) {
+      return _readEOFPacket();
     } else if (_isErrorPacket()) {
       return _readErrorPacket();
     } else {

@@ -1,6 +1,12 @@
 part of mysql_client.protocol;
 
-class QueryError extends Error {}
+class QueryError extends Error {
+  final String message;
+
+  QueryError(this.message);
+
+  String toString() => "QueryError: $message";
+}
 
 class QueryCommandTextProtocol extends Protocol {
   QueryCommandTextProtocol(DataWriter writer, DataReader reader,
@@ -8,7 +14,7 @@ class QueryCommandTextProtocol extends Protocol {
       : super(writer, reader, serverCapabilityFlags, clientCapabilityFlags);
 
   Future<QueryResult> executeQuery(String query) async {
-    await _writeCommandQueryPacket(query);
+    _writeCommandQueryPacket(query);
 
     var response = await _readCommandQueryResponse();
 
@@ -17,17 +23,13 @@ class QueryCommandTextProtocol extends Protocol {
     }
 
     if (response is! ResultSetColumnCountResponsePacket) {
-      throw new QueryError();
+      throw new QueryError(response.errorMessage);
     }
 
-    var result = new QueryResult.resultSet(response.columnCount, this);
-
-    return result;
+    return new QueryResult.resultSet(response.columnCount, this);
   }
 
-  void close() {}
-
-  Future _writeCommandQueryPacket(String query) async {
+  void _writeCommandQueryPacket(String query) {
     WriterBuffer buffer = _writer.createBuffer();
 
     var sequenceId = 0x00;

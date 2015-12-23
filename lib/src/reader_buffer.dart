@@ -116,30 +116,34 @@ class ReaderBuffer {
       readFixedLengthDataRange(_payloadLength - _readCount, reusableRange);
 
   DataRange readFixedLengthDataRange(int length, DataRange reusableRange) {
-    var chunk = _chunks[_chunkIndex];
-    var range = chunk.extractFixedLengthDataRange(length, reusableRange);
-    _readCount += range.length;
-    if (chunk.isEmpty) {
-      _chunkIndex++;
-    }
+    if (length > 0) {
+      var chunk = _chunks[_chunkIndex];
+      var range = chunk.extractFixedLengthDataRange(length, reusableRange);
+      _readCount += range.length;
+      if (chunk.isEmpty) {
+        _chunkIndex++;
+      }
 
-    if (range.isPending) {
-      var leftLength = length - range.length;
-      DataRange range2;
-      do {
-        chunk = _chunks[_chunkIndex];
-        range2 = chunk.extractFixedLengthDataRange(
-            leftLength, new DataRange.reusable());
-        _readCount += range2.length;
-        if (chunk.isEmpty) {
-          _chunkIndex++;
-        }
-        leftLength -= range2.length;
-        range.addExtraRange(range2);
-      } while (range2.isPending);
-    }
+      if (range.isPending) {
+        var leftLength = length - range.length;
+        DataRange range2;
+        do {
+          chunk = _chunks[_chunkIndex];
+          range2 = chunk.extractFixedLengthDataRange(
+              leftLength, new DataRange.reusable());
+          _readCount += range2.length;
+          if (chunk.isEmpty) {
+            _chunkIndex++;
+          }
+          leftLength -= range2.length;
+          range.addExtraRange(range2);
+        } while (range2.isPending);
+      }
 
-    return range;
+      return range;
+    } else {
+      return reusableRange.reuseNil();
+    }
   }
 
   DataRange readUpToDataRange(int terminator, DataRange reusableRange) {

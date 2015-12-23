@@ -16,3 +16,4 @@ import 'package:mysql_client/src/data_writer.dart';
 part "protocol/base_protocol.dart";
 part "protocol/connection_protocol.dart";
 part "protocol/text_protocol.dart";
+part "protocol/prepared_statement_protocol.dart";

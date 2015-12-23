@@ -169,21 +169,20 @@ class DataRange {
   void _mergeExtraRanges() {
     if (_extraRanges != null) {
       var range = this;
+      var start = 0;
+      var end = range.length;
+      var newData = new List(_mergeLength);
+      newData.setRange(start, end, range.data, range.start);
+      start = end;
 
-      var data = new List(_mergeLength);
-      data.setRange(0, range.length, range.data, range.start);
-      var start = range.length;
-      var leftLength = _mergeLength - range.length;
-
-      do {
-        var end = start + _length;
-        data.setRange(start, end, range.data, range.start);
+      for (range in _extraRanges) {
+        end = start + range.length;
+        newData.setRange(start, end, range.data, range.start);
         start = end;
-        leftLength -= range.length;
-      } while (leftLength > 0);
+      }
 
       _isPending = false;
-      _data = data;
+      _data = newData;
       _start = 0;
       _length = _mergeLength;
       _extraRanges = null;

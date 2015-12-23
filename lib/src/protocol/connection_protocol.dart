@@ -1,6 +1,12 @@
 part of mysql_client.protocol;
 
-class ConnectionError extends Error {}
+class ConnectionError extends Error {
+  final String message;
+
+  ConnectionError(this.message);
+
+  String toString() => "ConnectionError: $message";
+}
 
 class ConnectionProtocol extends Protocol {
   var _characterSet = 0x21; // corrisponde a utf8_general_ci
@@ -18,26 +24,35 @@ class ConnectionProtocol extends Protocol {
     var response = await _readInitialHandshakeResponse();
 
     if (response is! InitialHandshakePacket) {
-      throw new ConnectionError();
+      throw new ConnectionError(response.errorMessage);
     }
 
     _serverCapabilityFlags = response.serverCapabilityFlags;
 
-    await _writeHandshakeResponsePacket(userName, password, database,
+    _writeHandshakeResponsePacket(userName, password, database,
         response.authPluginData, response.authPluginName);
 
     response = await _readCommandResponse();
 
     if (response is ErrorPacket) {
-      throw new ConnectionError();
+      throw new ConnectionError(response.errorMessage);
     }
 
     return new ConnectionResult(_serverCapabilityFlags, _clientCapabilityFlags);
   }
 
-  Future _writeHandshakeResponsePacket(String userName, String password,
-      String database, String authPluginData, String authPluginName) async {
+  void _writeHandshakeResponsePacket(String userName, String password,
+      String database, String authPluginData, String authPluginName) {
     WriterBuffer buffer = _writer.createBuffer();
+
+    // TODO rivedere utilizzo capability flags
+    if (_clientCapabilityFlags & CLIENT_CONNECT_WITH_DB != 0) {
+      if (database == null) {
+        _clientCapabilityFlags ^= CLIENT_CONNECT_WITH_DB;
+      }
+    } else if (database != null) {
+      _clientCapabilityFlags ^= CLIENT_CONNECT_WITH_DB;
+    }
 
     var sequenceId =
         0x01; // penso dipenda dalla sequenza a cui era arrivato il server
@@ -73,7 +88,7 @@ class ConnectionProtocol extends Protocol {
       throw new UnsupportedError("TODO to implement");
     }
     // if capabilities & CLIENT_CONNECT_WITH_DB {
-    if (_serverCapabilityFlags & CLIENT_CONNECT_WITH_DB != 0) {
+    if (_clientCapabilityFlags & CLIENT_CONNECT_WITH_DB != 0) {
       // string[NUL]    database
       buffer.writeNulTerminatedUTF8String(database);
     }

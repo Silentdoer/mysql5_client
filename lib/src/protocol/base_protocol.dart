@@ -13,6 +13,8 @@ const int CLIENT_SESSION_TRACK = 0x00800000;
 const int SERVER_SESSION_STATE_CHANGED = 0x4000;
 
 const int COM_QUERY = 0x03;
+const int COM_STMT_PREPARE = 0x16;
+const int COM_STMT_CLOSE = 0x19;
 
 abstract class Protocol {
   final DataWriter _writer;
@@ -93,6 +95,10 @@ abstract class Protocol {
       _completeSuccessResponsePacket(packet);
     } else {
       // EOF packet
+      // int<1>	header	[00] or [fe] the OK packet header
+      packet._header = _reusablePacketBuffer.payload
+          .readFixedLengthDataRange(1, _reusableDataRange)
+          .toInt();
       // if capabilities & CLIENT_PROTOCOL_41 {
       if (_serverCapabilityFlags & CLIENT_PROTOCOL_41 != 0) {
         // int<2>	warnings	number of warnings
@@ -115,7 +121,10 @@ abstract class Protocol {
   ErrorPacket _readErrorPacket() {
     var packet = new ErrorPacket(
         _reusablePacketBuffer.sequenceId, _reusablePacketBuffer.payloadLength);
-
+    // int<1>	header	[00] or [fe] the OK packet header
+    packet._header = _reusablePacketBuffer.payload
+        .readFixedLengthDataRange(1, _reusableDataRange)
+        .toInt();
     // int<2>	error_code	error-code
     packet._errorCode = _reusablePacketBuffer.payload
         .readFixedLengthDataRange(2, _reusableDataRange)
@@ -133,7 +142,7 @@ abstract class Protocol {
     }
     // string<EOF>	error_message	human readable error message
     packet._errorMessage = _reusablePacketBuffer.payload
-        .readNulTerminatedDataRange(_reusableDataRange)
+        .readRestOfPacketDataRange(_reusableDataRange)
         .toString();
 
     _reusablePacketBuffer.free();
@@ -206,7 +215,7 @@ abstract class Protocol {
     } else {
       // string<EOF>	info	human readable status information
       packet._info = _reusablePacketBuffer.payload
-          .readNulTerminatedDataRange(_reusableDataRange)
+          .readRestOfPacketDataRange(_reusableDataRange)
           .toString();
     }
   }

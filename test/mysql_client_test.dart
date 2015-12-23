@@ -6,9 +6,97 @@ library mysql_client.test;
 import "dart:async";
 
 import 'package:mysql_client/mysql_client.dart';
+import "package:stack_trace/stack_trace.dart";
 
 Future main() async {
-  await test1();
+  Chain.capture(() async {
+    await test5();
+  }, onError: (e, s) {
+    print(e);
+    print(s.terse);
+  });
+}
+
+Future test5() async {
+  var connection = new ConnectionImpl();
+
+  try {
+    await connection.connect("localhost", 3306, "root", "mysql");
+
+    var queryResult =
+        await connection.executeQuery("SELECT * FROM people LIMIT 10");
+
+    // column count
+    var columnCount = queryResult.columnCount;
+    print(columnCount);
+
+    // column definitions
+    var columnSetReader = queryResult.columnSetReader;
+    while (true) {
+      var next = await columnSetReader.next();
+      if (!next) {
+        break;
+      }
+
+      print(columnSetReader.name);
+    }
+    columnSetReader.close();
+
+    // rows
+    var rowSetReader = queryResult.rowSetReader;
+    while (true) {
+      var next = await rowSetReader.next();
+      if (!next) {
+        break;
+      }
+
+      print(rowSetReader.getString(0));
+    }
+    rowSetReader.close();
+
+    queryResult.close();
+  } finally {
+    await connection.close();
+  }
+}
+
+Future test4() async {
+  var connection = new ConnectionImpl();
+
+  try {
+    await connection.connect("localhost", 3306, "root", "mysql", "");
+
+    var preparedStatement =
+        await connection.prepareQuery("SELECT * FROM people LIMIT 10");
+
+    // param definitions
+    var paramSetReader = preparedStatement.paramSetReader;
+    while (true) {
+      var next = await paramSetReader.next();
+      if (!next) {
+        break;
+      }
+
+      print(paramSetReader.name);
+    }
+    paramSetReader.close();
+
+    // column definitions
+    var columnSetReader = preparedStatement.columnSetReader;
+    while (true) {
+      var next = await columnSetReader.next();
+      if (!next) {
+        break;
+      }
+
+      print(columnSetReader.name);
+    }
+    columnSetReader.close();
+
+    preparedStatement.close();
+  } finally {
+    await connection.close();
+  }
 }
 
 Future test3() async {

@@ -11,6 +11,10 @@ dependencies:
   crypto: ^0.9.1
   sqljocky: any
   stack_trace: any
-
+  sqlconnection:
+    hosted:
+      name: sqlconnection
+      url: http://pub.primeapp.it:9091
+    version: any
 dev_dependencies:
   test: '>=0.12.0 <0.13.0'

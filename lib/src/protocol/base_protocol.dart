@@ -17,20 +17,37 @@ const int COM_STMT_PREPARE = 0x16;
 const int COM_STMT_CLOSE = 0x19;
 
 abstract class Protocol {
-  final DataWriter _writer;
+  final PacketBuffer _reusablePacketBuffer = new PacketBuffer.reusable();
 
-  final DataReader _reader;
+  final DataRange _reusableDataRange = new DataRange.reusable();
+
+  DataWriter _writer;
+
+  DataReader _reader;
 
   int _serverCapabilityFlags;
 
   int _clientCapabilityFlags;
 
-  final PacketBuffer _reusablePacketBuffer = new PacketBuffer.reusable();
-
-  final DataRange _reusableDataRange = new DataRange.reusable();
-
   Protocol(this._writer, this._reader, this._serverCapabilityFlags,
       this._clientCapabilityFlags);
+
+  Protocol.reusable(DataWriter writer, DataReader reader,
+      int serverCapabilityFlags, int clientCapabilityFlags) {
+    _writer = writer;
+    _reader = reader;
+    _serverCapabilityFlags = serverCapabilityFlags;
+    _clientCapabilityFlags = clientCapabilityFlags;
+  }
+
+  Protocol reuse() {
+    return this;
+  }
+
+  void free() {
+    _reusablePacketBuffer.free();
+    _reusableDataRange.free();
+  }
 
   _readPacketBuffer() {
     var value = _reader.readBuffer(4);

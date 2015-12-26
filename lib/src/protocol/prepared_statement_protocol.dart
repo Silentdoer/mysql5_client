@@ -12,10 +12,17 @@ class PreparedStatementProtocol extends Protocol {
         writer, reader, serverCapabilityFlags, clientCapabilityFlags);
   }
 
+  PreparedStatementProtocol.reusable(DataWriter writer, DataReader reader,
+      int serverCapabilityFlags, int clientCapabilityFlags)
+      : super.reusable(
+            writer, reader, serverCapabilityFlags, clientCapabilityFlags) {
+    _queryCommandTextProtocol = new QueryCommandTextProtocol(
+        writer, reader, serverCapabilityFlags, clientCapabilityFlags);
+  }
+
   Future<PreparedStatement> prepareQuery(String query) async {
     _writeCommandStatementPreparePacket(query);
 
-    // First packet:
     var response = await _readCommandStatementPrepareResponse();
 
     if (response is! CommandStatementPrepareOkResponsePacket) {
@@ -151,6 +158,7 @@ class PreparedStatement {
   }
 }
 
+// TODO vedere come TextProtocol
 class StatementColumnSetReader extends PacketIterator {
   final int _columnCount;
 

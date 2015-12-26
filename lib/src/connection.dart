@@ -17,6 +17,10 @@ abstract class Connection {
 }
 
 class ConnectionImpl implements Connection {
+  ConnectionProtocol _connectionProtocol;
+  QueryCommandTextProtocol _queryCommandTextProtocol;
+  PreparedStatementProtocol _preparedStatementProtocol;
+
   int _serverCapabilityFlags;
   int _clientCapabilityFlags;
 
@@ -32,10 +36,10 @@ class ConnectionImpl implements Connection {
     _reader = new DataReader(_socket);
     _writer = new DataWriter(_socket);
 
-    var protocol = new ConnectionProtocol(_writer, _reader);
+    _connectionProtocol = new ConnectionProtocol(_writer, _reader);
 
-    var connectionResult =
-        await protocol.connect(host, port, userName, password, database);
+    var connectionResult = await _connectionProtocol.connect(
+        host, port, userName, password, database);
 
     _serverCapabilityFlags = connectionResult.serverCapabilityFlags;
     _clientCapabilityFlags = connectionResult.clientCapabilityFlags;
@@ -43,17 +47,25 @@ class ConnectionImpl implements Connection {
 
   @override
   Future<QueryResult> executeQuery(String query) async {
-    var protocol = new QueryCommandTextProtocol(
-        _writer, _reader, _serverCapabilityFlags, _clientCapabilityFlags);
+    if (_queryCommandTextProtocol != null) {
+      _queryCommandTextProtocol.reuse();
+    } else {
+      _queryCommandTextProtocol = new QueryCommandTextProtocol.reusable(
+          _writer, _reader, _serverCapabilityFlags, _clientCapabilityFlags);
+    }
 
-    return protocol.executeQuery(query);
+    return _queryCommandTextProtocol.executeQuery(query);
   }
 
   Future<PreparedStatement> prepareQuery(String query) {
-    var protocol = new PreparedStatementProtocol(
-        _writer, _reader, _serverCapabilityFlags, _clientCapabilityFlags);
+    if (_preparedStatementProtocol != null) {
+      _preparedStatementProtocol.reuse();
+    } else {
+      _preparedStatementProtocol = new PreparedStatementProtocol.reusable(
+          _writer, _reader, _serverCapabilityFlags, _clientCapabilityFlags);
+    }
 
-    return protocol.prepareQuery(query);
+    return _preparedStatementProtocol.prepareQuery(query);
   }
 
   @override

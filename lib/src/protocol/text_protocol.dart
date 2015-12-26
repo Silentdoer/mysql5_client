@@ -18,6 +18,11 @@ class QueryCommandTextProtocol extends Protocol {
       int serverCapabilityFlags, int clientCapabilityFlags)
       : super(writer, reader, serverCapabilityFlags, clientCapabilityFlags);
 
+  QueryCommandTextProtocol.reusable(DataWriter writer, DataReader reader,
+      int serverCapabilityFlags, int clientCapabilityFlags)
+      : super.reusable(
+            writer, reader, serverCapabilityFlags, clientCapabilityFlags);
+
   Future<QueryResult> executeQuery(String query) async {
     _writeCommandQueryPacket(query);
 

@@ -42,7 +42,7 @@ Future test5() async {
     }
 
     // rows
-    var rowSetReader = queryResult.rowSetIterator;
+    var rowSetReader = queryResult.rowIterator;
     while (true) {
       var next = await rowSetReader.next();
       if (!next) {
@@ -137,7 +137,7 @@ Future test1() async {
     }
 
     // rows
-    var rowSetReader = queryResult.rowSetIterator;
+    var rowSetReader = queryResult.rowIterator;
     while (true) {
       var next = await rowSetReader.next();
       if (!next) {

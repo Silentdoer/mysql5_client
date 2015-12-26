@@ -263,7 +263,7 @@ class QueryResult {
     return _columnIterator;
   }
 
-  QueryRowIterator get rowSetIterator {
+  QueryRowIterator get rowIterator {
     // TODO check dello stato
 
     // TODO riutilizzare il QueryRowIterator

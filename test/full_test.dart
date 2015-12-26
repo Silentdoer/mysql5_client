@@ -92,7 +92,6 @@ abstract class SpeedTest {
           break;
         }
       }
-      columnSetReader.close();
 
       // rows
       var rowSetReader = queryResult.rowSetReader;
@@ -104,9 +103,6 @@ abstract class SpeedTest {
           break;
         }
       }
-      rowSetReader.close();
-
-      queryResult.close();
     }
     logTime("simple selects", sw);
   }

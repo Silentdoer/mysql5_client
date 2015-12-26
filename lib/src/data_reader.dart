@@ -10,6 +10,8 @@ import "package:mysql_client/src/data_chunk.dart";
 import "package:mysql_client/src/reader_buffer.dart";
 
 class DataReader {
+  final ReaderBuffer _reusableBuffer = new ReaderBuffer.reusable();
+
   final Queue<DataChunk> _chunks = new Queue();
 
   final Stream<List<int>> _stream;
@@ -20,31 +22,28 @@ class DataReader {
     this._stream.listen(_onData);
   }
 
-  readBuffer(int length, ReaderBuffer reusableBuffer) =>
-      _readBuffer(0, length, length, reusableBuffer);
+  readBuffer(int length) => _readBuffer(0, length, length);
 
-  _readBuffer(int reusableChunks, int totalLength, int leftLength,
-      ReaderBuffer reusableBuffer) {
+  _readBuffer(int reusableChunksCount, int totalLength, int leftLength) {
     if (_chunks.isEmpty) {
       _dataReadyCompleter = new Completer();
 
       return _dataReadyCompleter.future
           .then((_) => _dataReadyCompleter = null)
           .then((_) => _readBufferInternal(
-              reusableChunks, totalLength, leftLength, reusableBuffer));
+              reusableChunksCount, totalLength, leftLength));
     } else {
-      return _readBufferInternal(
-          reusableChunks, totalLength, leftLength, reusableBuffer);
+      return _readBufferInternal(reusableChunksCount, totalLength, leftLength);
     }
   }
 
-  _readBufferInternal(int reusableChunks, int totalLength, int leftLength,
-      ReaderBuffer reusableBuffer) {
+  _readBufferInternal(
+      int reusableChunksCount, int totalLength, int leftLength) {
     var chunk = _chunks.first;
 
-    var reusableChunk = reusableBuffer.getReusableChunk(reusableChunks);
+    var reusableChunk = _reusableBuffer.getReusableChunk(reusableChunksCount);
     var bufferChunk = chunk.extractDataChunk(leftLength, reusableChunk);
-    reusableChunks++;
+    reusableChunksCount++;
     leftLength -= bufferChunk.length;
 
     if (chunk.isEmpty) {
@@ -52,8 +51,8 @@ class DataReader {
     }
 
     return leftLength > 0
-        ? _readBuffer(reusableChunks, totalLength, leftLength, reusableBuffer)
-        : reusableBuffer.reuse(reusableChunks, totalLength);
+        ? _readBuffer(reusableChunksCount, totalLength, leftLength)
+        : _reusableBuffer.reuse(reusableChunksCount, totalLength);
   }
 
   void _onData(List<int> data) {

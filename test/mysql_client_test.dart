@@ -40,7 +40,6 @@ Future test5() async {
 
       print(columnSetReader.name);
     }
-    columnSetReader.close();
 
     // rows
     var rowSetReader = queryResult.rowSetReader;
@@ -52,9 +51,6 @@ Future test5() async {
 
       print(rowSetReader.getString(0));
     }
-    rowSetReader.close();
-
-    queryResult.close();
   } finally {
     await connection.close();
   }
@@ -107,8 +103,6 @@ Future test3() async {
 
     var queryResult = await connection
         .executeQuery("INSERT INTO people(name, age) VALUES('roby', 42)");
-
-    queryResult.close();
   } finally {
     await connection.close();
   }
@@ -141,7 +135,6 @@ Future test1() async {
 
       print(columnSetReader.name);
     }
-    columnSetReader.close();
 
     // rows
     var rowSetReader = queryResult.rowSetReader;
@@ -153,9 +146,6 @@ Future test1() async {
 
       print(rowSetReader.getString(0));
     }
-    rowSetReader.close();
-
-    queryResult.close();
   } finally {
     await connection.close();
   }

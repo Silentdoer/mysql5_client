@@ -28,7 +28,8 @@ Future testMySqlClient() async {
 
     time = new DateTime.now().millisecondsSinceEpoch;
 
-    await connection.executeQuery("CALL sysadmin_vpd.set_attributes('primeapp', null, 'test')");
+    await connection.executeQuery(
+        "CALL sysadmin_vpd.set_attributes('primeapp', null, 'test')");
 
     var queryResult = await connection.executeQuery("""
       select * from v_application.node limit 100
@@ -45,7 +46,6 @@ Future testMySqlClient() async {
         break;
       }
     }
-    columnSetReader.close();
 
     // rows
     var rows = [];
@@ -62,13 +62,10 @@ Future testMySqlClient() async {
       }
       rows.add(row);
     }
-    rowSetReader.close();
 
     print(rows.length);
 
     // print(rows);
-
-    queryResult.close();
   } finally {
     await connection.close();
 
@@ -94,7 +91,8 @@ Future testSqlJocky() async {
 
     time = new DateTime.now().millisecondsSinceEpoch;
 
-    await connection.query("CALL sysadmin_vpd.set_attributes('primeapp', null, 'test')");
+    await connection
+        .query("CALL sysadmin_vpd.set_attributes('primeapp', null, 'test')");
 
     var results = await connection.query("""
       select * from v_application.node limit 100
@@ -123,7 +121,6 @@ Future testRemoteSql() async {
   var connection;
 
   try {
-
     time = new DateTime.now().millisecondsSinceEpoch;
 
     connection = await factory.createConnection("application:primeapp");

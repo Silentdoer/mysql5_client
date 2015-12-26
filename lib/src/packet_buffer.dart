@@ -9,7 +9,7 @@ class PacketBuffer {
 
   PacketBuffer(this._sequenceId, this._payload);
 
-  PacketBuffer.reusable() : this._payload = new ReaderBuffer.reusable();
+  PacketBuffer.reusable();
 
   PacketBuffer reuse(int sequenceId, ReaderBuffer payload) {
     _sequenceId = sequenceId;

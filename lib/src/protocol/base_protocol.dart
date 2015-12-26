@@ -25,14 +25,37 @@ abstract class Protocol {
 
   int _clientCapabilityFlags;
 
-  final ReaderBuffer _reusableHeaderReaderBuffer = new ReaderBuffer.reusable();
-
   final PacketBuffer _reusablePacketBuffer = new PacketBuffer.reusable();
 
   final DataRange _reusableDataRange = new DataRange.reusable();
 
   Protocol(this._writer, this._reader, this._serverCapabilityFlags,
       this._clientCapabilityFlags);
+
+  _readPacketBuffer() {
+    var value = _reader.readBuffer(4);
+    return value is Future
+        ? value.then((headerReaderBuffer) =>
+            _readPacketBufferPayload(headerReaderBuffer))
+        : _readPacketBufferPayload(value);
+  }
+
+  _readPacketBufferPayload(ReaderBuffer headerReaderBuffer) {
+    var payloadLength = headerReaderBuffer
+        .readFixedLengthDataRange(3, _reusableDataRange)
+        .toInt();
+    var sequenceId = headerReaderBuffer.readOneLengthInteger();
+
+    _reusableDataRange.free();
+
+    var value = _reader.readBuffer(payloadLength);
+    if (value is Future) {
+      return value.then((payloadReaderBuffer) =>
+          _reusablePacketBuffer.reuse(sequenceId, payloadReaderBuffer));
+    } else {
+      return _reusablePacketBuffer.reuse(sequenceId, value);
+    }
+  }
 
   Future<Packet> _readCommandResponse() {
     var value = _readPacketBuffer();
@@ -219,32 +242,6 @@ abstract class Protocol {
           .toString();
     }
   }
-
-  _readPacketBuffer() {
-    var value = _reader.readBuffer(4, _reusableHeaderReaderBuffer);
-    return value is Future
-        ? value.then((headerReaderBuffer) => _readPacketBufferInternal())
-        : _readPacketBufferInternal();
-  }
-
-  _readPacketBufferInternal() {
-    var payloadLength = _reusableHeaderReaderBuffer
-        .readFixedLengthDataRange(3, _reusableDataRange)
-        .toInt();
-    var sequenceId = _reusableHeaderReaderBuffer.readOneLengthInteger();
-
-    _reusableHeaderReaderBuffer.free();
-    _reusableDataRange.free();
-
-    var value =
-        _reader.readBuffer(payloadLength, _reusablePacketBuffer.payload);
-    if (value is Future) {
-      return value.then((payloadReaderBuffer) =>
-          _reusablePacketBuffer.reuse(sequenceId, payloadReaderBuffer));
-    } else {
-      return _reusablePacketBuffer.reuse(sequenceId, value);
-    }
-  }
 }
 
 abstract class Packet {
@@ -344,6 +341,4 @@ abstract class SetReader {
   Future<bool> next();
 
   internalNext();
-
-  void close();
 }

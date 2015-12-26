@@ -34,10 +34,8 @@ class PreparedStatementProtocol extends Protocol {
     return value2 is Future ? value2 : new Future.value(value2);
   }
 
-  _readResultSetColumnDefinitionResponse(
-          ResultSetColumnDefinitionResponsePacket reusablePacket) =>
-      _queryCommandTextProtocol
-          ._readResultSetColumnDefinitionResponse(reusablePacket);
+  _readResultSetColumnDefinitionResponse() =>
+      _queryCommandTextProtocol._readResultSetColumnDefinitionResponse();
 
   Packet _readCommandStatementPrepareResponseInternal() {
     if (_isErrorPacket()) {
@@ -172,8 +170,7 @@ class StatementColumnSetReader extends SetReader {
   internalNext() {
     // TODO check dello stato
 
-    var response =
-        _protocol._readResultSetColumnDefinitionResponse(_reusableColumnPacket);
+    var response = _protocol._readResultSetColumnDefinitionResponse();
 
     return response is Future
         ? response.then(

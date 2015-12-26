@@ -15,18 +15,18 @@ class ReaderBuffer {
     int readOneLengthInteger()
     int readFixedLengthInteger(int length)
     int readLengthEncodedInteger()
-    DataRange readNulTerminatedDataRange()
-    String readNulTerminatedString()
-    String readNulTerminatedUTF8String()
-    DataRange readFixedLengthDataRange(int length)
     String readFixedLengthString(int length)
     String readFixedLengthUTF8String(int length)
-    DataRange readLengthEncodedDataRange()
     String readLengthEncodedString()
     String readLengthEncodedUTF8String()
-    DataRange readRestOfPacketDataRange()
+    String readNulTerminatedString()
+    String readNulTerminatedUTF8String()
     String readRestOfPacketString()
     String readRestOfPacketUTF8String()
+    DataRange readFixedLengthDataRange(int length)
+    DataRange readLengthEncodedDataRange()
+    DataRange readRestOfPacketDataRange()
+    DataRange readNulTerminatedDataRange()
 }
 
 class DataChunk {
@@ -41,11 +41,13 @@ class DataChunk {
 }
 
 class DataRange {
-    List<int> get data
     int get length
     bool get isPending
     DataRange(List<int> data, [int start = 0, int length])
     DataRange.pending(List<int> data, [int start = 0])
+    DataRange.nil()
+    DataRange.byte(int byte)
+    void addExtraRange(DataRange extraRange)
     int toInt()
     String toString()
     String toUTF8String()

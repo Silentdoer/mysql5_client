@@ -34,9 +34,6 @@ class ReaderBuffer {
   ReaderBuffer.reusable() : this._chunks = new List<DataChunk>();
 
   ReaderBuffer reuse(int reusableChunks, int payloadLength) {
-    for (var i = reusableChunks; i < _chunks.length; i++) {
-      _chunks[i].free();
-    }
     _payloadLength = payloadLength;
     _chunkIndex = 0;
     _readCount = 0;
@@ -84,13 +81,6 @@ class ReaderBuffer {
   int readLengthEncodedInteger() =>
       readLengthEncodedDataRange(new DataRange.reusable()).toInt();
 
-  String readNulTerminatedString() =>
-      readUpToDataRange(NULL_TERMINATOR, new DataRange.reusable()).toString();
-
-  String readNulTerminatedUTF8String() =>
-      readUpToDataRange(NULL_TERMINATOR, new DataRange.reusable())
-          .toUTF8String();
-
   String readFixedLengthString(int length) =>
       readFixedLengthDataRange(length, new DataRange.reusable()).toString();
 
@@ -103,6 +93,13 @@ class ReaderBuffer {
   String readLengthEncodedUTF8String() =>
       readFixedLengthUTF8String(readLengthEncodedInteger());
 
+  String readNulTerminatedString() =>
+      readUpToDataRange(NULL_TERMINATOR, new DataRange.reusable()).toString();
+
+  String readNulTerminatedUTF8String() =>
+      readUpToDataRange(NULL_TERMINATOR, new DataRange.reusable())
+          .toUTF8String();
+
   String readRestOfPacketString() =>
       readFixedLengthString(_payloadLength - _readCount);
 
@@ -112,15 +109,13 @@ class ReaderBuffer {
   DataRange readNulTerminatedDataRange(DataRange reusableRange) =>
       readUpToDataRange(NULL_TERMINATOR, reusableRange);
 
-  DataRange readRestOfPacketDataRange(DataRange reusableRange) =>
-      readFixedLengthDataRange(_payloadLength - _readCount, reusableRange);
-
   DataRange readFixedLengthDataRange(int length, DataRange reusableRange) {
     if (length > 0) {
       var chunk = _chunks[_chunkIndex];
       var range = chunk.extractFixedLengthDataRange(length, reusableRange);
       _readCount += range.length;
       if (chunk.isEmpty) {
+        chunk.free();
         _chunkIndex++;
       }
 
@@ -133,6 +128,7 @@ class ReaderBuffer {
               leftLength, new DataRange.reusable());
           _readCount += range2.length;
           if (chunk.isEmpty) {
+            chunk.free();
             _chunkIndex++;
           }
           leftLength -= range2.length;
@@ -151,6 +147,7 @@ class ReaderBuffer {
     var range = chunk.extractUpToDataRange(terminator, reusableRange);
     _readCount += range.length;
     if (chunk.isEmpty) {
+      chunk.free();
       _chunkIndex++;
     }
 
@@ -162,6 +159,7 @@ class ReaderBuffer {
             chunk.extractUpToDataRange(terminator, new DataRange.reusable());
         _readCount += range2.length;
         if (chunk.isEmpty) {
+          chunk.free();
           _chunkIndex++;
         }
         range.addExtraRange(range2);
@@ -200,10 +198,14 @@ class ReaderBuffer {
     return readFixedLengthDataRange(bytesLength - 1, reusableRange);
   }
 
+  DataRange readRestOfPacketDataRange(DataRange reusableRange) =>
+      readFixedLengthDataRange(_payloadLength - _readCount, reusableRange);
+
   int _readOneByte() {
     var chunk = _chunks[_chunkIndex];
     var byte = chunk.extractOneByte();
     if (chunk.isEmpty) {
+      chunk.free();
       _chunkIndex++;
     }
     _readCount++;

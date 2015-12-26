@@ -10,7 +10,7 @@ class ConnectionError extends Error {
 
 class ConnectionProtocol extends Protocol {
   var _characterSet = 0x21; // corrisponde a utf8_general_ci
-  var _maxPacketSize = pow(2, 24) - 1;
+  var _maxPacketSize = (2 << (24 - 1)) - 1;
   var _clientConnectAttributes = {};
 
   ConnectionProtocol(DataWriter writer, DataReader reader)

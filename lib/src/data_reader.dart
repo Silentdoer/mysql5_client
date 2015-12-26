@@ -28,8 +28,10 @@ class DataReader {
     if (_chunks.isEmpty) {
       _dataReadyCompleter = new Completer();
 
-      return _dataReadyCompleter.future.then((_) => _readBufferInternal(
-          reusableChunks, totalLength, leftLength, reusableBuffer));
+      return _dataReadyCompleter.future
+          .then((_) => _dataReadyCompleter = null)
+          .then((_) => _readBufferInternal(
+              reusableChunks, totalLength, leftLength, reusableBuffer));
     } else {
       return _readBufferInternal(
           reusableChunks, totalLength, leftLength, reusableBuffer);
@@ -56,11 +58,6 @@ class DataReader {
 
   void _onData(List<int> data) {
     _chunks.add(new DataChunk(data));
-
-    if (_dataReadyCompleter != null) {
-      var completer = _dataReadyCompleter;
-      _dataReadyCompleter = null;
-      completer.complete();
-    }
+    _dataReadyCompleter?.complete();
   }
 }

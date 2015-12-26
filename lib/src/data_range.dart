@@ -1,7 +1,7 @@
 // Copyright (c) 2015, <your name>. All rights reserved. Use of this source code
 // is governed by a BSD-style license that can be found in the LICENSE file.
 
-library mysql_client.data_range2;
+library mysql_client.data_range;
 
 import "dart:convert";
 
@@ -78,8 +78,6 @@ class DataRange {
   }
 
   bool get isPending => _isPending;
-  List<int> get data => _data;
-  int get start => _start;
   int get length => _length;
 
   void addExtraRange(DataRange extraRange) {
@@ -172,12 +170,12 @@ class DataRange {
       var start = 0;
       var end = range.length;
       var newData = new List(_mergeLength);
-      newData.setRange(start, end, range.data, range.start);
+      newData.setRange(start, end, range._data, range._start);
       start = end;
 
       for (range in _extraRanges) {
         end = start + range.length;
-        newData.setRange(start, end, range.data, range.start);
+        newData.setRange(start, end, range._data, range._start);
         start = end;
       }
 

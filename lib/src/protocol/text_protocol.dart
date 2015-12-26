@@ -242,9 +242,9 @@ class QueryResult {
 
   final QueryCommandTextProtocol _protocol;
 
-  QueryColumnSetReader _columnSetReader;
+  QueryColumnIterator _columnIterator;
 
-  QueryRowSetReader _rowSetReader;
+  QueryRowIterator _rowIterator;
 
   QueryResult.resultSet(this.columnCount, this._protocol)
       : this.affectedRows = 0;
@@ -253,27 +253,31 @@ class QueryResult {
       : this.columnCount = 0,
         this._protocol = null;
 
-  QueryColumnSetReader get columnSetReader {
+  QueryColumnIterator get columnIterator {
     // TODO check dello stato
 
-    _columnSetReader = new QueryColumnSetReader(_protocol);
+    // TODO riutilizzare il QueryColumnIterator
 
-    return _columnSetReader;
+    _columnIterator = new QueryColumnIterator(_protocol);
+
+    return _columnIterator;
   }
 
-  QueryRowSetReader get rowSetReader {
+  QueryRowIterator get rowSetIterator {
     // TODO check dello stato
 
-    _rowSetReader = new QueryRowSetReader(_protocol);
+    // TODO riutilizzare il QueryRowIterator
 
-    return _rowSetReader;
+    _rowIterator = new QueryRowIterator(_protocol);
+
+    return _rowIterator;
   }
 }
 
-class QueryColumnSetReader extends SetReader {
+class QueryColumnIterator extends PacketIterator {
   final QueryCommandTextProtocol _protocol;
 
-  QueryColumnSetReader(this._protocol);
+  QueryColumnIterator(this._protocol);
 
   Future<bool> next() {
     var value = internalNext();
@@ -303,10 +307,10 @@ class QueryColumnSetReader extends SetReader {
   }
 }
 
-class QueryRowSetReader extends SetReader {
+class QueryRowIterator extends PacketIterator {
   final QueryCommandTextProtocol _protocol;
 
-  QueryRowSetReader(this._protocol);
+  QueryRowIterator(this._protocol);
 
   Future<bool> next() {
     var value = internalNext();

@@ -31,7 +31,7 @@ Future test5() async {
     print(columnCount);
 
     // column definitions
-    var columnSetReader = queryResult.columnSetReader;
+    var columnSetReader = queryResult.columnIterator;
     while (true) {
       var next = await columnSetReader.next();
       if (!next) {
@@ -42,7 +42,7 @@ Future test5() async {
     }
 
     // rows
-    var rowSetReader = queryResult.rowSetReader;
+    var rowSetReader = queryResult.rowSetIterator;
     while (true) {
       var next = await rowSetReader.next();
       if (!next) {
@@ -122,7 +122,7 @@ Future test1() async {
     print(columnCount);
 
     // column definitions
-    var columnSetReader = queryResult.columnSetReader;
+    var columnSetReader = queryResult.columnIterator;
     while (true) {
       var next = await columnSetReader.next();
 /*
@@ -137,7 +137,7 @@ Future test1() async {
     }
 
     // rows
-    var rowSetReader = queryResult.rowSetReader;
+    var rowSetReader = queryResult.rowSetIterator;
     while (true) {
       var next = await rowSetReader.next();
       if (!next) {

@@ -151,7 +151,7 @@ class PreparedStatement {
   }
 }
 
-class StatementColumnSetReader extends SetReader {
+class StatementColumnSetReader extends PacketIterator {
   final int _columnCount;
 
   final PreparedStatementProtocol _protocol;

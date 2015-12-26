@@ -339,6 +339,4 @@ class ConnectionResult {
   final int clientCapabilityFlags;
 
   ConnectionResult(this.serverCapabilityFlags, this.clientCapabilityFlags);
-
-  void close() {}
 }

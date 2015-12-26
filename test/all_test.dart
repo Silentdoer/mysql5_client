@@ -39,7 +39,7 @@ Future testMySqlClient() async {
     var columnCount = queryResult.columnCount;
 
     // column definitions
-    var columnSetReader = queryResult.columnSetReader;
+    var columnSetReader = queryResult.columnIterator;
     while (true) {
       var next = await columnSetReader.next();
       if (!next) {
@@ -49,7 +49,7 @@ Future testMySqlClient() async {
 
     // rows
     var rows = [];
-    var rowSetReader = queryResult.rowSetReader;
+    var rowSetReader = queryResult.rowSetIterator;
     while (true) {
       var next = await rowSetReader.next();
       if (!next) {

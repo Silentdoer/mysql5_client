@@ -337,7 +337,7 @@ class ErrorPacket extends GenericResponsePacket {
   String get errorMessage => _errorMessage;
 }
 
-abstract class SetReader {
+abstract class PacketIterator {
   Future<bool> next();
 
   internalNext();

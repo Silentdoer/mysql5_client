@@ -83,7 +83,7 @@ abstract class SpeedTest {
       var queryResult = await executeQuery("select * from people");
 
       // column definitions
-      var columnSetReader = queryResult.columnSetReader;
+      var columnSetReader = queryResult.columnIterator;
       while (true) {
         // var next = await columnSetReader.next();
         var next = columnSetReader.internalNext();
@@ -94,7 +94,7 @@ abstract class SpeedTest {
       }
 
       // rows
-      var rowSetReader = queryResult.rowSetReader;
+      var rowSetReader = queryResult.rowSetIterator;
       while (true) {
         // var next = await rowSetReader.next();
         var next = rowSetReader.internalNext();

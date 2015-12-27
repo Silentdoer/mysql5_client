@@ -299,7 +299,18 @@ class QueryColumnIterator extends PacketIterator {
         : _checkLast(response);
   }
 
-  String get name => _protocol._reusableColumnPacket.orgName;
+  String get catalog => _protocol._reusableColumnPacket.catalog;
+  String get schema => _protocol._reusableColumnPacket.schema;
+  String get table => _protocol._reusableColumnPacket.table;
+  String get orgTable => _protocol._reusableColumnPacket.orgTable;
+  String get name => _protocol._reusableColumnPacket.name;
+  String get orgName => _protocol._reusableColumnPacket.orgName;
+  int get fieldsLength => _protocol._reusableColumnPacket.fieldsLength;
+  int get characterSet => _protocol._reusableColumnPacket.characterSet;
+  int get columnLength => _protocol._reusableColumnPacket.columnLength;
+  int get type => _protocol._reusableColumnPacket.type;
+  int get flags => _protocol._reusableColumnPacket.flags;
+  int get decimals => _protocol._reusableColumnPacket.decimals;
 
   bool _checkLast(Packet response) {
     if (response is ResultSetColumnDefinitionResponsePacket) {

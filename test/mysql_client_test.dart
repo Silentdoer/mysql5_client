@@ -21,10 +21,10 @@ Future test5() async {
   var connection = new ConnectionImpl();
 
   try {
-    await connection.connect("localhost", 3306, "root", "mysql");
+    await connection.connect("localhost", 3306, "root", "mysql", "test");
 
     var queryResult =
-        await connection.executeQuery("SELECT * FROM people LIMIT 10");
+    await connection.executeQuery("SELECT * FROM people LIMIT 10");
 
     // column count
     var columnCount = queryResult.columnCount;
@@ -51,6 +51,9 @@ Future test5() async {
 
       print(rowSetReader.getString(0));
     }
+  } catch (e, s) {
+    print("Error: $e");
+    print(new Chain.forTrace(s).terse);
   } finally {
     await connection.close();
   }

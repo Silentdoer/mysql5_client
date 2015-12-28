@@ -16,7 +16,16 @@ const int COM_QUERY = 0x03;
 const int COM_STMT_PREPARE = 0x16;
 const int COM_STMT_CLOSE = 0x19;
 
-abstract class Protocol {
+abstract class ProtocolDelegate {
+  Protocol _protocol;
+
+  ProtocolDelegate(this._protocol);
+
+  
+}
+
+// TODO implementare una chiusura ed una release dei protocolli
+class Protocol {
   final PacketBuffer _reusablePacketBuffer = new PacketBuffer.reusable();
 
   final DataRange _reusableDataRange = new DataRange.reusable();
@@ -29,25 +38,32 @@ abstract class Protocol {
 
   int _clientCapabilityFlags;
 
-  Protocol(this._writer, this._reader, this._serverCapabilityFlags,
-      this._clientCapabilityFlags);
+  ConnectionProtocol _connectionProtocol;
 
-  Protocol.reusable(DataWriter writer, DataReader reader,
-      int serverCapabilityFlags, int clientCapabilityFlags) {
-    _writer = writer;
-    _reader = reader;
-    _serverCapabilityFlags = serverCapabilityFlags;
-    _clientCapabilityFlags = clientCapabilityFlags;
+  QueryCommandTextProtocol _queryCommandTextProtocol;
+
+  PreparedStatementProtocol _preparedStatementProtocol;
+
+  Protocol(Socket socket) {
+    _reader = new DataReader(socket);
+    _writer = new DataWriter(socket);
+
+    _connectionProtocol = new ConnectionProtocol(this);
+    _queryCommandTextProtocol = new QueryCommandTextProtocol(this);
+    _preparedStatementProtocol = new PreparedStatementProtocol(this);
   }
 
-  Protocol reuse() {
-    return this;
-  }
+  ConnectionProtocol get connectionProtocol => _connectionProtocol;
 
-  void free() {
-    _reusablePacketBuffer.free();
-    _reusableDataRange.free();
-  }
+  QueryCommandTextProtocol get queryCommandTextProtocol =>
+      _queryCommandTextProtocol;
+
+  PreparedStatementProtocol get preparedStatementProtocol =>
+      _preparedStatementProtocol;
+
+  WriterBuffer _createBuffer() => _writer.createBuffer();
+
+  void _writeBuffer(WriterBuffer buffer) => _writer.writeBuffer(buffer);
 
   _readPacketBuffer() {
     var value = _reader.readBuffer(4);
@@ -77,8 +93,8 @@ abstract class Protocol {
   Future<Packet> _readCommandResponse() {
     var value = _readPacketBuffer();
     var value2 = value is Future
-        ? value.then((_) => _readCommandResponseInternal())
-        : _readCommandResponseInternal();
+        ? value.then((_) => __readCommandResponseInternal())
+        : __readCommandResponseInternal();
     return value2 is Future ? value2 : new Future.value(value2);
   }
 
@@ -90,33 +106,11 @@ abstract class Protocol {
 
   bool _isErrorPacket() => _reusablePacketBuffer.header == 0xff;
 
-  bool _isLocalInFilePacket() => _reusablePacketBuffer.header == 0xfb;
-
-  Packet _readCommandResponseInternal() {
-    if (_isOkPacket()) {
-      return _readOkPacket();
-    } else if (_isErrorPacket()) {
-      return _readErrorPacket();
-    } else {
-      throw new UnsupportedError("header: ${_reusablePacketBuffer.header}");
-    }
-  }
-
-  Packet _readEOFResponseInternal() {
-    if (_isEOFPacket()) {
-      return _readEOFPacket();
-    } else if (_isErrorPacket()) {
-      return _readErrorPacket();
-    } else {
-      throw new UnsupportedError("header: ${_reusablePacketBuffer.header}");
-    }
-  }
-
   OkPacket _readOkPacket() {
     var packet = new OkPacket(
         _reusablePacketBuffer.sequenceId, _reusablePacketBuffer.payloadLength);
 
-    _completeSuccessResponsePacket(packet);
+    __completeSuccessResponsePacket(packet);
 
     _reusablePacketBuffer.free();
     _reusableDataRange.free();
@@ -132,7 +126,7 @@ abstract class Protocol {
     bool isEOFDeprecated = false;
 
     if (isEOFDeprecated) {
-      _completeSuccessResponsePacket(packet);
+      __completeSuccessResponsePacket(packet);
     } else {
       // EOF packet
       // int<1>	header	[00] or [fe] the OK packet header
@@ -191,7 +185,17 @@ abstract class Protocol {
     return packet;
   }
 
-  void _completeSuccessResponsePacket(SuccessResponsePacket packet) {
+  Packet __readCommandResponseInternal() {
+    if (_isOkPacket()) {
+      return _readOkPacket();
+    } else if (_isErrorPacket()) {
+      return _readErrorPacket();
+    } else {
+      throw new UnsupportedError("header: ${_reusablePacketBuffer.header}");
+    }
+  }
+
+  void __completeSuccessResponsePacket(SuccessResponsePacket packet) {
     // int<1>	header	[00] or [fe] the OK packet header
     packet._header = _reusablePacketBuffer.payload
         .readFixedLengthDataRange(1, _reusableDataRange)
@@ -259,6 +263,13 @@ abstract class Protocol {
           .toString();
     }
   }
+}
+
+abstract class PacketIterator {
+  Future<bool> next();
+
+  // TODO qui si potrebbe utilizzare il FutureWrapper
+  internalNext();
 }
 
 abstract class Packet {
@@ -352,10 +363,4 @@ class ErrorPacket extends GenericResponsePacket {
   String get sqlStateMarker => _sqlStateMarker;
   String get sqlState => _sqlState;
   String get errorMessage => _errorMessage;
-}
-
-abstract class PacketIterator {
-  Future<bool> next();
-
-  internalNext();
 }

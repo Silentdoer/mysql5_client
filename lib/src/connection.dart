@@ -3,13 +3,11 @@ library mysql_client.connection;
 import "dart:async";
 import "dart:io";
 
-import "package:mysql_client/src/data_reader.dart";
-import "package:mysql_client/src/data_writer.dart";
-
 import "package:mysql_client/src/protocol.dart";
 
 class SqlError extends Error {}
 
+// TODO implementare anche un metodo release
 abstract class Connection {
   Future<QueryResult> executeQuery(String query);
 
@@ -17,56 +15,27 @@ abstract class Connection {
 }
 
 class ConnectionImpl implements Connection {
-  ConnectionProtocol _connectionProtocol;
-  QueryCommandTextProtocol _queryCommandTextProtocol;
-  PreparedStatementProtocol _preparedStatementProtocol;
-
-  int _serverCapabilityFlags;
-  int _clientCapabilityFlags;
-
   Socket _socket;
-  DataReader _reader;
-  DataWriter _writer;
+
+  Protocol _protocol;
 
   Future connect(host, int port, String userName, String password,
       [String database]) async {
     _socket = await Socket.connect(host, port);
     _socket.setOption(SocketOption.TCP_NODELAY, true);
 
-    _reader = new DataReader(_socket);
-    _writer = new DataWriter(_socket);
+    _protocol = new Protocol(_socket);
 
-    _connectionProtocol = new ConnectionProtocol(_writer, _reader);
-
-    var connectionResult = await _connectionProtocol.connect(
-        host, port, userName, password, database);
-
-    _serverCapabilityFlags = connectionResult.serverCapabilityFlags;
-    _clientCapabilityFlags = connectionResult.clientCapabilityFlags;
+    await _protocol.connectionProtocol
+        .connect(host, port, userName, password, database);
   }
 
   @override
-  Future<QueryResult> executeQuery(String query) async {
-    if (_queryCommandTextProtocol != null) {
-      _queryCommandTextProtocol.reuse();
-    } else {
-      _queryCommandTextProtocol = new QueryCommandTextProtocol.reusable(
-          _writer, _reader, _serverCapabilityFlags, _clientCapabilityFlags);
-    }
+  Future<QueryResult> executeQuery(String query) async =>
+      _protocol.queryCommandTextProtocol.executeQuery(query);
 
-    return _queryCommandTextProtocol.executeQuery(query);
-  }
-
-  Future<PreparedStatement> prepareQuery(String query) {
-    if (_preparedStatementProtocol != null) {
-      _preparedStatementProtocol.reuse();
-    } else {
-      _preparedStatementProtocol = new PreparedStatementProtocol.reusable(
-          _writer, _reader, _serverCapabilityFlags, _clientCapabilityFlags);
-    }
-
-    return _preparedStatementProtocol.prepareQuery(query);
-  }
+  Future<PreparedStatement> prepareQuery(String query) =>
+      _protocol.preparedStatementProtocol.prepareQuery(query);
 
   @override
   Future close() async {

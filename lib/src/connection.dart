@@ -11,8 +11,6 @@ class SqlError extends Error {}
 abstract class Connection {
   bool get isConnected;
 
-  bool get isClosed;
-
   Future connect(host, int port, String userName, String password,
       [String database]);
 
@@ -34,23 +32,21 @@ class ConnectionImpl implements Connection {
   bool get isConnected => _protocol != null;
 
   @override
-  bool get isClosed => _socket == null;
-
-  @override
   Future connect(host, int port, String userName, String password,
       [String database]) async {
     if (isConnected) {
       throw new StateError("Connection already connected");
     }
 
-    _socket = await Socket.connect(host, port);
-    _socket.setOption(SocketOption.TCP_NODELAY, true);
+    var socket = await Socket.connect(host, port);
+    socket.setOption(SocketOption.TCP_NODELAY, true);
 
-    var protocol = new Protocol(_socket);
+    var protocol = new Protocol(socket);
 
     await protocol.connectionProtocol
         .connect(host, port, userName, password, database);
 
+    _socket = socket;
     _protocol = protocol;
   }
 
@@ -79,20 +75,19 @@ class ConnectionImpl implements Connection {
 
   @override
   Future close() async {
-    if (isClosed) {
-      throw new StateError("Connection already closed");
+    if (!isConnected) {
+      throw new StateError("Connection not connected");
     }
 
-    if (isConnected) {
-      _protocol.destroy();
-
-      _protocol = null;
-    }
-
-    await _socket.close();
-
-    _socket.destroy();
+    var socket = _socket;
+    var protocol = _protocol;
 
     _socket = null;
+    _protocol = null;
+
+    protocol.destroy();
+
+    await socket.close();
+    socket.destroy();
   }
 }

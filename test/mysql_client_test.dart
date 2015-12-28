@@ -26,24 +26,23 @@ Future test6() async {
     var queryResult;
 
     queryResult =
-      await connection.executeQuery("SELECT * FROM people LIMIT 1");
+      await connection.executeQuery("SELECT * FROM people LIMIT 100");
 
     queryResult =
         await connection.executeQuery("SELECT * FROM people LIMIT 10");
 
     print(queryResult.columnCount);
-/*
+
     // column definitions
-    var columnSetReader = queryResult.columnIterator;
+    var columnSetReader = await queryResult.columnIterator();
     while (true) {
-      var next = await columnSetReader.next();
+      var next = await columnSetReader.nextAsFuture();
       if (!next) {
         break;
       }
 
       print(columnSetReader.name);
     }
-*/
 
     // rows
     var rowSetReader = await queryResult.rowIterator();

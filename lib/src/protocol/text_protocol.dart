@@ -58,11 +58,25 @@ class QueryCommandTextProtocol extends ProtocolDelegate {
     return value2 is Future ? value2 : new Future.value(value2);
   }
 
+  _skipResultSetColumnDefinitionResponse() {
+    var value = _protocol._readPacketBuffer();
+    return value is Future
+        ? value.then((_) => _skipResultSetColumnDefinitionResponsePacket())
+        : _skipResultSetColumnDefinitionResponsePacket();
+  }
+
   _readResultSetColumnDefinitionResponse() {
     var value = _protocol._readPacketBuffer();
     return value is Future
         ? value.then((_) => _readResultSetColumnDefinitionResponsePacket())
         : _readResultSetColumnDefinitionResponsePacket();
+  }
+
+  _skipResultSetRowResponse() {
+    var value = _protocol._readPacketBuffer();
+    return value is Future
+        ? value.then((_) => _skipResultSetRowResponsePacket())
+        : _skipResultSetRowResponsePacket();
   }
 
   _readResultSetRowResponse() {
@@ -84,6 +98,20 @@ class QueryCommandTextProtocol extends ProtocolDelegate {
     }
   }
 
+  Packet _skipResultSetColumnDefinitionResponsePacket() {
+    if (_protocol._isErrorPacket()) {
+      _reusableColumnPacket.free();
+
+      return _protocol._readErrorPacket();
+    } else if (_protocol._isEOFPacket()) {
+      _reusableColumnPacket.free();
+
+      return _protocol._readEOFPacket();
+    } else {
+      return _skipResultSetColumnDefinitionPacket();
+    }
+  }
+
   Packet _readResultSetColumnDefinitionResponsePacket() {
     if (_protocol._isErrorPacket()) {
       _reusableColumnPacket.free();
@@ -95,6 +123,20 @@ class QueryCommandTextProtocol extends ProtocolDelegate {
       return _protocol._readEOFPacket();
     } else {
       return _readResultSetColumnDefinitionPacket();
+    }
+  }
+
+  Packet _skipResultSetRowResponsePacket() {
+    if (_protocol._isErrorPacket()) {
+      _reusableRowPacket.free();
+
+      return _protocol._readErrorPacket();
+    } else if (_protocol._isEOFPacket()) {
+      _reusableRowPacket.free();
+
+      return _protocol._readEOFPacket();
+    } else {
+      return _skipResultSetRowPacket();
     }
   }
 
@@ -126,6 +168,19 @@ class QueryCommandTextProtocol extends ProtocolDelegate {
     _protocol._reusableDataRange.free();
 
     _reusableRowPacket = new ResultSetRowPacket.reusable(packet._columnCount);
+
+    return packet;
+  }
+
+  ResultSetColumnDefinitionPacket _skipResultSetColumnDefinitionPacket() {
+    var packet = _reusableColumnPacket.reuse(
+        _protocol._reusablePacketBuffer.sequenceId,
+        _protocol._reusablePacketBuffer.payloadLength);
+
+    _protocol._reusablePacketBuffer.payload
+        .skipBytes(_protocol._reusablePacketBuffer.payloadLength);
+
+    _protocol._reusablePacketBuffer.free();
 
     return packet;
   }
@@ -214,6 +269,19 @@ class QueryCommandTextProtocol extends ProtocolDelegate {
     return packet;
   }
 
+  ResultSetRowPacket _skipResultSetRowPacket() {
+    var packet = _reusableRowPacket.reuse(
+        _protocol._reusablePacketBuffer.sequenceId,
+        _protocol._reusablePacketBuffer.payloadLength);
+
+    _protocol._reusablePacketBuffer.payload
+        .skipBytes(_protocol._reusablePacketBuffer.payloadLength);
+
+    _protocol._reusablePacketBuffer.free();
+
+    return packet;
+  }
+
   ResultSetRowPacket _readResultSetRowPacket() {
     var packet = _reusableRowPacket.reuse(
         _protocol._reusablePacketBuffer.sequenceId,
@@ -296,10 +364,10 @@ class QueryResult implements ProtocolResult {
     if (!_columnIterator.isClosed) {
       await _columnIterator.close();
     }
-
     if (!isClosed) {
       await _rowIterator.close();
     }
+    // TODO pulizia protocol
   }
 }
 
@@ -316,10 +384,9 @@ class QueryColumnIterator extends PacketIterator {
 
   Future close() async {
     if (!isClosed) {
-      // TODO ottimizzare l'esaurimento dei pacchetti
       var hasNext = true;
       while (hasNext) {
-        hasNext = next();
+        hasNext = _skip();
         hasNext = hasNext is Future ? await hasNext : hasNext;
       }
 
@@ -357,18 +424,17 @@ class QueryColumnIterator extends PacketIterator {
   int get flags => _protocol._reusableColumnPacket.flags;
   int get decimals => _protocol._reusableColumnPacket.decimals;
 
+  _skip() {
+    var response = _protocol._skipResultSetColumnDefinitionResponse();
+
+    return response is Future
+        ? response.then((response) => _checkLast(response))
+        : _checkLast(response);
+  }
+
   bool _checkLast(Packet response) {
-    if (response is ResultSetColumnDefinitionPacket) {
-      _isClosed = false;
-
-      return true;
-    } else {
-      _protocol._reusableRowPacket.free();
-
-      _isClosed = true;
-
-      return false;
-    }
+    _isClosed = response is! ResultSetColumnDefinitionPacket;
+    return !_isClosed;
   }
 }
 
@@ -385,10 +451,9 @@ class QueryRowIterator extends PacketIterator {
 
   Future close() async {
     if (!isClosed) {
-      // TODO ottimizzare l'esaurimento dei pacchetti
       var hasNext = true;
       while (hasNext) {
-        hasNext = next();
+        hasNext = _skip();
         hasNext = hasNext is Future ? await hasNext : hasNext;
       }
 
@@ -418,18 +483,17 @@ class QueryRowIterator extends PacketIterator {
   String getUTF8String(int index) =>
       _protocol._reusableRowPacket._getUTF8String(index);
 
+  _skip() {
+    var response = _protocol._skipResultSetRowResponse();
+
+    return response is Future
+        ? response.then((response) => _checkLast(response))
+        : _checkLast(response);
+  }
+
   bool _checkLast(Packet response) {
-    if (response is ResultSetRowPacket) {
-      _isClosed = false;
-
-      return true;
-    } else {
-      _protocol._reusableRowPacket.free();
-
-      _isClosed = true;
-
-      return false;
-    }
+    _isClosed = response is! ResultSetRowPacket;
+    return !_isClosed;
   }
 }
 

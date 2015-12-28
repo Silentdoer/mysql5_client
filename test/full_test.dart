@@ -84,24 +84,20 @@ abstract class SpeedTest {
 
       // column definitions
       var columnIterator = await queryResult.columnIterator();
-      while (true) {
-        // var next = await columnIterator.next();
-        var next = columnIterator.next();
-        next = next is Future ? await next : next;
-        if (!next) {
-          break;
-        }
+      var hasColumn = true;
+      while (hasColumn) {
+        // hasColumn = await columnIterator.next();
+        hasColumn = columnIterator.next();
+        hasColumn = hasColumn is Future ? await hasColumn : hasColumn;
       }
 
       // rows
       var rowIterator = await queryResult.rowIterator();
-      while (true) {
-        // var next = await rowIterator.next();
-        var next = rowIterator.next();
-        next = next is Future ? await next : next;
-        if (!next) {
-          break;
-        }
+      var hasRow = true;
+      while (hasRow) {
+        // var hasRow = await rowIterator.next();
+        hasRow = rowIterator.next();
+        hasRow = hasRow is Future ? await hasRow : hasRow;
       }
     }
     logTime("simple selects", sw);

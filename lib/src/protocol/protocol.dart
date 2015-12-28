@@ -59,10 +59,6 @@ class Protocol {
   PreparedStatementProtocol get preparedStatementProtocol =>
       _preparedStatementProtocol;
 
-  void free() {
-    // TODO implementare Protocol.free()
-  }
-
   void destroy() {
     // TODO implementare Protocol.destroy()
   }

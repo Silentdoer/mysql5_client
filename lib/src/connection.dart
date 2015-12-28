@@ -9,7 +9,18 @@ class SqlError extends Error {}
 
 // TODO implementare anche un metodo release
 abstract class Connection {
+  bool get isConnected;
+
+  bool get isClosed;
+
+  Future connect(host, int port, String userName, String password,
+      [String database]);
+
   Future<QueryResult> executeQuery(String query);
+
+  Future<PreparedStatement> prepareQuery(String query);
+
+  void free();
 
   Future close();
 }
@@ -19,27 +30,64 @@ class ConnectionImpl implements Connection {
 
   Protocol _protocol;
 
+  @override
+  bool get isConnected => _protocol != null;
+
+  @override
+  bool get isClosed => _socket == null;
+
+  @override
   Future connect(host, int port, String userName, String password,
       [String database]) async {
+    if (isConnected) {
+      throw new StateError("Connection already connected");
+    }
+
     _socket = await Socket.connect(host, port);
     _socket.setOption(SocketOption.TCP_NODELAY, true);
 
-    _protocol = new Protocol(_socket);
+    var protocol = new Protocol(_socket);
 
-    await _protocol.connectionProtocol
+    await protocol.connectionProtocol
         .connect(host, port, userName, password, database);
+
+    _protocol = protocol;
   }
 
   @override
-  Future<QueryResult> executeQuery(String query) async =>
-      _protocol.queryCommandTextProtocol.executeQuery(query);
+  Future<QueryResult> executeQuery(String query) async {
+    if (!isConnected) {
+      throw new StateError("Connection not connected");
+    }
 
-  Future<PreparedStatement> prepareQuery(String query) =>
-      _protocol.preparedStatementProtocol.prepareQuery(query);
+    return _protocol.queryCommandTextProtocol.executeQuery(query);
+  }
+
+  @override
+  Future<PreparedStatement> prepareQuery(String query) {
+    if (!isConnected) {
+      throw new StateError("Connection not connected");
+    }
+
+    return _protocol.preparedStatementProtocol.prepareQuery(query);
+  }
+
+  @override
+  void free() {
+    _protocol.free();
+  }
 
   @override
   Future close() async {
-    // TODO liberare i protocolli precedenti
+    if (isClosed) {
+      throw new StateError("Connection already closed");
+    }
+
+    if (isConnected) {
+      _protocol.destroy();
+
+      _protocol = null;
+    }
 
     await _socket.close();
 

@@ -59,6 +59,14 @@ class Protocol {
   PreparedStatementProtocol get preparedStatementProtocol =>
       _preparedStatementProtocol;
 
+  void free() {
+    // TODO implementare Protocol.free()
+  }
+
+  void destroy() {
+    // TODO implementare Protocol.destroy()
+  }
+
   WriterBuffer _createBuffer() => _writer.createBuffer();
 
   void _writeBuffer(WriterBuffer buffer) => _writer.writeBuffer(buffer);

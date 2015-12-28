@@ -20,8 +20,6 @@ abstract class ProtocolDelegate {
   Protocol _protocol;
 
   ProtocolDelegate(this._protocol);
-
-  
 }
 
 // TODO implementare una chiusura ed una release dei protocolli

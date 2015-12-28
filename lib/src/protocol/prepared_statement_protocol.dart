@@ -14,8 +14,8 @@ class PreparedStatementProtocol extends ProtocolDelegate {
       throw new PrepareStatementError();
     }
 
-    return new PreparedStatement(
-        response.statementId, response.numColumns, response.numParams, this);
+    return new PreparedStatement(response.statementId, response.numColumns,
+        response.numParams, _protocol);
   }
 
   Future<Packet> _readCommandStatementPrepareResponse() {
@@ -109,19 +109,18 @@ class PreparedStatementProtocol extends ProtocolDelegate {
   }
 }
 
-class PreparedStatement implements ProtocolResult {
+class PreparedStatement extends ProtocolResult {
   final int _statementId;
   final int _numColumns;
   final int _numParams;
-
-  final PreparedStatementProtocol _protocol;
 
   StatementColumnSetReader _paramSetReader;
 
   StatementColumnSetReader _columnSetReader;
 
   PreparedStatement(
-      this._statementId, this._numColumns, this._numParams, this._protocol);
+      this._statementId, this._numColumns, this._numParams, Protocol protocol)
+      : super(protocol);
 
   StatementColumnSetReader get paramSetReader {
     // TODO check dello stato
@@ -139,8 +138,10 @@ class PreparedStatement implements ProtocolResult {
     return _columnSetReader;
   }
 
+  @override
   Future close() async {
-    _protocol._writeCommandStatementClosePacket(_statementId);
+    _protocol._preparedStatementProtocol
+        ._writeCommandStatementClosePacket(_statementId);
   }
 }
 
@@ -148,7 +149,7 @@ class PreparedStatement implements ProtocolResult {
 class StatementColumnSetReader extends PacketIterator {
   final int _columnCount;
 
-  final PreparedStatementProtocol _protocol;
+  final Protocol _protocol;
 
   final ResultSetColumnDefinitionPacket _reusableColumnPacket;
 
@@ -164,7 +165,8 @@ class StatementColumnSetReader extends PacketIterator {
   next() {
     // TODO check dello stato
 
-    var response = _protocol._readResultSetColumnDefinitionResponse();
+    var response = _protocol._queryCommandTextProtocol
+        ._readResultSetColumnDefinitionResponse();
 
     return response is Future
         ? response

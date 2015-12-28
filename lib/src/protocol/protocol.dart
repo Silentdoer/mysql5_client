@@ -22,7 +22,6 @@ abstract class ProtocolDelegate {
   ProtocolDelegate(this._protocol);
 }
 
-// TODO implementare una chiusura ed una release dei protocolli
 class Protocol {
   final PacketBuffer _reusablePacketBuffer = new PacketBuffer.reusable();
 
@@ -58,10 +57,6 @@ class Protocol {
 
   PreparedStatementProtocol get preparedStatementProtocol =>
       _preparedStatementProtocol;
-
-  void destroy() {
-    // TODO implementare Protocol.destroy()
-  }
 
   WriterBuffer _createBuffer() => _writer.createBuffer();
 
@@ -268,6 +263,10 @@ class Protocol {
 }
 
 abstract class ProtocolResult {
+  final Protocol _protocol;
+
+  ProtocolResult(this._protocol);
+
   Future close();
 }
 

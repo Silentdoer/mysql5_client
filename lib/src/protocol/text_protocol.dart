@@ -22,14 +22,14 @@ class QueryCommandTextProtocol extends ProtocolDelegate {
     var response = await _readCommandQueryResponse();
 
     if (response is OkPacket) {
-      return new QueryResult.ok(response.affectedRows);
+      return new QueryResult.ok(response.affectedRows, _protocol);
     }
 
     if (response is! ResultSetColumnCountPacket) {
       throw new QueryError(response.errorMessage);
     }
 
-    return new QueryResult.resultSet(response.columnCount, this);
+    return new QueryResult.resultSet(response.columnCount, _protocol);
   }
 
   void _writeCommandQueryPacket(String query) {
@@ -312,29 +312,27 @@ class QueryCommandTextProtocol extends ProtocolDelegate {
   bool _isLocalInFilePacket() => _protocol._reusablePacketBuffer.header == 0xfb;
 }
 
-class QueryResult implements ProtocolResult {
+class QueryResult extends ProtocolResult {
   final int affectedRows;
 
   final int columnCount;
-
-  final QueryCommandTextProtocol _protocol;
 
   final QueryColumnIterator _columnIterator;
 
   final QueryRowIterator _rowIterator;
 
-  QueryResult.resultSet(this.columnCount, QueryCommandTextProtocol protocol)
+  QueryResult.resultSet(this.columnCount, Protocol protocol)
       : this.affectedRows = 0,
-        this._protocol = protocol,
         _columnIterator = new QueryColumnIterator(protocol),
-        _rowIterator = new QueryRowIterator(protocol);
+        _rowIterator = new QueryRowIterator(protocol),
+        super(protocol);
 
   // TODO rivedere se tutto torna con gli statement senza risultato
-  QueryResult.ok(this.affectedRows)
+  QueryResult.ok(this.affectedRows, Protocol protocol)
       : this.columnCount = 0,
-        this._protocol = null,
         this._columnIterator = null,
-        this._rowIterator = null;
+        this._rowIterator = null,
+        super(protocol);
 
   bool get isClosed => _rowIterator.isClosed;
 
@@ -360,6 +358,7 @@ class QueryResult implements ProtocolResult {
     return _rowIterator;
   }
 
+  @override
   Future close() async {
     if (!_columnIterator.isClosed) {
       await _columnIterator.close();
@@ -367,12 +366,11 @@ class QueryResult implements ProtocolResult {
     if (!isClosed) {
       await _rowIterator.close();
     }
-    // TODO pulizia protocol
   }
 }
 
 class QueryColumnIterator extends PacketIterator {
-  final QueryCommandTextProtocol _protocol;
+  final Protocol _protocol;
 
   bool _isClosed;
 
@@ -404,28 +402,42 @@ class QueryColumnIterator extends PacketIterator {
       throw new StateError("Column iterator closed");
     }
 
-    var response = _protocol._readResultSetColumnDefinitionResponse();
+    var response = _protocol._queryCommandTextProtocol
+        ._readResultSetColumnDefinitionResponse();
 
     return response is Future
         ? response.then((response) => _checkLast(response))
         : _checkLast(response);
   }
 
-  String get catalog => _protocol._reusableColumnPacket.catalog;
-  String get schema => _protocol._reusableColumnPacket.schema;
-  String get table => _protocol._reusableColumnPacket.table;
-  String get orgTable => _protocol._reusableColumnPacket.orgTable;
-  String get name => _protocol._reusableColumnPacket.name;
-  String get orgName => _protocol._reusableColumnPacket.orgName;
-  int get fieldsLength => _protocol._reusableColumnPacket.fieldsLength;
-  int get characterSet => _protocol._reusableColumnPacket.characterSet;
-  int get columnLength => _protocol._reusableColumnPacket.columnLength;
-  int get type => _protocol._reusableColumnPacket.type;
-  int get flags => _protocol._reusableColumnPacket.flags;
-  int get decimals => _protocol._reusableColumnPacket.decimals;
+  String get catalog =>
+      _protocol._queryCommandTextProtocol._reusableColumnPacket.catalog;
+  String get schema =>
+      _protocol._queryCommandTextProtocol._reusableColumnPacket.schema;
+  String get table =>
+      _protocol._queryCommandTextProtocol._reusableColumnPacket.table;
+  String get orgTable =>
+      _protocol._queryCommandTextProtocol._reusableColumnPacket.orgTable;
+  String get name =>
+      _protocol._queryCommandTextProtocol._reusableColumnPacket.name;
+  String get orgName =>
+      _protocol._queryCommandTextProtocol._reusableColumnPacket.orgName;
+  int get fieldsLength =>
+      _protocol._queryCommandTextProtocol._reusableColumnPacket.fieldsLength;
+  int get characterSet =>
+      _protocol._queryCommandTextProtocol._reusableColumnPacket.characterSet;
+  int get columnLength =>
+      _protocol._queryCommandTextProtocol._reusableColumnPacket.columnLength;
+  int get type =>
+      _protocol._queryCommandTextProtocol._reusableColumnPacket.type;
+  int get flags =>
+      _protocol._queryCommandTextProtocol._reusableColumnPacket.flags;
+  int get decimals =>
+      _protocol._queryCommandTextProtocol._reusableColumnPacket.decimals;
 
   _skip() {
-    var response = _protocol._skipResultSetColumnDefinitionResponse();
+    var response = _protocol._queryCommandTextProtocol
+        ._skipResultSetColumnDefinitionResponse();
 
     return response is Future
         ? response.then((response) => _checkLast(response))
@@ -439,7 +451,7 @@ class QueryColumnIterator extends PacketIterator {
 }
 
 class QueryRowIterator extends PacketIterator {
-  final QueryCommandTextProtocol _protocol;
+  final Protocol _protocol;
 
   bool _isClosed;
 
@@ -471,20 +483,23 @@ class QueryRowIterator extends PacketIterator {
       throw new StateError("Column iterator closed");
     }
 
-    var response = _protocol._readResultSetRowResponse();
+    var response =
+        _protocol._queryCommandTextProtocol._readResultSetRowResponse();
 
     return response is Future
         ? response.then((response) => _checkLast(response))
         : _checkLast(response);
   }
 
-  String getString(int index) => _protocol._reusableRowPacket._getString(index);
+  String getString(int index) =>
+      _protocol._queryCommandTextProtocol._reusableRowPacket._getString(index);
 
-  String getUTF8String(int index) =>
-      _protocol._reusableRowPacket._getUTF8String(index);
+  String getUTF8String(int index) => _protocol
+      ._queryCommandTextProtocol._reusableRowPacket._getUTF8String(index);
 
   _skip() {
-    var response = _protocol._skipResultSetRowResponse();
+    var response =
+        _protocol._queryCommandTextProtocol._skipResultSetRowResponse();
 
     return response is Future
         ? response.then((response) => _checkLast(response))

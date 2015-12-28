@@ -86,12 +86,9 @@ class ConnectionImpl implements Connection {
     await _lastProtocolResult?.close();
 
     var socket = _socket;
-    var protocol = _protocol;
 
     _socket = null;
     _protocol = null;
-
-    protocol.destroy();
 
     await socket.close();
     socket.destroy();

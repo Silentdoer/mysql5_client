@@ -37,7 +37,8 @@ class ConnectionProtocol extends ProtocolDelegate {
       throw new ConnectionError(response.errorMessage);
     }
 
-    return new ConnectionResult(_protocol._serverCapabilityFlags, _protocol._clientCapabilityFlags);
+    return new ConnectionResult(
+        _protocol._serverCapabilityFlags, _protocol._clientCapabilityFlags);
   }
 
   void _writeHandshakeResponsePacket(String userName, String password,
@@ -68,14 +69,17 @@ class ConnectionProtocol extends ProtocolDelegate {
     buffer.writeNulTerminatedUTF8String(userName);
 
     // if capabilities & CLIENT_PLUGIN_AUTH_LENENC_CLIENT_DATA {
-    if (_protocol._serverCapabilityFlags & CLIENT_PLUGIN_AUTH_LENENC_CLIENT_DATA != 0) {
+    if (_protocol._serverCapabilityFlags &
+            CLIENT_PLUGIN_AUTH_LENENC_CLIENT_DATA !=
+        0) {
       // lenenc-int     length of auth-response
       // string[n]      auth-response
       buffer.writeLengthEncodedString(_generateAuthResponse(
           password, authPluginData, authPluginName,
           utf8Encoded: true));
       // else if capabilities & CLIENT_SECURE_CONNECTION {
-    } else if (_protocol._serverCapabilityFlags & CLIENT_SECURE_CONNECTION != 0) {
+    } else if (_protocol._serverCapabilityFlags & CLIENT_SECURE_CONNECTION !=
+        0) {
       // 1              length of auth-response
       // string[n]      auth-response
       // TODO to implement
@@ -122,12 +126,12 @@ class ConnectionProtocol extends ProtocolDelegate {
   Future<Packet> _readInitialHandshakeResponse() {
     var value = _protocol._readPacketBuffer();
     var value2 = value is Future
-        ? value.then((_) => _readInitialHandshakeResponseInternal())
-        : _readInitialHandshakeResponseInternal();
+        ? value.then((_) => _readInitialHandshakeResponsePacket())
+        : _readInitialHandshakeResponsePacket();
     return value2 is Future ? value2 : new Future.value(value2);
   }
 
-  Packet _readInitialHandshakeResponseInternal() {
+  Packet _readInitialHandshakeResponsePacket() {
     if (_protocol._isErrorPacket()) {
       return _protocol._readErrorPacket();
     } else {
@@ -137,7 +141,8 @@ class ConnectionProtocol extends ProtocolDelegate {
 
   InitialHandshakePacket _readInitialHandshakePacket() {
     var packet = new InitialHandshakePacket(
-        _protocol._reusablePacketBuffer.sequenceId, _protocol._reusablePacketBuffer.payloadLength);
+        _protocol._reusablePacketBuffer.sequenceId,
+        _protocol._reusablePacketBuffer.payloadLength);
 
     // 1              [0a] protocol version
     packet._protocolVersion = _protocol._reusablePacketBuffer.payload

@@ -3,8 +3,7 @@ part of mysql_client.protocol;
 class PrepareStatementError extends Error {}
 
 class PreparedStatementProtocol extends ProtocolDelegate {
-  PreparedStatementProtocol(Protocol protocol)
-      : super(protocol);
+  PreparedStatementProtocol(Protocol protocol) : super(protocol);
 
   Future<PreparedStatement> prepareQuery(String query) async {
     _writeCommandStatementPreparePacket(query);
@@ -40,7 +39,8 @@ class PreparedStatementProtocol extends ProtocolDelegate {
 
   CommandStatementPrepareOkResponsePacket _readCommandStatementPrepareOkResponsePacket() {
     var packet = new CommandStatementPrepareOkResponsePacket(
-        _protocol._reusablePacketBuffer.sequenceId, _protocol._reusablePacketBuffer.payloadLength);
+        _protocol._reusablePacketBuffer.sequenceId,
+        _protocol._reusablePacketBuffer.payloadLength);
 
     // status (1) -- [00] OK
     packet._status = _protocol._reusablePacketBuffer.payload
@@ -150,11 +150,11 @@ class StatementColumnSetReader extends PacketIterator {
 
   final PreparedStatementProtocol _protocol;
 
-  final ResultSetColumnDefinitionResponsePacket _reusableColumnPacket;
+  final ResultSetColumnDefinitionPacket _reusableColumnPacket;
 
   StatementColumnSetReader(this._columnCount, this._protocol)
       : this._reusableColumnPacket =
-            new ResultSetColumnDefinitionResponsePacket.reusable();
+            new ResultSetColumnDefinitionPacket.reusable();
 
   Future<bool> nextAsFuture() {
     var value = _columnCount > 0 ? next() : false;
@@ -167,9 +167,9 @@ class StatementColumnSetReader extends PacketIterator {
     var response = _protocol._readResultSetColumnDefinitionResponse();
 
     return response is Future
-        ? response.then(
-            (response) => response is ResultSetColumnDefinitionResponsePacket)
-        : response is ResultSetColumnDefinitionResponsePacket;
+        ? response
+            .then((response) => response is ResultSetColumnDefinitionPacket)
+        : response is ResultSetColumnDefinitionPacket;
   }
 
   String get name => _reusableColumnPacket.orgName;

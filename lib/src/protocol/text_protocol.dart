@@ -9,10 +9,10 @@ class QueryError extends Error {
 }
 
 class QueryCommandTextProtocol extends ProtocolDelegate {
-  final ResultSetColumnDefinitionResponsePacket _reusableColumnPacket =
-      new ResultSetColumnDefinitionResponsePacket.reusable();
+  final ResultSetColumnDefinitionPacket _reusableColumnPacket =
+      new ResultSetColumnDefinitionPacket.reusable();
 
-  ResultSetRowResponsePacket _reusableRowPacket;
+  ResultSetRowPacket _reusableRowPacket;
 
   QueryCommandTextProtocol(Protocol protocol) : super(protocol);
 
@@ -25,7 +25,7 @@ class QueryCommandTextProtocol extends ProtocolDelegate {
       return new QueryResult.ok(response.affectedRows);
     }
 
-    if (response is! ResultSetColumnCountResponsePacket) {
+    if (response is! ResultSetColumnCountPacket) {
       throw new QueryError(response.errorMessage);
     }
 
@@ -53,26 +53,26 @@ class QueryCommandTextProtocol extends ProtocolDelegate {
   Future<Packet> _readCommandQueryResponse() {
     var value = _protocol._readPacketBuffer();
     var value2 = value is Future
-        ? value.then((_) => _readCommandQueryResponseInternal())
-        : _readCommandQueryResponseInternal();
+        ? value.then((_) => _readCommandQueryResponsePacket())
+        : _readCommandQueryResponsePacket();
     return value2 is Future ? value2 : new Future.value(value2);
   }
 
   _readResultSetColumnDefinitionResponse() {
     var value = _protocol._readPacketBuffer();
     return value is Future
-        ? value.then((_) => _readResultSetColumnDefinitionResponseInternal())
-        : _readResultSetColumnDefinitionResponseInternal();
+        ? value.then((_) => _readResultSetColumnDefinitionResponsePacket())
+        : _readResultSetColumnDefinitionResponsePacket();
   }
 
   _readResultSetRowResponse() {
     var value = _protocol._readPacketBuffer();
     return value is Future
-        ? value.then((_) => _readResultSetRowResponseInternal())
-        : _readResultSetRowResponseInternal();
+        ? value.then((_) => _readResultSetRowResponsePacket())
+        : _readResultSetRowResponsePacket();
   }
 
-  Packet _readCommandQueryResponseInternal() {
+  Packet _readCommandQueryResponsePacket() {
     if (_protocol._isOkPacket()) {
       return _protocol._readOkPacket();
     } else if (_protocol._isErrorPacket()) {
@@ -80,11 +80,11 @@ class QueryCommandTextProtocol extends ProtocolDelegate {
     } else if (_isLocalInFilePacket()) {
       throw new UnsupportedError("Protocol::LOCAL_INFILE_Data");
     } else {
-      return _readResultSetColumnCountResponsePacket();
+      return _readResultSetColumnCountPacket();
     }
   }
 
-  Packet _readResultSetColumnDefinitionResponseInternal() {
+  Packet _readResultSetColumnDefinitionResponsePacket() {
     if (_protocol._isErrorPacket()) {
       _reusableColumnPacket.free();
 
@@ -94,11 +94,11 @@ class QueryCommandTextProtocol extends ProtocolDelegate {
 
       return _protocol._readEOFPacket();
     } else {
-      return _readResultSetColumnDefinitionResponsePacket();
+      return _readResultSetColumnDefinitionPacket();
     }
   }
 
-  Packet _readResultSetRowResponseInternal() {
+  Packet _readResultSetRowResponsePacket() {
     if (_protocol._isErrorPacket()) {
       _reusableRowPacket.free();
 
@@ -108,12 +108,12 @@ class QueryCommandTextProtocol extends ProtocolDelegate {
 
       return _protocol._readEOFPacket();
     } else {
-      return _readResultSetRowResponsePacket();
+      return _readResultSetRowPacket();
     }
   }
 
-  ResultSetColumnCountResponsePacket _readResultSetColumnCountResponsePacket() {
-    var packet = new ResultSetColumnCountResponsePacket(
+  ResultSetColumnCountPacket _readResultSetColumnCountPacket() {
+    var packet = new ResultSetColumnCountPacket(
         _protocol._reusablePacketBuffer.sequenceId,
         _protocol._reusablePacketBuffer.payloadLength);
 
@@ -125,13 +125,12 @@ class QueryCommandTextProtocol extends ProtocolDelegate {
     _protocol._reusablePacketBuffer.free();
     _protocol._reusableDataRange.free();
 
-    _reusableRowPacket =
-        new ResultSetRowResponsePacket.reusable(packet._columnCount);
+    _reusableRowPacket = new ResultSetRowPacket.reusable(packet._columnCount);
 
     return packet;
   }
 
-  ResultSetColumnDefinitionResponsePacket _readResultSetColumnDefinitionResponsePacket() {
+  ResultSetColumnDefinitionPacket _readResultSetColumnDefinitionPacket() {
     var packet = _reusableColumnPacket.reuse(
         _protocol._reusablePacketBuffer.sequenceId,
         _protocol._reusablePacketBuffer.payloadLength);
@@ -215,7 +214,7 @@ class QueryCommandTextProtocol extends ProtocolDelegate {
     return packet;
   }
 
-  ResultSetRowResponsePacket _readResultSetRowResponsePacket() {
+  ResultSetRowPacket _readResultSetRowPacket() {
     var packet = _reusableRowPacket.reuse(
         _protocol._reusablePacketBuffer.sequenceId,
         _protocol._reusablePacketBuffer.payloadLength);
@@ -359,7 +358,7 @@ class QueryColumnIterator extends PacketIterator {
   int get decimals => _protocol._reusableColumnPacket.decimals;
 
   bool _checkLast(Packet response) {
-    if (response is ResultSetColumnDefinitionResponsePacket) {
+    if (response is ResultSetColumnDefinitionPacket) {
       _isClosed = false;
 
       return true;
@@ -420,7 +419,7 @@ class QueryRowIterator extends PacketIterator {
       _protocol._reusableRowPacket._getUTF8String(index);
 
   bool _checkLast(Packet response) {
-    if (response is ResultSetRowResponsePacket) {
+    if (response is ResultSetRowPacket) {
       _isClosed = false;
 
       return true;
@@ -434,20 +433,19 @@ class QueryRowIterator extends PacketIterator {
   }
 }
 
-class ResultSetColumnCountResponsePacket extends Packet {
+class ResultSetColumnCountPacket extends Packet {
   int _columnCount;
 
-  ResultSetColumnCountResponsePacket(int payloadLength, int sequenceId)
+  ResultSetColumnCountPacket(int payloadLength, int sequenceId)
       : super(payloadLength, sequenceId);
 
   int get columnCount => _columnCount;
 }
 
-class ResultSetColumnDefinitionResponsePacket extends ReusablePacket {
-  ResultSetColumnDefinitionResponsePacket.reusable() : super.reusable(13);
+class ResultSetColumnDefinitionPacket extends ReusablePacket {
+  ResultSetColumnDefinitionPacket.reusable() : super.reusable(13);
 
-  ResultSetColumnDefinitionResponsePacket reuse(
-          int payloadLength, int sequenceId) =>
+  ResultSetColumnDefinitionPacket reuse(int payloadLength, int sequenceId) =>
       _reuse(payloadLength, sequenceId);
 
   String get catalog => _getString(0);
@@ -464,10 +462,9 @@ class ResultSetColumnDefinitionResponsePacket extends ReusablePacket {
   int get decimals => _getInt(11);
 }
 
-class ResultSetRowResponsePacket extends ReusablePacket {
-  ResultSetRowResponsePacket.reusable(int columnCount)
-      : super.reusable(columnCount);
+class ResultSetRowPacket extends ReusablePacket {
+  ResultSetRowPacket.reusable(int columnCount) : super.reusable(columnCount);
 
-  ResultSetRowResponsePacket reuse(int payloadLength, int sequenceId) =>
+  ResultSetRowPacket reuse(int payloadLength, int sequenceId) =>
       _reuse(payloadLength, sequenceId);
 }

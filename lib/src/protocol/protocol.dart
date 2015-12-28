@@ -99,8 +99,8 @@ class Protocol {
   Future<Packet> _readCommandResponse() {
     var value = _readPacketBuffer();
     var value2 = value is Future
-        ? value.then((_) => __readCommandResponseInternal())
-        : __readCommandResponseInternal();
+        ? value.then((_) => __readCommandResponsePacket())
+        : __readCommandResponsePacket();
     return value2 is Future ? value2 : new Future.value(value2);
   }
 
@@ -191,7 +191,7 @@ class Protocol {
     return packet;
   }
 
-  Packet __readCommandResponseInternal() {
+  Packet __readCommandResponsePacket() {
     if (_isOkPacket()) {
       return _readOkPacket();
     } else if (_isErrorPacket()) {

@@ -14,8 +14,7 @@ class QueryCommandTextProtocol extends ProtocolDelegate {
 
   ResultSetRowResponsePacket _reusableRowPacket;
 
-  QueryCommandTextProtocol(Protocol protocol)
-      : super(protocol);
+  QueryCommandTextProtocol(Protocol protocol) : super(protocol);
 
   Future<QueryResult> executeQuery(String query) async {
     _writeCommandQueryPacket(query);
@@ -115,7 +114,8 @@ class QueryCommandTextProtocol extends ProtocolDelegate {
 
   ResultSetColumnCountResponsePacket _readResultSetColumnCountResponsePacket() {
     var packet = new ResultSetColumnCountResponsePacket(
-        _protocol._reusablePacketBuffer.sequenceId, _protocol._reusablePacketBuffer.payloadLength);
+        _protocol._reusablePacketBuffer.sequenceId,
+        _protocol._reusablePacketBuffer.payloadLength);
 
     // A packet containing a Protocol::LengthEncodedInteger column_count
     packet._columnCount = _protocol._reusablePacketBuffer.payload
@@ -133,7 +133,8 @@ class QueryCommandTextProtocol extends ProtocolDelegate {
 
   ResultSetColumnDefinitionResponsePacket _readResultSetColumnDefinitionResponsePacket() {
     var packet = _reusableColumnPacket.reuse(
-        _protocol._reusablePacketBuffer.sequenceId, _protocol._reusablePacketBuffer.payloadLength);
+        _protocol._reusablePacketBuffer.sequenceId,
+        _protocol._reusablePacketBuffer.payloadLength);
 
     var dataRange;
     var i = 0;
@@ -181,25 +182,32 @@ class QueryCommandTextProtocol extends ProtocolDelegate {
         dataRange);
     // lenenc_int     length of fixed-length fields [0c]
     dataRange = _reusableColumnPacket.getReusableRange(i++);
-    _protocol._reusablePacketBuffer.payload.readLengthEncodedDataRange(dataRange);
+    _protocol._reusablePacketBuffer.payload
+        .readLengthEncodedDataRange(dataRange);
     // 2              character set
     dataRange = _reusableColumnPacket.getReusableRange(i++);
-    _protocol._reusablePacketBuffer.payload.readFixedLengthDataRange(2, dataRange);
+    _protocol._reusablePacketBuffer.payload
+        .readFixedLengthDataRange(2, dataRange);
     // 4              column length
     dataRange = _reusableColumnPacket.getReusableRange(i++);
-    _protocol._reusablePacketBuffer.payload.readFixedLengthDataRange(4, dataRange);
+    _protocol._reusablePacketBuffer.payload
+        .readFixedLengthDataRange(4, dataRange);
     // 1              type
     dataRange = _reusableColumnPacket.getReusableRange(i++);
-    _protocol._reusablePacketBuffer.payload.readFixedLengthDataRange(1, dataRange);
+    _protocol._reusablePacketBuffer.payload
+        .readFixedLengthDataRange(1, dataRange);
     // 2              flags
     dataRange = _reusableColumnPacket.getReusableRange(i++);
-    _protocol._reusablePacketBuffer.payload.readFixedLengthDataRange(2, dataRange);
+    _protocol._reusablePacketBuffer.payload
+        .readFixedLengthDataRange(2, dataRange);
     // 1              decimals
     dataRange = _reusableColumnPacket.getReusableRange(i++);
-    _protocol._reusablePacketBuffer.payload.readFixedLengthDataRange(1, dataRange);
+    _protocol._reusablePacketBuffer.payload
+        .readFixedLengthDataRange(1, dataRange);
     // 2              filler [00] [00]
     dataRange = _reusableColumnPacket.getReusableRange(i++);
-    _protocol._reusablePacketBuffer.payload.readFixedLengthDataRange(2, dataRange);
+    _protocol._reusablePacketBuffer.payload
+        .readFixedLengthDataRange(2, dataRange);
 
     _protocol._reusablePacketBuffer.free();
     _protocol._reusableDataRange.free();
@@ -209,7 +217,8 @@ class QueryCommandTextProtocol extends ProtocolDelegate {
 
   ResultSetRowResponsePacket _readResultSetRowResponsePacket() {
     var packet = _reusableRowPacket.reuse(
-        _protocol._reusablePacketBuffer.sequenceId, _protocol._reusablePacketBuffer.payloadLength);
+        _protocol._reusablePacketBuffer.sequenceId,
+        _protocol._reusablePacketBuffer.payloadLength);
 
     var i = 0;
     while (!_protocol._reusablePacketBuffer.payload.isAllRead) {
@@ -228,7 +237,7 @@ class QueryCommandTextProtocol extends ProtocolDelegate {
     }
 
     _protocol._reusablePacketBuffer.free();
-    _protocol. _reusableDataRange.free();
+    _protocol._reusableDataRange.free();
 
     return packet;
   }
@@ -236,57 +245,98 @@ class QueryCommandTextProtocol extends ProtocolDelegate {
   bool _isLocalInFilePacket() => _protocol._reusablePacketBuffer.header == 0xfb;
 }
 
-class QueryResult {
+class QueryResult implements ProtocolResult {
   final int affectedRows;
 
   final int columnCount;
 
   final QueryCommandTextProtocol _protocol;
 
-  QueryColumnIterator _columnIterator;
+  final QueryColumnIterator _columnIterator;
 
-  QueryRowIterator _rowIterator;
+  final QueryRowIterator _rowIterator;
 
-  QueryResult.resultSet(this.columnCount, this._protocol)
-      : this.affectedRows = 0;
+  QueryResult.resultSet(this.columnCount, QueryCommandTextProtocol protocol)
+      : this.affectedRows = 0,
+        this._protocol = protocol,
+        _columnIterator = new QueryColumnIterator(protocol),
+        _rowIterator = new QueryRowIterator(protocol);
 
+  // TODO rivedere se tutto torna con gli statement senza risultato
   QueryResult.ok(this.affectedRows)
       : this.columnCount = 0,
-        this._protocol = null;
+        this._protocol = null,
+        this._columnIterator = null,
+        this._rowIterator = null;
 
-  QueryColumnIterator get columnIterator {
-    // TODO check dello stato
+  bool get isClosed => _rowIterator.isClosed;
 
-    // TODO riutilizzare il QueryColumnIterator
-
-    _columnIterator = new QueryColumnIterator(_protocol);
+  Future<QueryColumnIterator> columnIterator() async {
+    if (isClosed) {
+      throw new StateError("Query result closed");
+    } else if (_columnIterator.isClosed) {
+      throw new StateError("Column iterator closed");
+    }
 
     return _columnIterator;
   }
 
-  QueryRowIterator get rowIterator {
-    // TODO check dello stato
+  Future<QueryRowIterator> rowIterator() async {
+    if (isClosed) {
+      throw new StateError("Query result closed");
+    }
 
-    // TODO riutilizzare il QueryRowIterator
-
-    _rowIterator = new QueryRowIterator(_protocol);
+    if (!_columnIterator.isClosed) {
+      await _columnIterator.close();
+    }
 
     return _rowIterator;
+  }
+
+  Future close() async {
+    if (!_columnIterator.isClosed) {
+      await _columnIterator.close();
+    }
+
+    if (!isClosed) {
+      await _rowIterator.close();
+    }
   }
 }
 
 class QueryColumnIterator extends PacketIterator {
   final QueryCommandTextProtocol _protocol;
 
-  QueryColumnIterator(this._protocol);
+  bool _isClosed;
 
-  Future<bool> next() {
-    var value = internalNext();
+  QueryColumnIterator(this._protocol) {
+    _isClosed = false;
+  }
+
+  bool get isClosed => _isClosed;
+
+  Future close() async {
+    if (!isClosed) {
+      // TODO ottimizzare l'esaurimento dei pacchetti
+      var hasNext = true;
+      while (hasNext) {
+        hasNext = next();
+        hasNext = hasNext is Future ? await hasNext : hasNext;
+      }
+
+      _isClosed = true;
+    }
+  }
+
+  Future<bool> nextAsFuture() {
+    var value = next();
     return value is Future ? value : new Future.value(value);
   }
 
-  internalNext() {
-    // TODO check dello stato
+  next() {
+    if (isClosed) {
+      throw new StateError("Column iterator closed");
+    }
 
     var response = _protocol._readResultSetColumnDefinitionResponse();
 
@@ -310,9 +360,13 @@ class QueryColumnIterator extends PacketIterator {
 
   bool _checkLast(Packet response) {
     if (response is ResultSetColumnDefinitionResponsePacket) {
+      _isClosed = false;
+
       return true;
     } else {
-      _protocol._reusableColumnPacket.free();
+      _protocol._reusableRowPacket.free();
+
+      _isClosed = true;
 
       return false;
     }
@@ -322,15 +376,36 @@ class QueryColumnIterator extends PacketIterator {
 class QueryRowIterator extends PacketIterator {
   final QueryCommandTextProtocol _protocol;
 
-  QueryRowIterator(this._protocol);
+  bool _isClosed;
 
-  Future<bool> next() {
-    var value = internalNext();
+  QueryRowIterator(this._protocol) {
+    _isClosed = false;
+  }
+
+  bool get isClosed => _isClosed;
+
+  Future close() async {
+    if (!isClosed) {
+      // TODO ottimizzare l'esaurimento dei pacchetti
+      var hasNext = true;
+      while (hasNext) {
+        hasNext = next();
+        hasNext = hasNext is Future ? await hasNext : hasNext;
+      }
+
+      _isClosed = true;
+    }
+  }
+
+  Future<bool> nextAsFuture() {
+    var value = next();
     return value is Future ? value : new Future.value(value);
   }
 
-  internalNext() {
-    // TODO check dello stato
+  next() {
+    if (isClosed) {
+      throw new StateError("Column iterator closed");
+    }
 
     var response = _protocol._readResultSetRowResponse();
 
@@ -346,9 +421,13 @@ class QueryRowIterator extends PacketIterator {
 
   bool _checkLast(Packet response) {
     if (response is ResultSetRowResponsePacket) {
+      _isClosed = false;
+
       return true;
     } else {
       _protocol._reusableRowPacket.free();
+
+      _isClosed = true;
 
       return false;
     }

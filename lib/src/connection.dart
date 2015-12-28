@@ -7,9 +7,8 @@ import "package:mysql_client/src/protocol.dart";
 
 class SqlError extends Error {}
 
-// TODO implementare anche un metodo release
 abstract class Connection {
-  bool get isConnected;
+  bool get isClosed;
 
   Future connect(host, int port, String userName, String password,
       [String database]);
@@ -17,8 +16,6 @@ abstract class Connection {
   Future<QueryResult> executeQuery(String query);
 
   Future<PreparedStatement> prepareQuery(String query);
-
-  void free();
 
   Future close();
 }
@@ -28,13 +25,15 @@ class ConnectionImpl implements Connection {
 
   Protocol _protocol;
 
+  ProtocolResult _lastProtocolResult;
+
   @override
-  bool get isConnected => _protocol != null;
+  bool get isClosed => _protocol == null;
 
   @override
   Future connect(host, int port, String userName, String password,
       [String database]) async {
-    if (isConnected) {
+    if (!isClosed) {
       throw new StateError("Connection already connected");
     }
 
@@ -52,32 +51,39 @@ class ConnectionImpl implements Connection {
 
   @override
   Future<QueryResult> executeQuery(String query) async {
-    if (!isConnected) {
-      throw new StateError("Connection not connected");
+    if (isClosed) {
+      throw new StateError("Connection closed");
     }
 
-    return _protocol.queryCommandTextProtocol.executeQuery(query);
+    await _lastProtocolResult?.close();
+
+    _lastProtocolResult =
+        await _protocol.queryCommandTextProtocol.executeQuery(query);
+
+    return _lastProtocolResult;
   }
 
   @override
-  Future<PreparedStatement> prepareQuery(String query) {
-    if (!isConnected) {
-      throw new StateError("Connection not connected");
+  Future<PreparedStatement> prepareQuery(String query) async {
+    if (isClosed) {
+      throw new StateError("Connection closed");
     }
 
-    return _protocol.preparedStatementProtocol.prepareQuery(query);
-  }
+    await _lastProtocolResult?.close();
 
-  @override
-  void free() {
-    _protocol.free();
+    _lastProtocolResult =
+        await _protocol.preparedStatementProtocol.prepareQuery(query);
+
+    return _lastProtocolResult;
   }
 
   @override
   Future close() async {
-    if (!isConnected) {
-      throw new StateError("Connection not connected");
+    if (isClosed) {
+      throw new StateError("Connection closed");
     }
+
+    await _lastProtocolResult?.close();
 
     var socket = _socket;
     var protocol = _protocol;

@@ -109,7 +109,7 @@ class PreparedStatementProtocol extends ProtocolDelegate {
   }
 }
 
-class PreparedStatement {
+class PreparedStatement implements ProtocolResult {
   final int _statementId;
   final int _numColumns;
   final int _numParams;
@@ -139,7 +139,7 @@ class PreparedStatement {
     return _columnSetReader;
   }
 
-  void close() {
+  Future close() async {
     _protocol._writeCommandStatementClosePacket(_statementId);
   }
 }
@@ -156,12 +156,12 @@ class StatementColumnSetReader extends PacketIterator {
       : this._reusableColumnPacket =
             new ResultSetColumnDefinitionResponsePacket.reusable();
 
-  Future<bool> next() {
-    var value = _columnCount > 0 ? internalNext() : false;
+  Future<bool> nextAsFuture() {
+    var value = _columnCount > 0 ? next() : false;
     return value is Future ? value : new Future.value(value);
   }
 
-  internalNext() {
+  next() {
     // TODO check dello stato
 
     var response = _protocol._readResultSetColumnDefinitionResponse();
@@ -174,7 +174,7 @@ class StatementColumnSetReader extends PacketIterator {
 
   String get name => _reusableColumnPacket.orgName;
 
-  void close() {
+  Future close() async {
     // TODO check dello stato
 
     _reusableColumnPacket.free();

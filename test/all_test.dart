@@ -39,9 +39,9 @@ Future testMySqlClient() async {
     var columnCount = queryResult.columnCount;
 
     // column definitions
-    var columnSetReader = queryResult.columnIterator;
+    var columnSetReader = await queryResult.columnIterator();
     while (true) {
-      var next = await columnSetReader.next();
+      var next = await columnSetReader.nextAsFuture();
       if (!next) {
         break;
       }
@@ -49,9 +49,9 @@ Future testMySqlClient() async {
 
     // rows
     var rows = [];
-    var rowSetReader = queryResult.rowIterator;
+    var rowSetReader = await queryResult.rowIterator();
     while (true) {
-      var next = await rowSetReader.next();
+      var next = await rowSetReader.nextAsFuture();
       if (!next) {
         break;
       }

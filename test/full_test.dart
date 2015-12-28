@@ -83,10 +83,10 @@ abstract class SpeedTest {
       var queryResult = await executeQuery("select * from people");
 
       // column definitions
-      var columnIterator = queryResult.columnIterator;
+      var columnIterator = await queryResult.columnIterator();
       while (true) {
         // var next = await columnIterator.next();
-        var next = columnIterator.internalNext();
+        var next = columnIterator.next();
         next = next is Future ? await next : next;
         if (!next) {
           break;
@@ -94,10 +94,10 @@ abstract class SpeedTest {
       }
 
       // rows
-      var rowIterator = queryResult.rowIterator;
+      var rowIterator = await queryResult.rowIterator();
       while (true) {
         // var next = await rowIterator.next();
-        var next = rowIterator.internalNext();
+        var next = rowIterator.next();
         next = next is Future ? await next : next;
         if (!next) {
           break;

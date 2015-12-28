@@ -10,26 +10,29 @@ import "package:stack_trace/stack_trace.dart";
 
 Future main() async {
   Chain.capture(() async {
-    await test5();
+    await test6();
   }, onError: (e, s) {
     print(e);
     print(s.terse);
   });
 }
 
-Future test5() async {
+Future test6() async {
   var connection = new ConnectionImpl();
 
   try {
     await connection.connect("localhost", 3306, "root", "mysql", "test");
 
-    var queryResult =
-    await connection.executeQuery("SELECT * FROM people LIMIT 10");
+    var queryResult;
 
-    // column count
-    var columnCount = queryResult.columnCount;
-    print(columnCount);
+    queryResult =
+      await connection.executeQuery("SELECT * FROM people LIMIT 1");
 
+    queryResult =
+        await connection.executeQuery("SELECT * FROM people LIMIT 10");
+
+    print(queryResult.columnCount);
+/*
     // column definitions
     var columnSetReader = queryResult.columnIterator;
     while (true) {
@@ -40,11 +43,69 @@ Future test5() async {
 
       print(columnSetReader.name);
     }
+*/
 
     // rows
-    var rowSetReader = queryResult.rowIterator;
+    var rowSetReader = await queryResult.rowIterator();
     while (true) {
-      var next = await rowSetReader.next();
+      var next = await rowSetReader.nextAsFuture();
+      if (!next) {
+        break;
+      }
+
+      print(rowSetReader.getString(0));
+    }
+
+    queryResult = await connection.executeQuery("SELECT * FROM people LIMIT 5");
+
+    print(queryResult.columnCount);
+
+    // rows
+    rowSetReader = await queryResult.rowIterator();
+    while (true) {
+      var next = await rowSetReader.nextAsFuture();
+      if (!next) {
+        break;
+      }
+
+      print(rowSetReader.getString(0));
+    }
+  } catch (e, s) {
+    print("Error: $e");
+    print(new Chain.forTrace(s).terse);
+  } finally {
+    await connection.close();
+  }
+}
+
+Future test5() async {
+  var connection = new ConnectionImpl();
+
+  try {
+    await connection.connect("localhost", 3306, "root", "mysql", "test");
+
+    var queryResult =
+        await connection.executeQuery("SELECT * FROM people LIMIT 10");
+
+    // column count
+    var columnCount = queryResult.columnCount;
+    print(columnCount);
+
+    // column definitions
+    var columnSetReader = await queryResult.columnIterator();
+    while (true) {
+      var next = await columnSetReader.nextAsFuture();
+      if (!next) {
+        break;
+      }
+
+      print(columnSetReader.name);
+    }
+
+    // rows
+    var rowSetReader = await queryResult.rowIterator();
+    while (true) {
+      var next = await rowSetReader.nextAsFuture();
       if (!next) {
         break;
       }
@@ -71,7 +132,7 @@ Future test4() async {
     // param definitions
     var paramSetReader = preparedStatement.paramSetReader;
     while (true) {
-      var next = await paramSetReader.next();
+      var next = await paramSetReader.nextAsFuture();
       if (!next) {
         break;
       }
@@ -83,7 +144,7 @@ Future test4() async {
     // column definitions
     var columnSetReader = preparedStatement.columnSetReader;
     while (true) {
-      var next = await columnSetReader.next();
+      var next = await columnSetReader.nextAsFuture();
       if (!next) {
         break;
       }
@@ -93,74 +154,6 @@ Future test4() async {
     columnSetReader.close();
 
     preparedStatement.close();
-  } finally {
-    await connection.close();
-  }
-}
-
-Future test3() async {
-  var connection = new ConnectionImpl();
-
-  try {
-    await connection.connect("localhost", 3306, "root", "mysql", "test");
-
-    var queryResult = await connection
-        .executeQuery("INSERT INTO people(name, age) VALUES('roby', 42)");
-  } finally {
-    await connection.close();
-  }
-}
-
-Future test1() async {
-  var connection = new ConnectionImpl();
-
-  try {
-    await connection.connect("localhost", 3306, "root", "mysql", "test");
-
-    var queryResult =
-        await connection.executeQuery("SELECT * FROM people LIMIT 10");
-
-    // column count
-    var columnCount = queryResult.columnCount;
-    print(columnCount);
-
-    // column definitions
-    var columnSetReader = queryResult.columnIterator;
-    while (true) {
-      var next = await columnSetReader.next();
-/*
-      var next = columnSetReader.internalNext();
-      next = next is Future ? await next : next;
-*/
-      if (!next) {
-        break;
-      }
-
-      print(columnSetReader.name);
-    }
-
-    // rows
-    var rowSetReader = queryResult.rowIterator;
-    while (true) {
-      var next = await rowSetReader.next();
-      if (!next) {
-        break;
-      }
-
-      print(rowSetReader.getString(0));
-    }
-  } finally {
-    await connection.close();
-  }
-}
-
-Future test2() async {
-  var connection = new ConnectionImpl();
-
-  try {
-    await connection.connect("localhost", 3306, "root", "mysql", "test");
-
-    await connection.executeQuery("SELECT * FROM people LIMIT 10");
   } finally {
     await connection.close();
   }

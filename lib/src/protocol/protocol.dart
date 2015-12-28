@@ -271,11 +271,19 @@ class Protocol {
   }
 }
 
+abstract class ProtocolResult {
+  Future close();
+}
+
 abstract class PacketIterator {
-  Future<bool> next();
+  bool isClosed;
+
+  Future<bool> nextAsFuture();
 
   // TODO qui si potrebbe utilizzare il FutureWrapper
-  internalNext();
+  next();
+
+  Future close();
 }
 
 abstract class Packet {

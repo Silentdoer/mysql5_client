@@ -22,7 +22,7 @@ class QueryCommandTextProtocol extends ProtocolDelegate {
     var response = await _readCommandQueryResponse();
 
     if (response is OkPacket) {
-      return new QueryResult.ok(response.affectedRows, _protocol);
+      return new QueryResult.ok(response.affectedRows);
     }
 
     if (response is! ResultSetColumnCountPacket) {
@@ -312,7 +312,9 @@ class QueryCommandTextProtocol extends ProtocolDelegate {
   bool _isLocalInFilePacket() => _protocol._reusablePacketBuffer.header == 0xfb;
 }
 
-class QueryResult extends ProtocolResult {
+class QueryResult implements ProtocolResult {
+  final Protocol _protocol;
+
   final int affectedRows;
 
   final int columnCount;
@@ -321,20 +323,20 @@ class QueryResult extends ProtocolResult {
 
   final QueryRowIterator _rowIterator;
 
-  QueryResult.resultSet(this.columnCount, Protocol protocol)
-      : this.affectedRows = 0,
-        _columnIterator = new QueryColumnIterator(protocol),
-        _rowIterator = new QueryRowIterator(protocol),
-        super(protocol);
+  QueryResult.resultSet(int columnCount, Protocol protocol)
+      : this.columnCount = columnCount,
+        this.affectedRows = null,
+        this._protocol = protocol,
+        this._columnIterator = new QueryColumnIterator(columnCount, protocol),
+        this._rowIterator = new QueryRowIterator(protocol);
 
-  // TODO rivedere se tutto torna con gli statement senza risultato
-  QueryResult.ok(this.affectedRows, Protocol protocol)
-      : this.columnCount = 0,
+  QueryResult.ok(this.affectedRows)
+      : this.columnCount = null,
         this._columnIterator = null,
         this._rowIterator = null,
-        super(protocol);
+        this._protocol = null;
 
-  bool get isClosed => _rowIterator.isClosed;
+  bool get isClosed => _rowIterator == null || _rowIterator.isClosed;
 
   Future<QueryColumnIterator> columnIterator() async {
     if (isClosed) {
@@ -360,21 +362,23 @@ class QueryResult extends ProtocolResult {
 
   @override
   Future close() async {
-    if (!_columnIterator.isClosed) {
+    if (_columnIterator != null && !_columnIterator.isClosed) {
       await _columnIterator.close();
     }
-    if (!isClosed) {
+    if (_rowIterator != null && !_rowIterator.isClosed) {
       await _rowIterator.close();
     }
   }
 }
 
 class QueryColumnIterator extends PacketIterator {
+  final int columnCount;
+
   final Protocol _protocol;
 
   bool _isClosed;
 
-  QueryColumnIterator(this._protocol) {
+  QueryColumnIterator(this.columnCount, this._protocol) {
     _isClosed = false;
   }
 
@@ -402,12 +406,16 @@ class QueryColumnIterator extends PacketIterator {
       throw new StateError("Column iterator closed");
     }
 
-    var response = _protocol._queryCommandTextProtocol
-        ._readResultSetColumnDefinitionResponse();
+    if (columnCount > 0) {
+      var response = _protocol._queryCommandTextProtocol
+          ._readResultSetColumnDefinitionResponse();
 
-    return response is Future
-        ? response.then((response) => _checkLast(response))
-        : _checkLast(response);
+      return response is Future
+          ? response.then((response) => _checkLast(response))
+          : _checkLast(response);
+    } else {
+      return false;
+    }
   }
 
   String get catalog =>

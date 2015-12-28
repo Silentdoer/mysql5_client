@@ -263,10 +263,6 @@ class Protocol {
 }
 
 abstract class ProtocolResult {
-  final Protocol _protocol;
-
-  ProtocolResult(this._protocol);
-
   Future close();
 }
 

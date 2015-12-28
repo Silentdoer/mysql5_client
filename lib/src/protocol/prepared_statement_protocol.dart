@@ -1,6 +1,12 @@
 part of mysql_client.protocol;
 
-class PrepareStatementError extends Error {}
+class PrepareStatementError extends Error {
+  final String message;
+
+  PrepareStatementError(this.message);
+
+  String toString() => "PrepareStatementError: $message";
+}
 
 class PreparedStatementProtocol extends ProtocolDelegate {
   PreparedStatementProtocol(Protocol protocol) : super(protocol);
@@ -11,25 +17,64 @@ class PreparedStatementProtocol extends ProtocolDelegate {
     var response = await _readCommandStatementPrepareResponse();
 
     if (response is! CommandStatementPrepareOkResponsePacket) {
-      throw new PrepareStatementError();
+      throw new PrepareStatementError(response.errorMessage);
     }
 
-    return new PreparedStatement(response.statementId, response.numColumns,
-        response.numParams, _protocol);
+    return new PreparedStatement(response.statementId, response.numParams,
+        response.numColumns, _protocol);
+  }
+
+  void _writeCommandStatementPreparePacket(String query) {
+    WriterBuffer buffer = _protocol._createBuffer();
+
+    var sequenceId = 0x00;
+
+    // command (1) -- [16] the COM_STMT_PREPARE command
+    buffer.writeFixedLengthInteger(COM_STMT_PREPARE, 1);
+    // query (string.EOF) -- the query to prepare
+    buffer.writeFixedLengthUTF8String(query);
+
+    var headerBuffer = _protocol._createBuffer();
+    headerBuffer.writeFixedLengthInteger(buffer.length, 3);
+    headerBuffer.writeOneLengthInteger(sequenceId);
+
+    _protocol._writeBuffer(headerBuffer);
+    _protocol._writeBuffer(buffer);
+  }
+
+  void _writeCommandStatementClosePacket(int statementId) {
+    WriterBuffer buffer = _protocol._createBuffer();
+
+    var sequenceId = 0x00;
+
+    // 1              [19] COM_STMT_CLOSE
+    buffer.writeFixedLengthInteger(COM_STMT_CLOSE, 1);
+    // 4              statement-id
+    buffer.writeFixedLengthInteger(statementId, 4);
+
+    var headerBuffer = _protocol._createBuffer();
+    headerBuffer.writeFixedLengthInteger(buffer.length, 3);
+    headerBuffer.writeOneLengthInteger(sequenceId);
+
+    _protocol._writeBuffer(headerBuffer);
+    _protocol._writeBuffer(buffer);
   }
 
   Future<Packet> _readCommandStatementPrepareResponse() {
     var value = _protocol._readPacketBuffer();
     var value2 = value is Future
-        ? value.then((_) => _readCommandStatementPrepareResponseInternal())
-        : _readCommandStatementPrepareResponseInternal();
+        ? value.then((_) => _readCommandStatementPrepareResponsePacket())
+        : _readCommandStatementPrepareResponsePacket();
     return value2 is Future ? value2 : new Future.value(value2);
   }
+
+  _skipResultSetColumnDefinitionResponse() => _protocol
+      ._queryCommandTextProtocol._skipResultSetColumnDefinitionResponse();
 
   _readResultSetColumnDefinitionResponse() => _protocol
       ._queryCommandTextProtocol._readResultSetColumnDefinitionResponse();
 
-  Packet _readCommandStatementPrepareResponseInternal() {
+  Packet _readCommandStatementPrepareResponsePacket() {
     if (_protocol._isErrorPacket()) {
       return _protocol._readErrorPacket();
     } else {
@@ -71,115 +116,50 @@ class PreparedStatementProtocol extends ProtocolDelegate {
 
     return packet;
   }
-
-  void _writeCommandStatementPreparePacket(String query) {
-    WriterBuffer buffer = _protocol._createBuffer();
-
-    var sequenceId = 0x00;
-
-    // command (1) -- [16] the COM_STMT_PREPARE command
-    buffer.writeFixedLengthInteger(COM_STMT_PREPARE, 1);
-    // query (string.EOF) -- the query to prepare
-    buffer.writeFixedLengthUTF8String(query);
-
-    var headerBuffer = _protocol._createBuffer();
-    headerBuffer.writeFixedLengthInteger(buffer.length, 3);
-    headerBuffer.writeOneLengthInteger(sequenceId);
-
-    _protocol._writeBuffer(headerBuffer);
-    _protocol._writeBuffer(buffer);
-  }
-
-  void _writeCommandStatementClosePacket(int statementId) {
-    WriterBuffer buffer = _protocol._createBuffer();
-
-    var sequenceId = 0x00;
-
-    // 1              [19] COM_STMT_CLOSE
-    buffer.writeFixedLengthInteger(COM_STMT_CLOSE, 1);
-    // 4              statement-id
-    buffer.writeFixedLengthInteger(statementId, 4);
-
-    var headerBuffer = _protocol._createBuffer();
-    headerBuffer.writeFixedLengthInteger(buffer.length, 3);
-    headerBuffer.writeOneLengthInteger(sequenceId);
-
-    _protocol._writeBuffer(headerBuffer);
-    _protocol._writeBuffer(buffer);
-  }
 }
 
-class PreparedStatement extends ProtocolResult {
+class PreparedStatement implements ProtocolResult {
+  final Protocol _protocol;
+
   final int _statementId;
-  final int _numColumns;
-  final int _numParams;
+  final int parameterCount;
+  final int columnCount;
 
-  StatementColumnSetReader _paramSetReader;
-
-  StatementColumnSetReader _columnSetReader;
+  final QueryColumnIterator _parameterIterator;
+  final QueryColumnIterator _columnIterator;
 
   PreparedStatement(
-      this._statementId, this._numColumns, this._numParams, Protocol protocol)
-      : super(protocol);
+      this._statementId, int parameterCount, int columnCount, Protocol protocol)
+      : this.parameterCount = parameterCount,
+        this.columnCount = columnCount,
+        this._protocol = protocol,
+        this._parameterIterator =
+            new QueryColumnIterator(parameterCount, protocol),
+        this._columnIterator = new QueryColumnIterator(columnCount, protocol);
 
-  StatementColumnSetReader get paramSetReader {
-    // TODO check dello stato
-
-    _paramSetReader = new StatementColumnSetReader(_numParams, _protocol);
-
-    return _paramSetReader;
+  bool get isClosed {
+    // TODO implementare PreparedStatement.isClosed
+    return false;
   }
 
-  StatementColumnSetReader get columnSetReader {
+  Future<QueryColumnIterator> parameterIterator() async {
     // TODO check dello stato
 
-    _columnSetReader = new StatementColumnSetReader(_numColumns, _protocol);
+    return _parameterIterator;
+  }
 
-    return _columnSetReader;
+  Future<QueryColumnIterator> columnIterator() async {
+    // TODO check dello stato
+
+    return _columnIterator;
   }
 
   @override
   Future close() async {
+    // TODO implementare PreparedStatement.close
+
     _protocol._preparedStatementProtocol
         ._writeCommandStatementClosePacket(_statementId);
-  }
-}
-
-// TODO vedere come TextProtocol
-class StatementColumnSetReader extends PacketIterator {
-  final int _columnCount;
-
-  final Protocol _protocol;
-
-  final ResultSetColumnDefinitionPacket _reusableColumnPacket;
-
-  StatementColumnSetReader(this._columnCount, this._protocol)
-      : this._reusableColumnPacket =
-            new ResultSetColumnDefinitionPacket.reusable();
-
-  Future<bool> nextAsFuture() {
-    var value = _columnCount > 0 ? next() : false;
-    return value is Future ? value : new Future.value(value);
-  }
-
-  next() {
-    // TODO check dello stato
-
-    var response = _protocol._queryCommandTextProtocol
-        ._readResultSetColumnDefinitionResponse();
-
-    return response is Future
-        ? response
-            .then((response) => response is ResultSetColumnDefinitionPacket)
-        : response is ResultSetColumnDefinitionPacket;
-  }
-
-  String get name => _reusableColumnPacket.orgName;
-
-  Future close() async {
-    // TODO check dello stato
-
-    _reusableColumnPacket.free();
   }
 }
 

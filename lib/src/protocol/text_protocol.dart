@@ -1,5 +1,7 @@
 part of mysql_client.protocol;
 
+const int COM_QUERY = 0x03;
+
 class QueryError extends Error {
   final String message;
 
@@ -358,6 +360,11 @@ class QueryResult implements ProtocolResult {
     }
 
     return _rowIterator;
+  }
+
+  @override
+  Future free() async {
+    await close();
   }
 
   @override

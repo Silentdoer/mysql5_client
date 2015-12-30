@@ -17,6 +17,48 @@ Future main() async {
   });
 }
 
+Future test8() async {
+  var connection = new ConnectionImpl();
+
+  try {
+    await connection.connect("localhost", 3306, "root", "mysql", "test");
+
+    var queryResult =
+        await connection.executeQuery("SELECT * FROM people WHERE id = 10");
+
+    // column count
+    var columnCount = queryResult.columnCount;
+    print(columnCount);
+
+    // column definitions
+    var columnSetReader = await queryResult.columnIterator();
+    while (true) {
+      var next = await columnSetReader.nextAsFuture();
+      if (!next) {
+        break;
+      }
+
+      print(columnSetReader.name);
+    }
+
+    // rows
+    var rowSetReader = await queryResult.rowIterator();
+    while (true) {
+      var next = await rowSetReader.nextAsFuture();
+      if (!next) {
+        break;
+      }
+
+      print("${rowSetReader.getString(0)}: ${rowSetReader.getString(1)}");
+    }
+  } catch (e, s) {
+    print("Error: $e");
+    print(new Chain.forTrace(s).terse);
+  } finally {
+    await connection.close();
+  }
+}
+
 Future test4() async {
   var connection = new ConnectionImpl();
 
@@ -24,7 +66,7 @@ Future test4() async {
     await connection.connect("localhost", 3306, "root", "mysql", "test");
 
     var preparedStatement =
-        await connection.prepareQuery("SELECT * FROM people LIMIT 10");
+        await connection.prepareQuery("SELECT * FROM people WHERE id = ?");
 
     print("Parameters: ${preparedStatement.parameterCount}");
     print("Columns: ${preparedStatement.columnCount}");
@@ -37,7 +79,6 @@ Future test4() async {
 
       if (hasParameter) {
         print("Parameter: ${parameterIterator.name}");
-
       }
     }
 
@@ -51,6 +92,8 @@ Future test4() async {
         print("Column: ${columnIterator.name}");
       }
     }
+
+    await preparedStatement.close();
   } finally {
     await connection.close();
   }

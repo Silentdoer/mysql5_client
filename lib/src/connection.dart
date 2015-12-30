@@ -55,7 +55,7 @@ class ConnectionImpl implements Connection {
       throw new StateError("Connection closed");
     }
 
-    await _lastProtocolResult?.close();
+    await _lastProtocolResult?.free();
 
     _lastProtocolResult =
         await _protocol.queryCommandTextProtocol.executeQuery(query);
@@ -69,7 +69,7 @@ class ConnectionImpl implements Connection {
       throw new StateError("Connection closed");
     }
 
-    await _lastProtocolResult?.close();
+    await _lastProtocolResult?.free();
 
     _lastProtocolResult =
         await _protocol.preparedStatementProtocol.prepareQuery(query);
@@ -83,7 +83,7 @@ class ConnectionImpl implements Connection {
       throw new StateError("Connection closed");
     }
 
-    await _lastProtocolResult?.close();
+    await _lastProtocolResult?.free();
 
     var socket = _socket;
 

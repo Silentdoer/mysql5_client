@@ -1,5 +1,9 @@
 part of mysql_client.protocol;
 
+const int COM_STMT_PREPARE = 0x16;
+const int COM_STMT_CLOSE = 0x19;
+const int COM_STMT_RESET = 0x1a;
+
 class PrepareStatementError extends Error {
   final String message;
 
@@ -33,6 +37,24 @@ class PreparedStatementProtocol extends ProtocolDelegate {
     buffer.writeFixedLengthInteger(COM_STMT_PREPARE, 1);
     // query (string.EOF) -- the query to prepare
     buffer.writeFixedLengthUTF8String(query);
+
+    var headerBuffer = _protocol._createBuffer();
+    headerBuffer.writeFixedLengthInteger(buffer.length, 3);
+    headerBuffer.writeOneLengthInteger(sequenceId);
+
+    _protocol._writeBuffer(headerBuffer);
+    _protocol._writeBuffer(buffer);
+  }
+
+  void _writeCommandStatementResetPacket(int statementId) {
+    WriterBuffer buffer = _protocol._createBuffer();
+
+    var sequenceId = 0x00;
+
+    // 1              [1a] COM_STMT_RESET
+    buffer.writeFixedLengthInteger(COM_STMT_RESET, 1);
+    // 4              statement-id
+    buffer.writeFixedLengthInteger(statementId, 4);
 
     var headerBuffer = _protocol._createBuffer();
     headerBuffer.writeFixedLengthInteger(buffer.length, 3);
@@ -128,6 +150,8 @@ class PreparedStatement implements ProtocolResult {
   final QueryColumnIterator _parameterIterator;
   final QueryColumnIterator _columnIterator;
 
+  bool _isClosed;
+
   PreparedStatement(
       this._statementId, int parameterCount, int columnCount, Protocol protocol)
       : this.parameterCount = parameterCount,
@@ -135,12 +159,11 @@ class PreparedStatement implements ProtocolResult {
         this._protocol = protocol,
         this._parameterIterator =
             new QueryColumnIterator(parameterCount, protocol),
-        this._columnIterator = new QueryColumnIterator(columnCount, protocol);
-
-  bool get isClosed {
-    // TODO implementare PreparedStatement.isClosed
-    return false;
+        this._columnIterator = new QueryColumnIterator(columnCount, protocol) {
+    _isClosed = false;
   }
+
+  bool get isClosed => _isClosed;
 
   Future<QueryColumnIterator> parameterIterator() async {
     // TODO check dello stato
@@ -150,8 +173,24 @@ class PreparedStatement implements ProtocolResult {
 
   Future<QueryColumnIterator> columnIterator() async {
     // TODO check dello stato
-
+/*
+    if (!_parameterIterator.isClosed) {
+      await _parameterIterator.close();
+    }
+*/
     return _columnIterator;
+  }
+
+  @override
+  Future free() async {
+/*
+    if (!_parameterIterator.isClosed) {
+      await _parameterIterator.close();
+    }
+    if (!_columnIterator.isClosed) {
+      await _columnIterator.close();
+    }
+*/
   }
 
   @override

@@ -1,20 +1,15 @@
 part of mysql_client.protocol;
 
-const int CLIENT_PLUGIN_AUTH = 0x00080000;
-const int CLIENT_SECURE_CONNECTION = 0x00008000;
-const int CLIENT_PLUGIN_AUTH_LENENC_CLIENT_DATA = 0x00200000;
 const int CLIENT_CONNECT_WITH_DB = 0x00000008;
-const int CLIENT_CONNECT_ATTRS = 0x00100000;
-
 const int CLIENT_PROTOCOL_41 = 0x00000200;
 const int CLIENT_TRANSACTIONS = 0x00002000;
+const int CLIENT_SECURE_CONNECTION = 0x00008000;
+const int CLIENT_PLUGIN_AUTH = 0x00080000;
+const int CLIENT_CONNECT_ATTRS = 0x00100000;
+const int CLIENT_PLUGIN_AUTH_LENENC_CLIENT_DATA = 0x00200000;
 const int CLIENT_SESSION_TRACK = 0x00800000;
 
 const int SERVER_SESSION_STATE_CHANGED = 0x4000;
-
-const int COM_QUERY = 0x03;
-const int COM_STMT_PREPARE = 0x16;
-const int COM_STMT_CLOSE = 0x19;
 
 abstract class ProtocolDelegate {
   Protocol _protocol;
@@ -263,6 +258,8 @@ class Protocol {
 }
 
 abstract class ProtocolResult {
+  Future free();
+
   Future close();
 }
 

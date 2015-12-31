@@ -10,7 +10,7 @@ import "package:stack_trace/stack_trace.dart";
 
 Future main() async {
   Chain.capture(() async {
-    await test4();
+    await test8();
   }, onError: (e, s) {
     print(e);
     print(s.terse);

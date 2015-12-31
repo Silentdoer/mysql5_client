@@ -24,7 +24,7 @@ class QueryCommandTextProtocol extends ProtocolDelegate {
     var response = await _readCommandQueryResponse();
 
     if (response is OkPacket) {
-      return new QueryResult.ok(response.affectedRows);
+      return new QueryResult.ok(response.affectedRows, response.lastInsertId);
     }
 
     if (response is! ResultSetColumnCountPacket) {
@@ -319,6 +319,8 @@ class QueryResult implements ProtocolResult {
 
   final int affectedRows;
 
+  final int lastInsertId;
+
   final int columnCount;
 
   final QueryColumnIterator _columnIterator;
@@ -328,11 +330,12 @@ class QueryResult implements ProtocolResult {
   QueryResult.resultSet(int columnCount, Protocol protocol)
       : this.columnCount = columnCount,
         this.affectedRows = null,
+        this.lastInsertId = null,
         this._protocol = protocol,
         this._columnIterator = new QueryColumnIterator(columnCount, protocol),
         this._rowIterator = new QueryRowIterator(protocol);
 
-  QueryResult.ok(this.affectedRows)
+  QueryResult.ok(this.affectedRows, this.lastInsertId)
       : this.columnCount = null,
         this._columnIterator = null,
         this._rowIterator = null,

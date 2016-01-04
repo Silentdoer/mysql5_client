@@ -16,6 +16,8 @@ abstract class WriterBuffer {
 
   void addToSink(IOSink sink);
 
+  void writeBytes(List<int> bytes);
+
   void writeBuffer(WriterBuffer buffer);
 
   void writeOneLengthInteger(int value);
@@ -48,6 +50,10 @@ class WriterBufferImpl implements WriterBuffer {
 
   void addToSink(IOSink sink) {
     sink.add(_data);
+  }
+
+  void writeBytes(List<int> bytes) {
+    _data.addAll(bytes);
   }
 
   void writeBuffer(WriterBuffer buffer) {

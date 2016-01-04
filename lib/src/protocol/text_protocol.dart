@@ -2,6 +2,15 @@ part of mysql_client.protocol;
 
 const int COM_QUERY = 0x03;
 
+const int MYSQL_TYPE_TINY = 0x01;
+const int MYSQL_TYPE_LONG = 0x03;
+const int MYSQL_TYPE_DOUBLE = 0x05;
+const int MYSQL_TYPE_NULL = 0x06;
+const int MYSQL_TYPE_TIMESTAMP = 0x07;
+const int MYSQL_TYPE_LONGLONG = 0x08;
+const int MYSQL_TYPE_DATETIME = 0x0c;
+const int MYSQL_TYPE_VAR_STRING = 0xfd;
+
 class QueryError extends Error {
   final String message;
 
@@ -31,7 +40,19 @@ class QueryCommandTextProtocol extends ProtocolDelegate {
       throw new QueryError(response.errorMessage);
     }
 
-    return new QueryResult.resultSet(response.columnCount, _protocol);
+    List<ColumnDefinition> columns = new List(response.columnCount);
+    var columnIterator = new QueryColumnIterator(columns.length, _protocol);
+    var hasColumn = true;
+    var i = 0;
+    while (hasColumn) {
+      hasColumn = await columnIterator.next();
+      if (hasColumn) {
+        columns[i++] =
+            new ColumnDefinition(columnIterator.name, columnIterator.type);
+      }
+    }
+
+    return new QueryResult.resultSet(columns, _protocol);
   }
 
   void _writeCommandQueryPacket(String query) {
@@ -195,73 +216,73 @@ class QueryCommandTextProtocol extends ProtocolDelegate {
     var dataRange;
     var i = 0;
     // lenenc_str     catalog
-    dataRange = _reusableColumnPacket.getReusableRange(i++);
+    dataRange = _reusableColumnPacket._getDataRange(i++);
     _protocol._reusablePacketBuffer.payload.readFixedLengthDataRange(
         _protocol._reusablePacketBuffer.payload
             .readLengthEncodedDataRange(dataRange)
             .toInt(),
         dataRange);
     // lenenc_str     schema
-    dataRange = _reusableColumnPacket.getReusableRange(i++);
+    dataRange = _reusableColumnPacket._getDataRange(i++);
     _protocol._reusablePacketBuffer.payload.readFixedLengthDataRange(
         _protocol._reusablePacketBuffer.payload
             .readLengthEncodedDataRange(dataRange)
             .toInt(),
         dataRange);
     // lenenc_str     table
-    dataRange = _reusableColumnPacket.getReusableRange(i++);
+    dataRange = _reusableColumnPacket._getDataRange(i++);
     _protocol._reusablePacketBuffer.payload.readFixedLengthDataRange(
         _protocol._reusablePacketBuffer.payload
             .readLengthEncodedDataRange(dataRange)
             .toInt(),
         dataRange);
     // lenenc_str     org_table
-    dataRange = _reusableColumnPacket.getReusableRange(i++);
+    dataRange = _reusableColumnPacket._getDataRange(i++);
     _protocol._reusablePacketBuffer.payload.readFixedLengthDataRange(
         _protocol._reusablePacketBuffer.payload
             .readLengthEncodedDataRange(dataRange)
             .toInt(),
         dataRange);
     // lenenc_str     name
-    dataRange = _reusableColumnPacket.getReusableRange(i++);
+    dataRange = _reusableColumnPacket._getDataRange(i++);
     _protocol._reusablePacketBuffer.payload.readFixedLengthDataRange(
         _protocol._reusablePacketBuffer.payload
             .readLengthEncodedDataRange(dataRange)
             .toInt(),
         dataRange);
     // lenenc_str     org_name
-    dataRange = _reusableColumnPacket.getReusableRange(i++);
+    dataRange = _reusableColumnPacket._getDataRange(i++);
     _protocol._reusablePacketBuffer.payload.readFixedLengthDataRange(
         _protocol._reusablePacketBuffer.payload
             .readLengthEncodedDataRange(dataRange)
             .toInt(),
         dataRange);
     // lenenc_int     length of fixed-length fields [0c]
-    dataRange = _reusableColumnPacket.getReusableRange(i++);
+    dataRange = _reusableColumnPacket._getDataRange(i++);
     _protocol._reusablePacketBuffer.payload
         .readLengthEncodedDataRange(dataRange);
     // 2              character set
-    dataRange = _reusableColumnPacket.getReusableRange(i++);
+    dataRange = _reusableColumnPacket._getDataRange(i++);
     _protocol._reusablePacketBuffer.payload
         .readFixedLengthDataRange(2, dataRange);
     // 4              column length
-    dataRange = _reusableColumnPacket.getReusableRange(i++);
+    dataRange = _reusableColumnPacket._getDataRange(i++);
     _protocol._reusablePacketBuffer.payload
         .readFixedLengthDataRange(4, dataRange);
     // 1              type
-    dataRange = _reusableColumnPacket.getReusableRange(i++);
+    dataRange = _reusableColumnPacket._getDataRange(i++);
     _protocol._reusablePacketBuffer.payload
         .readFixedLengthDataRange(1, dataRange);
     // 2              flags
-    dataRange = _reusableColumnPacket.getReusableRange(i++);
+    dataRange = _reusableColumnPacket._getDataRange(i++);
     _protocol._reusablePacketBuffer.payload
         .readFixedLengthDataRange(2, dataRange);
     // 1              decimals
-    dataRange = _reusableColumnPacket.getReusableRange(i++);
+    dataRange = _reusableColumnPacket._getDataRange(i++);
     _protocol._reusablePacketBuffer.payload
         .readFixedLengthDataRange(1, dataRange);
     // 2              filler [00] [00]
-    dataRange = _reusableColumnPacket.getReusableRange(i++);
+    dataRange = _reusableColumnPacket._getDataRange(i++);
     _protocol._reusablePacketBuffer.payload
         .readFixedLengthDataRange(2, dataRange);
 
@@ -291,7 +312,7 @@ class QueryCommandTextProtocol extends ProtocolDelegate {
 
     var i = 0;
     while (!_protocol._reusablePacketBuffer.payload.isAllRead) {
-      var reusableRange = _reusableRowPacket.getReusableRange(i++);
+      var reusableRange = _reusableRowPacket._getDataRange(i++);
       if (_protocol._reusablePacketBuffer.payload.checkOneLengthInteger() !=
           PREFIX_NULL) {
         _protocol._reusablePacketBuffer.payload.readFixedLengthDataRange(
@@ -314,6 +335,13 @@ class QueryCommandTextProtocol extends ProtocolDelegate {
   bool _isLocalInFilePacket() => _protocol._reusablePacketBuffer.header == 0xfb;
 }
 
+class ColumnDefinition {
+  final String name;
+  final int type;
+
+  ColumnDefinition(this.name, this.type);
+}
+
 class QueryResult implements ProtocolResult {
   final Protocol _protocol;
 
@@ -321,45 +349,29 @@ class QueryResult implements ProtocolResult {
 
   final int lastInsertId;
 
-  final int columnCount;
+  final List<ColumnDefinition> columns;
 
-  final QueryColumnIterator _columnIterator;
+  QueryRowIterator _rowIterator;
 
-  final QueryRowIterator _rowIterator;
-
-  QueryResult.resultSet(int columnCount, Protocol protocol)
-      : this.columnCount = columnCount,
-        this.affectedRows = null,
+  QueryResult.resultSet(this.columns, Protocol protocol)
+      : this.affectedRows = null,
         this.lastInsertId = null,
-        this._protocol = protocol,
-        this._columnIterator = new QueryColumnIterator(columnCount, protocol),
-        this._rowIterator = new QueryRowIterator(protocol);
+        this._protocol = protocol {
+    this._rowIterator = new QueryRowIterator(this);
+  }
 
   QueryResult.ok(this.affectedRows, this.lastInsertId)
-      : this.columnCount = null,
-        this._columnIterator = null,
+      : this.columns = null,
         this._rowIterator = null,
         this._protocol = null;
 
+  int get columnCount => columns.length;
+
   bool get isClosed => _rowIterator == null || _rowIterator.isClosed;
-
-  Future<QueryColumnIterator> columnIterator() async {
-    if (isClosed) {
-      throw new StateError("Query result closed");
-    } else if (_columnIterator.isClosed) {
-      throw new StateError("Column iterator closed");
-    }
-
-    return _columnIterator;
-  }
 
   Future<QueryRowIterator> rowIterator() async {
     if (isClosed) {
       throw new StateError("Query result closed");
-    }
-
-    if (!_columnIterator.isClosed) {
-      await _columnIterator.close();
     }
 
     return _rowIterator;
@@ -372,9 +384,6 @@ class QueryResult implements ProtocolResult {
 
   @override
   Future close() async {
-    if (_columnIterator != null && !_columnIterator.isClosed) {
-      await _columnIterator.close();
-    }
     if (_rowIterator != null && !_rowIterator.isClosed) {
       await _rowIterator.close();
     }
@@ -469,11 +478,11 @@ class QueryColumnIterator extends PacketIterator {
 }
 
 class QueryRowIterator extends PacketIterator {
-  final Protocol _protocol;
+  final QueryResult _result;
 
   bool _isClosed;
 
-  QueryRowIterator(this._protocol) {
+  QueryRowIterator(this._result) {
     _isClosed = false;
   }
 
@@ -502,22 +511,30 @@ class QueryRowIterator extends PacketIterator {
     }
 
     var response =
-        _protocol._queryCommandTextProtocol._readResultSetRowResponse();
+        _result._protocol._queryCommandTextProtocol._readResultSetRowResponse();
 
     return response is Future
         ? response.then((response) => _checkLast(response))
         : _checkLast(response);
   }
 
-  String getString(int index) =>
-      _protocol._queryCommandTextProtocol._reusableRowPacket._getString(index);
-
-  String getUTF8String(int index) => _protocol
+  String getStringValue(int index) => _result._protocol
       ._queryCommandTextProtocol._reusableRowPacket._getUTF8String(index);
+
+  num getNumValue(int index) {
+    var formatted = _result._protocol._queryCommandTextProtocol
+        ._reusableRowPacket._getString(index);
+    return formatted != null ? num.parse(formatted) : null;
+  }
+
+  bool getBoolValue(int index) {
+    var formatted = getNumValue(index);
+    return formatted != null ? formatted != 0 : null;
+  }
 
   _skip() {
     var response =
-        _protocol._queryCommandTextProtocol._skipResultSetRowResponse();
+        _result._protocol._queryCommandTextProtocol._skipResultSetRowResponse();
 
     return response is Future
         ? response.then((response) => _checkLast(response))

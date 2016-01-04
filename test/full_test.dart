@@ -82,15 +82,6 @@ abstract class SpeedTest {
     for (var i = 0; i < SIMPLE_SELECTS; i++) {
       var queryResult = await executeQuery("select * from people");
 
-      // column definitions
-      var columnIterator = await queryResult.columnIterator();
-      var hasColumn = true;
-      while (hasColumn) {
-        // hasColumn = await columnIterator.next();
-        hasColumn = columnIterator.next();
-        hasColumn = hasColumn is Future ? await hasColumn : hasColumn;
-      }
-
       // rows
       var rowIterator = await queryResult.rowIterator();
       var hasRow = true;

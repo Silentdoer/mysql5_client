@@ -299,13 +299,13 @@ class ReusablePacket extends Packet {
     return this;
   }
 
-  DataRange getReusableRange(int i) => _dataRanges[i];
-
   void free() {
     for (var range in _dataRanges) {
       range?.free();
     }
   }
+
+  DataRange _getDataRange(int index) => _dataRanges[index];
 
   int _getInt(int index) => _dataRanges[index].toInt();
 

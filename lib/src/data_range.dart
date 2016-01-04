@@ -3,6 +3,7 @@
 
 library mysql_client.data_range;
 
+import "dart:typed_data";
 import "dart:convert";
 
 class DataRange {
@@ -105,6 +106,9 @@ class DataRange {
       case 3:
         return _data[i++] | _data[i++] << 8 | _data[i++] << 16;
       case 4:
+        print("*** ${_data[i + 3] & 255}");
+
+
         return _data[i++] |
             _data[i++] << 8 |
             _data[i++] << 16 |
@@ -159,6 +163,19 @@ class DataRange {
       _mergeExtraRanges();
 
       return UTF8.decoder.convert(_data, _start, _start + _length);
+    } else {
+      return null;
+    }
+  }
+
+  double toDouble() {
+    if (_data != null) {
+      _mergeExtraRanges();
+
+      // TODO verificare se esistono conversioni più snelle
+      return new Uint8List.fromList(_data.sublist(_start, _start + _length))
+          .buffer
+          .asFloat64List()[0];
     } else {
       return null;
     }

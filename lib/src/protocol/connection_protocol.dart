@@ -82,12 +82,12 @@ class ConnectionProtocol extends ProtocolDelegate {
         0) {
       // 1              length of auth-response
       // string[n]      auth-response
-      // TODO to implement
+      // TODO to implement auth-response
       throw new UnsupportedError("TODO to implement");
       // else {
     } else {
       // string[NUL]    auth-response
-      // TODO to implement
+      // TODO to implement auth-response
       throw new UnsupportedError("TODO to implement");
     }
     // if capabilities & CLIENT_CONNECT_WITH_DB {

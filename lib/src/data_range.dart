@@ -106,9 +106,6 @@ class DataRange {
       case 3:
         return _data[i++] | _data[i++] << 8 | _data[i++] << 16;
       case 4:
-        print("*** ${_data[i + 3] & 255}");
-
-
         return _data[i++] |
             _data[i++] << 8 |
             _data[i++] << 16 |

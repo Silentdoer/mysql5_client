@@ -34,46 +34,46 @@ class PreparedStatementProtocol extends ProtocolDelegate {
   }
 
   void writeCommandStatementPreparePacket(String query) {
-    WriterBuffer buffer = _createBuffer();
+    _createBuffer();
 
     var sequenceId = 0x00;
 
     // command (1) -- [16] the COM_STMT_PREPARE command
-    _writeFixedLengthInteger(buffer, COM_STMT_PREPARE, 1);
+    _writeFixedLengthInteger(COM_STMT_PREPARE, 1);
     // query (string.EOF) -- the query to prepare
-    _writeFixedLengthUTF8String(buffer, query);
+    _writeFixedLengthUTF8String(query);
 
-    _writePacket(sequenceId, buffer);
+    _writePacket(sequenceId);
   }
 
   void writeCommandStatementExecutePacket(int statementId, List parameterValues,
       bool isNewParamsBoundFlag, List<int> parameterTypes) {
-    WriterBuffer buffer = _createBuffer();
+    _createBuffer();
 
     var sequenceId = 0x00;
 
     // 1              [17] COM_STMT_EXECUTE
-    _writeFixedLengthInteger(buffer, COM_STMT_EXECUTE, 1);
+    _writeFixedLengthInteger(COM_STMT_EXECUTE, 1);
     // 4              stmt-id
-    _writeFixedLengthInteger(buffer, statementId, 4);
+    _writeFixedLengthInteger(statementId, 4);
     // 1              flags
-    _writeFixedLengthInteger(buffer, CURSOR_TYPE_NO_CURSOR, 1);
+    _writeFixedLengthInteger(CURSOR_TYPE_NO_CURSOR, 1);
     // 4              iteration-count
-    _writeFixedLengthInteger(buffer, 1, 4);
+    _writeFixedLengthInteger(1, 4);
     // if num-params > 0:
     if (parameterValues.isNotEmpty) {
       //   n              NULL-bitmap, length: (num-params+7)/8
-      _writeBytes(buffer, _encodeNullBitmap(parameterValues));
+      _writeBytes(_encodeNullBitmap(parameterValues));
       //   1              new-params-bound-flag
-      _writeFixedLengthInteger(buffer, isNewParamsBoundFlag ? 1 : 0, 1);
+      _writeFixedLengthInteger(isNewParamsBoundFlag ? 1 : 0, 1);
       //   if new-params-bound-flag == 1:
       if (isNewParamsBoundFlag) {
         //     n              type of each parameter, length: num-params * 2
         for (var type in parameterTypes) {
           // the type as in Protocol::ColumnType
-          _writeFixedLengthInteger(buffer, type, 1);
+          _writeFixedLengthInteger(type, 1);
           // a flag byte which has the highest bit set if the type is unsigned [80]
-          _writeFixedLengthInteger(buffer, 0, 1);
+          _writeFixedLengthInteger(0, 1);
         }
       }
       //   n              value of each parameter
@@ -84,22 +84,22 @@ class PreparedStatementProtocol extends ProtocolDelegate {
           switch (dataType) {
             case DataType.INTEGER_1:
               // value (1) -- integer
-              _writeFixedLengthInteger(buffer, value ? 1 : 0, 1);
+              _writeFixedLengthInteger(value ? 1 : 0, 1);
               break;
             case DataType.DOUBLE:
               // value (string.fix_len) -- (len=8) double
-              _writeBytes(buffer, _encodeDouble(value));
-              _writeFixedLengthInteger(buffer, value ? 1 : 0, 1);
+              _writeBytes(_encodeDouble(value));
+              _writeFixedLengthInteger(value ? 1 : 0, 1);
               break;
             case DataType.INTEGER_8:
               // value (8) -- integer
-              _writeFixedLengthInteger(buffer, value, 8);
+              _writeFixedLengthInteger(value, 8);
               break;
             case DataType.DATETIME:
               throw new UnsupportedError("DateTime not supported yet");
             case DataType.STRING:
               // value (lenenc_str) -- string
-              _writeLengthEncodedUTF8String(buffer, value);
+              _writeLengthEncodedUTF8String(value);
               break;
             default:
               throw new UnsupportedError("Data type not supported $dataType");
@@ -108,33 +108,33 @@ class PreparedStatementProtocol extends ProtocolDelegate {
       }
     }
 
-    _writePacket(sequenceId, buffer);
+    _writePacket(sequenceId);
   }
 
   void writeCommandStatementResetPacket(int statementId) {
-    WriterBuffer buffer = _createBuffer();
+    _createBuffer();
 
     var sequenceId = 0x00;
 
     // 1              [1a] COM_STMT_RESET
-    _writeFixedLengthInteger(buffer, COM_STMT_RESET, 1);
+    _writeFixedLengthInteger(COM_STMT_RESET, 1);
     // 4              statement-id
-    _writeFixedLengthInteger(buffer, statementId, 4);
+    _writeFixedLengthInteger(statementId, 4);
 
-    _writePacket(sequenceId, buffer);
+    _writePacket(sequenceId);
   }
 
   void writeCommandStatementClosePacket(int statementId) {
-    WriterBuffer buffer = _createBuffer();
+    _createBuffer();
 
     var sequenceId = 0x00;
 
     // 1              [19] COM_STMT_CLOSE
-    _writeFixedLengthInteger(buffer, COM_STMT_CLOSE, 1);
+    _writeFixedLengthInteger(COM_STMT_CLOSE, 1);
     // 4              statement-id
-    _writeFixedLengthInteger(buffer, statementId, 4);
+    _writeFixedLengthInteger(statementId, 4);
 
-    _writePacket(sequenceId, buffer);
+    _writePacket(sequenceId);
   }
 
   Future<Packet> readCommandStatementPrepareResponse() {

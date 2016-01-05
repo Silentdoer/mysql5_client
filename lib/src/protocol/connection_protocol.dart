@@ -12,7 +12,7 @@ class ConnectionProtocol extends ProtocolDelegate {
 
   void writeHandshakeResponsePacket(String userName, String password,
       String database, String authPluginData, String authPluginName) {
-    WriterBuffer buffer = _createBuffer();
+    _createBuffer();
 
     // TODO rivedere utilizzo capability flags
     if (_clientCapabilityFlags & CLIENT_CONNECT_WITH_DB != 0) {
@@ -27,22 +27,21 @@ class ConnectionProtocol extends ProtocolDelegate {
         0x01; // penso dipenda dalla sequenza a cui era arrivato il server
 
     // 4              capability flags, CLIENT_PROTOCOL_41 always set
-    _writeFixedLengthInteger(buffer, _clientCapabilityFlags, 4);
+    _writeFixedLengthInteger(_clientCapabilityFlags, 4);
     // 4              max-packet size
-    _writeFixedLengthInteger(buffer, _maxPacketSize, 4);
+    _writeFixedLengthInteger(_maxPacketSize, 4);
     // 1              character set
-    _writeByte(buffer, _characterSet);
+    _writeByte(_characterSet);
     // string[23]     reserved (all [0])
-    _writeFixedFilledLengthString(buffer, 0x00, 23);
+    _writeFixedFilledLengthString(0x00, 23);
     // string[NUL]    username
-    _writeNulTerminatedUTF8String(buffer, userName);
+    _writeNulTerminatedUTF8String(userName);
 
     // if capabilities & CLIENT_PLUGIN_AUTH_LENENC_CLIENT_DATA {
     if (_serverCapabilityFlags & CLIENT_PLUGIN_AUTH_LENENC_CLIENT_DATA != 0) {
       // lenenc-int     length of auth-response
       // string[n]      auth-response
       _writeLengthEncodedString(
-          buffer,
           _generateAuthResponse(password, authPluginData, authPluginName,
               utf8Encoded: true));
       // else if capabilities & CLIENT_SECURE_CONNECTION {
@@ -60,12 +59,12 @@ class ConnectionProtocol extends ProtocolDelegate {
     // if capabilities & CLIENT_CONNECT_WITH_DB {
     if (_clientCapabilityFlags & CLIENT_CONNECT_WITH_DB != 0) {
       // string[NUL]    database
-      _writeNulTerminatedUTF8String(buffer, database);
+      _writeNulTerminatedUTF8String(database);
     }
     // if capabilities & CLIENT_PLUGIN_AUTH {
     if (_serverCapabilityFlags & CLIENT_PLUGIN_AUTH != 0) {
       // string[NUL]    auth plugin name
-      _writeNulTerminatedUTF8String(buffer, authPluginName);
+      _writeNulTerminatedUTF8String(authPluginName);
     }
     // if capabilities & CLIENT_CONNECT_ATTRS {
     if (_serverCapabilityFlags & CLIENT_CONNECT_ATTRS != 0) {
@@ -73,16 +72,19 @@ class ConnectionProtocol extends ProtocolDelegate {
       // lenenc-str     key
       // lenenc-str     value
       // if-more data in 'length of all key-values', more keys and value pairs
-      var valuesBuffer = _createBuffer();
+      var tempBuffer = _writerBuffer;
+      _createBuffer();
       _clientConnectAttributes.forEach((key, value) {
-        _writeLengthEncodedString(valuesBuffer, key);
-        _writeLengthEncodedString(valuesBuffer, value);
+        _writeLengthEncodedString(key);
+        _writeLengthEncodedString(value);
       });
-      _writeLengthEncodedInteger(buffer, valuesBuffer.length);
-      _writeBuffer(buffer, valuesBuffer);
+      var valuesBuffer = _writerBuffer;
+      _writerBuffer = tempBuffer;
+      _writeLengthEncodedInteger(valuesBuffer.length);
+      _writeBuffer(valuesBuffer);
     }
 
-    _writePacket(sequenceId, buffer);
+    _writePacket(sequenceId);
   }
 
   Future<Packet> readInitialHandshakeResponse() {

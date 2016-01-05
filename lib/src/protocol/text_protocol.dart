@@ -34,16 +34,16 @@ class QueryCommandTextProtocol extends ProtocolDelegate {
   }
 
   void writeCommandQueryPacket(String query) {
-    WriterBuffer buffer = _createBuffer();
+    _createBuffer();
 
     var sequenceId = 0x00;
 
     // 1              [03] COM_QUERY
-    _writeFixedLengthInteger(buffer, COM_QUERY, 1);
+    _writeFixedLengthInteger(COM_QUERY, 1);
     // string[EOF]    the query the server shall execute
-    _writeFixedLengthUTF8String(buffer, query);
+    _writeFixedLengthUTF8String(query);
 
-    _writePacket(sequenceId, buffer);
+    _writePacket(sequenceId);
   }
 
   Future<Packet> readCommandQueryResponse() {

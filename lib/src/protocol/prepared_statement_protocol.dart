@@ -34,7 +34,7 @@ class PreparedStatementProtocol extends ProtocolDelegate {
   }
 
   void writeCommandStatementPreparePacket(String query) {
-    _createBuffer();
+    _createWriterBuffer();
 
     var sequenceId = 0x00;
 
@@ -48,7 +48,7 @@ class PreparedStatementProtocol extends ProtocolDelegate {
 
   void writeCommandStatementExecutePacket(int statementId, List parameterValues,
       bool isNewParamsBoundFlag, List<int> parameterTypes) {
-    _createBuffer();
+    _createWriterBuffer();
 
     var sequenceId = 0x00;
 
@@ -112,7 +112,7 @@ class PreparedStatementProtocol extends ProtocolDelegate {
   }
 
   void writeCommandStatementResetPacket(int statementId) {
-    _createBuffer();
+    _createWriterBuffer();
 
     var sequenceId = 0x00;
 
@@ -125,7 +125,7 @@ class PreparedStatementProtocol extends ProtocolDelegate {
   }
 
   void writeCommandStatementClosePacket(int statementId) {
-    _createBuffer();
+    _createWriterBuffer();
 
     var sequenceId = 0x00;
 

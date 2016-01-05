@@ -3,7 +3,7 @@ library mysql_client.connection;
 import "dart:async";
 import "dart:io";
 
-import "package:mysql_client/src/protocol.dart";
+import "protocol.dart";
 
 class ConnectionError extends Error {
   final String message;

@@ -12,7 +12,7 @@ class ConnectionProtocol extends ProtocolDelegate {
 
   void writeHandshakeResponsePacket(String userName, String password,
       String database, String authPluginData, String authPluginName) {
-    _createBuffer();
+    _createWriterBuffer();
 
     // TODO rivedere utilizzo capability flags
     if (_clientCapabilityFlags & CLIENT_CONNECT_WITH_DB != 0) {
@@ -73,7 +73,7 @@ class ConnectionProtocol extends ProtocolDelegate {
       // lenenc-str     value
       // if-more data in 'length of all key-values', more keys and value pairs
       var tempBuffer = _writerBuffer;
-      _createBuffer();
+      _createWriterBuffer();
       _clientConnectAttributes.forEach((key, value) {
         _writeLengthEncodedString(key);
         _writeLengthEncodedString(value);
@@ -81,7 +81,7 @@ class ConnectionProtocol extends ProtocolDelegate {
       var valuesBuffer = _writerBuffer;
       _writerBuffer = tempBuffer;
       _writeLengthEncodedInteger(valuesBuffer.length);
-      _writeBuffer(valuesBuffer);
+      _writeBytes(valuesBuffer);
     }
 
     _writePacket(sequenceId);

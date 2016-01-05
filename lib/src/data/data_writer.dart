@@ -5,17 +5,12 @@ library mysql_client.data_writer;
 
 import "dart:io";
 
-import "package:mysql_client/src/writer/writer_buffer.dart";
-export "package:mysql_client/src/writer/writer_buffer.dart" show WriterBuffer;
-
 class DataWriter {
   final IOSink _sink;
 
   DataWriter(this._sink);
 
-  WriterBuffer createBuffer() => new WriterBuffer();
-
-  void writeBuffer(WriterBuffer buffer) {
-    buffer.addToSink(_sink);
+  void writeBuffer(List<int> buffer) {
+    _sink.add(buffer);
   }
 }

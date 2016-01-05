@@ -34,7 +34,7 @@ class QueryCommandTextProtocol extends ProtocolDelegate {
   }
 
   void writeCommandQueryPacket(String query) {
-    _createBuffer();
+    _createWriterBuffer();
 
     var sequenceId = 0x00;
 

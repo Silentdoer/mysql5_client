@@ -6,8 +6,8 @@ library mysql_client.data_reader;
 import "dart:async";
 import "dart:collection";
 
-import "package:mysql_client/src/reader/data_chunk.dart";
-import "package:mysql_client/src/reader/reader_buffer.dart";
+import "data_chunk.dart";
+import "reader_buffer.dart";
 
 class DataReader {
   final ReaderBuffer _reusableBuffer = new ReaderBuffer.reusable();

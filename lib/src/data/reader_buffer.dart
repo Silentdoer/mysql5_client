@@ -3,8 +3,8 @@
 
 library mysql_client.data_buffer;
 
-import "package:mysql_client/src/reader/data_chunk.dart";
-import "package:mysql_client/src/reader/data_range.dart";
+import "data_chunk.dart";
+import "data_range.dart";
 
 class ReaderBuffer {
   List<DataChunk> _chunks;

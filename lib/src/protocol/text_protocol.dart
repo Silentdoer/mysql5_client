@@ -26,6 +26,13 @@ class QueryCommandTextProtocol extends ProtocolDelegate {
 
   ResultSetRowPacket get reusableRowPacket => _reusableRowPacket;
 
+  void freeReusables() {
+    super.freeReusables();
+
+    _reusableColumnPacket._free();
+    _reusableRowPacket._free();
+  }
+
   void writeCommandQueryPacket(String query) {
     WriterBuffer buffer = _createBuffer();
 
@@ -81,10 +88,10 @@ class QueryCommandTextProtocol extends ProtocolDelegate {
   }
 
   Packet _readCommandQueryResponsePacket() {
-    if (_protocol._isOkPacket()) {
-      return _protocol._readOkPacket();
-    } else if (_protocol._isErrorPacket()) {
-      return _protocol._readErrorPacket();
+    if (_isOkPacket()) {
+      return _readOkPacket();
+    } else if (_isErrorPacket()) {
+      return _readErrorPacket();
     } else if (_isLocalInFilePacket()) {
       throw new UnsupportedError("Protocol::LOCAL_INFILE_Data");
     } else {
@@ -94,12 +101,8 @@ class QueryCommandTextProtocol extends ProtocolDelegate {
 
   Packet _skipResultSetColumnDefinitionResponsePacket() {
     if (_isErrorPacket()) {
-      _reusableColumnPacket.free();
-
       return _readErrorPacket();
     } else if (_isEOFPacket()) {
-      _reusableColumnPacket.free();
-
       return _readEOFPacket();
     } else {
       return _skipResultSetColumnDefinitionPacket();
@@ -108,12 +111,8 @@ class QueryCommandTextProtocol extends ProtocolDelegate {
 
   Packet _readResultSetColumnDefinitionResponsePacket() {
     if (_isErrorPacket()) {
-      _reusableColumnPacket.free();
-
       return _readErrorPacket();
     } else if (_isEOFPacket()) {
-      _reusableColumnPacket.free();
-
       return _readEOFPacket();
     } else {
       return _readResultSetColumnDefinitionPacket();
@@ -122,12 +121,8 @@ class QueryCommandTextProtocol extends ProtocolDelegate {
 
   Packet _skipResultSetRowResponsePacket() {
     if (_isErrorPacket()) {
-      _reusableRowPacket.free();
-
       return _readErrorPacket();
     } else if (_isEOFPacket()) {
-      _reusableRowPacket.free();
-
       return _readEOFPacket();
     } else {
       return _skipResultSetRowPacket();
@@ -136,12 +131,8 @@ class QueryCommandTextProtocol extends ProtocolDelegate {
 
   Packet _readResultSetRowResponsePacket() {
     if (_isErrorPacket()) {
-      _reusableRowPacket.free();
-
       return _readErrorPacket();
     } else if (_isEOFPacket()) {
-      _reusableRowPacket.free();
-
       return _readEOFPacket();
     } else {
       return _readResultSetRowPacket();
@@ -154,8 +145,6 @@ class QueryCommandTextProtocol extends ProtocolDelegate {
     // A packet containing a Protocol::LengthEncodedInteger column_count
     packet._columnCount = _readLengthEncodedInteger();
 
-    _freeReusables();
-
     _reusableRowPacket =
         new ResultSetRowPacket.reusable(_protocol, packet._columnCount);
 
@@ -166,8 +155,6 @@ class QueryCommandTextProtocol extends ProtocolDelegate {
     var packet = _reusableColumnPacket.reuse(_sequenceId, _payloadLength);
 
     _skipBytes(_payloadLength);
-
-    _freeReusables();
 
     return packet;
   }
@@ -217,8 +204,6 @@ class QueryCommandTextProtocol extends ProtocolDelegate {
     dataRange = _reusableColumnPacket._getReusableDataRange(i++);
     _readFixedLengthDataRange(2, dataRange);
 
-    _freeReusables();
-
     return packet;
   }
 
@@ -226,8 +211,6 @@ class QueryCommandTextProtocol extends ProtocolDelegate {
     var packet = _reusableRowPacket.reuse(_sequenceId, _payloadLength);
 
     _skipBytes(_payloadLength);
-
-    _freeReusables();
 
     return packet;
   }
@@ -245,8 +228,6 @@ class QueryCommandTextProtocol extends ProtocolDelegate {
         reusableRange.reuseNil();
       }
     }
-
-    _freeReusables();
 
     return packet;
   }

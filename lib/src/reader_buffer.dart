@@ -28,12 +28,14 @@ class ReaderBuffer {
   }
 
   void free() {
-    for (var chunk in _chunks) {
-      chunk.free();
+    if (_chunkIndex != null) {
+      for (int i = _chunkIndex; i < _chunks.length; i++) {
+        _chunks[i].free();
+      }
+      _dataLength = null;
+      _chunkIndex = null;
+      _readCount = null;
     }
-    _dataLength = null;
-    _chunkIndex = null;
-    _readCount = null;
   }
 
   DataChunk getReusableChunk(int index) {

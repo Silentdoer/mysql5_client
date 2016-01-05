@@ -49,26 +49,28 @@ class Connection {
 
     var protocol = new Protocol(socket);
 
-    var response =
-        await protocol.connectionProtocol.readInitialHandshakeResponse();
+    try {
+      var response =
+          await protocol.connectionProtocol.readInitialHandshakeResponse();
 
-    if (response is! InitialHandshakePacket) {
-      throw new ConnectionError(response.errorMessage);
+      if (response is! InitialHandshakePacket) {
+        throw new ConnectionError(response.errorMessage);
+      }
+
+      protocol.connectionProtocol.writeHandshakeResponsePacket(userName,
+          password, database, response.authPluginData, response.authPluginName);
+
+      response = await protocol.readCommandResponse();
+
+      if (response is ErrorPacket) {
+        throw new ConnectionError(response.errorMessage);
+      }
+
+      _socket = socket;
+      _protocol = protocol;
+    } finally {
+      protocol.connectionProtocol.freeReusables();
     }
-
-    protocol.serverCapabilityFlags = response.serverCapabilityFlags;
-
-    protocol.connectionProtocol.writeHandshakeResponsePacket(userName, password,
-        database, response.authPluginData, response.authPluginName);
-
-    response = await protocol.readCommandResponse();
-
-    if (response is ErrorPacket) {
-      throw new ConnectionError(response.errorMessage);
-    }
-
-    _socket = socket;
-    _protocol = protocol;
   }
 
   Future<QueryResult> executeQuery(String query) async {
@@ -80,34 +82,38 @@ class Connection {
 
     _lastProtocolResult = null;
 
-    _protocol.queryCommandTextProtocol.writeCommandQueryPacket(query);
+    try {
+      _protocol.queryCommandTextProtocol.writeCommandQueryPacket(query);
 
-    var response =
-        await _protocol.queryCommandTextProtocol.readCommandQueryResponse();
+      var response =
+          await _protocol.queryCommandTextProtocol.readCommandQueryResponse();
 
-    if (response is OkPacket) {
-      return new QueryResult.ok(response.affectedRows, response.lastInsertId);
-    }
-
-    if (response is! ResultSetColumnCountPacket) {
-      throw new QueryError(response.errorMessage);
-    }
-
-    List<ColumnDefinition> columns = new List(response.columnCount);
-    var columnIterator = new QueryColumnIterator(columns.length, _protocol);
-    var hasColumn = true;
-    var i = 0;
-    while (hasColumn) {
-      hasColumn = await columnIterator.next();
-      if (hasColumn) {
-        columns[i++] =
-            new ColumnDefinition(columnIterator.name, columnIterator.type);
+      if (response is OkPacket) {
+        return new QueryResult.ok(response.affectedRows, response.lastInsertId);
       }
+
+      if (response is! ResultSetColumnCountPacket) {
+        throw new QueryError(response.errorMessage);
+      }
+
+      List<ColumnDefinition> columns = new List(response.columnCount);
+      var columnIterator = new QueryColumnIterator(columns.length, _protocol);
+      var hasColumn = true;
+      var i = 0;
+      while (hasColumn) {
+        hasColumn = await columnIterator.next();
+        if (hasColumn) {
+          columns[i++] =
+              new ColumnDefinition(columnIterator.name, columnIterator.type);
+        }
+      }
+
+      _lastProtocolResult = new QueryResult.resultSet(columns, _protocol);
+
+      return _lastProtocolResult;
+    } finally {
+      _protocol.queryCommandTextProtocol.freeReusables();
     }
-
-    _lastProtocolResult = new QueryResult.resultSet(columns, _protocol);
-
-    return _lastProtocolResult;
   }
 
   Future<PreparedStatement> prepareQuery(String query) async {
@@ -119,45 +125,49 @@ class Connection {
 
     _lastProtocolResult = null;
 
-    _protocol.preparedStatementProtocol
-        .writeCommandStatementPreparePacket(query);
+    try {
+      _protocol.preparedStatementProtocol
+          .writeCommandStatementPreparePacket(query);
 
-    var response = await _protocol.preparedStatementProtocol
-        .readCommandStatementPrepareResponse();
+      var response = await _protocol.preparedStatementProtocol
+          .readCommandStatementPrepareResponse();
 
-    if (response is! CommandStatementPrepareOkResponsePacket) {
-      throw new PrepareStatementError(response.errorMessage);
-    }
-
-    List<ColumnDefinition> parameters = new List(response.numParams);
-    var parameterIterator =
-        new QueryColumnIterator(parameters.length, _protocol);
-    var hasParameter = true;
-    var i = 0;
-    while (hasParameter) {
-      hasParameter = await parameterIterator.next();
-      if (hasParameter) {
-        parameters[i++] = new ColumnDefinition(
-            parameterIterator.name, parameterIterator.type);
+      if (response is! CommandStatementPrepareOkResponsePacket) {
+        throw new PrepareStatementError(response.errorMessage);
       }
-    }
 
-    List<ColumnDefinition> columns = new List(response.numColumns);
-    var columnIterator = new QueryColumnIterator(columns.length, _protocol);
-    var hasColumn = true;
-    var l = 0;
-    while (hasColumn) {
-      hasColumn = await columnIterator.next();
-      if (hasColumn) {
-        columns[l++] =
-            new ColumnDefinition(columnIterator.name, columnIterator.type);
+      List<ColumnDefinition> parameters = new List(response.numParams);
+      var parameterIterator =
+          new QueryColumnIterator(parameters.length, _protocol);
+      var hasParameter = true;
+      var i = 0;
+      while (hasParameter) {
+        hasParameter = await parameterIterator.next();
+        if (hasParameter) {
+          parameters[i++] = new ColumnDefinition(
+              parameterIterator.name, parameterIterator.type);
+        }
       }
+
+      List<ColumnDefinition> columns = new List(response.numColumns);
+      var columnIterator = new QueryColumnIterator(columns.length, _protocol);
+      var hasColumn = true;
+      var l = 0;
+      while (hasColumn) {
+        hasColumn = await columnIterator.next();
+        if (hasColumn) {
+          columns[l++] =
+              new ColumnDefinition(columnIterator.name, columnIterator.type);
+        }
+      }
+
+      _lastProtocolResult = new PreparedStatement(
+          response.statementId, parameters, columns, _protocol);
+
+      return _lastProtocolResult;
+    } finally {
+      _protocol.preparedStatementProtocol.freeReusables();
     }
-
-    _lastProtocolResult = new PreparedStatement(
-        response.statementId, parameters, columns, _protocol);
-
-    return _lastProtocolResult;
   }
 
   Future close() async {
@@ -175,6 +185,23 @@ class Connection {
     await socket.close();
     socket.destroy();
   }
+}
+
+abstract class ProtocolResult {
+  Future free();
+
+  Future close();
+}
+
+abstract class ProtocolIterator {
+  bool isClosed;
+
+  Future<bool> nextAsFuture();
+
+  // TODO qui si potrebbe utilizzare il FutureWrapper
+  next();
+
+  Future close();
 }
 
 class ColumnDefinition {
@@ -232,7 +259,7 @@ class QueryResult implements ProtocolResult {
   }
 }
 
-class QueryColumnIterator extends PacketIterator {
+class QueryColumnIterator extends ProtocolIterator {
   final int columnCount;
 
   final Protocol _protocol;
@@ -272,8 +299,8 @@ class QueryColumnIterator extends PacketIterator {
           .readResultSetColumnDefinitionResponse();
 
       return response is Future
-          ? response.then((response) => _checkLast(response))
-          : _checkLast(response);
+          ? response.then((response) => _checkNext(response))
+          : _checkNext(response);
     } else {
       return false;
     }
@@ -308,17 +335,22 @@ class QueryColumnIterator extends PacketIterator {
         .skipResultSetColumnDefinitionResponse();
 
     return response is Future
-        ? response.then((response) => _checkLast(response))
-        : _checkLast(response);
+        ? response.then((response) => _checkNext(response))
+        : _checkNext(response);
   }
 
-  bool _checkLast(Packet response) {
-    _isClosed = response is! ResultSetColumnDefinitionPacket;
-    return !_isClosed;
+  bool _checkNext(Packet response) {
+    if (response is ResultSetColumnDefinitionPacket) {
+      return true;
+    } else {
+      _isClosed = true;
+      _protocol.queryCommandTextProtocol.freeReusables();
+      return false;
+    }
   }
 }
 
-class QueryRowIterator extends PacketIterator {
+class QueryRowIterator extends ProtocolIterator {
   final QueryResult _result;
 
   bool _isClosed;
@@ -355,8 +387,8 @@ class QueryRowIterator extends PacketIterator {
         _result._protocol.queryCommandTextProtocol.readResultSetRowResponse();
 
     return response is Future
-        ? response.then((response) => _checkLast(response))
-        : _checkLast(response);
+        ? response.then((response) => _checkNext(response))
+        : _checkNext(response);
   }
 
   String getStringValue(int index) => _result._protocol.queryCommandTextProtocol
@@ -378,13 +410,18 @@ class QueryRowIterator extends PacketIterator {
         _result._protocol.queryCommandTextProtocol.skipResultSetRowResponse();
 
     return response is Future
-        ? response.then((response) => _checkLast(response))
-        : _checkLast(response);
+        ? response.then((response) => _checkNext(response))
+        : _checkNext(response);
   }
 
-  bool _checkLast(Packet response) {
-    _isClosed = response is! ResultSetRowPacket;
-    return !_isClosed;
+  bool _checkNext(Packet response) {
+    if (response is ResultSetRowPacket) {
+      return true;
+    } else {
+      _isClosed = true;
+      _result._protocol.queryCommandTextProtocol.freeReusables();
+      return false;
+    }
   }
 }
 
@@ -428,6 +465,7 @@ class PreparedStatement implements ProtocolResult {
       throw new IndexError(index, _parameterValues);
     }
 
+    // TODO non mi piace molto questo metodo del protocol
     sqlType ??= _protocol.preparedStatementProtocol.getSqlTypeFromValue(value);
 
     if (sqlType != null && _parameterTypes[index] != sqlType) {
@@ -441,29 +479,36 @@ class PreparedStatement implements ProtocolResult {
   Future<PreparedQueryResult> executeQuery() async {
     // TODO check dello stato
 
-    _protocol.preparedStatementProtocol.writeCommandStatementExecutePacket(
-        _statementId, _parameterValues, _isNewParamsBoundFlag, _parameterTypes);
+    try {
+      _protocol.preparedStatementProtocol.writeCommandStatementExecutePacket(
+          _statementId,
+          _parameterValues,
+          _isNewParamsBoundFlag,
+          _parameterTypes);
 
-    var response = await _protocol.preparedStatementProtocol
-        .readCommandStatementExecuteResponse();
+      var response = await _protocol.preparedStatementProtocol
+          .readCommandStatementExecuteResponse();
 
-    if (response is ErrorPacket) {
-      throw new QueryError(response.errorMessage);
-    }
-
-    _isNewParamsBoundFlag = false;
-
-    if (response is OkPacket) {
-      return new PreparedQueryResult.ok(
-          response.affectedRows, response.lastInsertId);
-    } else {
-      var columnIterator = new QueryColumnIterator(columnCount, _protocol);
-      var hasColumn = true;
-      while (hasColumn) {
-        hasColumn = await columnIterator._skip();
+      if (response is ErrorPacket) {
+        throw new QueryError(response.errorMessage);
       }
 
-      return new PreparedQueryResult.resultSet(this);
+      _isNewParamsBoundFlag = false;
+
+      if (response is OkPacket) {
+        return new PreparedQueryResult.ok(
+            response.affectedRows, response.lastInsertId);
+      } else {
+        var columnIterator = new QueryColumnIterator(columnCount, _protocol);
+        var hasColumn = true;
+        while (hasColumn) {
+          hasColumn = await columnIterator._skip();
+        }
+
+        return new PreparedQueryResult.resultSet(this);
+      }
+    } finally {
+      _protocol.preparedStatementProtocol.freeReusables();
     }
   }
 
@@ -474,8 +519,12 @@ class PreparedStatement implements ProtocolResult {
   Future close() async {
     // TODO implementare PreparedStatement.close
 
-    _protocol.preparedStatementProtocol
-        .writeCommandStatementClosePacket(_statementId);
+    try {
+      _protocol.preparedStatementProtocol
+          .writeCommandStatementClosePacket(_statementId);
+    } finally {
+      _protocol.preparedStatementProtocol.freeReusables();
+    }
   }
 }
 
@@ -524,7 +573,7 @@ class PreparedQueryResult implements ProtocolResult {
   }
 }
 
-class PreparedQueryRowIterator extends PacketIterator {
+class PreparedQueryRowIterator extends ProtocolIterator {
   final PreparedQueryResult _result;
 
   bool _isClosed;
@@ -561,8 +610,8 @@ class PreparedQueryRowIterator extends PacketIterator {
         .readResultSetRowResponse(_result._statement._columnTypes);
 
     return response is Future
-        ? response.then((response) => _checkLast(response))
-        : _checkLast(response);
+        ? response.then((response) => _checkNext(response))
+        : _checkNext(response);
   }
 
   String getStringValue(int index) => _result._statement._protocol
@@ -594,12 +643,17 @@ class PreparedQueryRowIterator extends PacketIterator {
         .skipResultSetRowResponse();
 
     return response is Future
-        ? response.then((response) => _checkLast(response))
-        : _checkLast(response);
+        ? response.then((response) => _checkNext(response))
+        : _checkNext(response);
   }
 
-  bool _checkLast(Packet response) {
-    _isClosed = response is! PreparedResultSetRowPacket;
-    return !_isClosed;
+  bool _checkNext(Packet response) {
+    if (response is PreparedResultSetRowPacket) {
+      return true;
+    } else {
+      _isClosed = true;
+      _result._statement._protocol.preparedStatementProtocol.freeReusables();
+      return false;
+    }
   }
 }

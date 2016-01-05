@@ -25,6 +25,14 @@ class PreparedStatementProtocol extends ProtocolDelegate {
 
   PreparedResultSetRowPacket get reusableRowPacket => _reusableRowPacket;
 
+  void freeReusables() {
+    super.freeReusables();
+
+    _protocol.queryCommandTextProtocol.freeReusables();
+
+    _reusableRowPacket._free();
+  }
+
   void writeCommandStatementPreparePacket(String query) {
     WriterBuffer buffer = _createBuffer();
 
@@ -198,12 +206,8 @@ class PreparedStatementProtocol extends ProtocolDelegate {
 
   Packet _skipResultSetRowResponsePacket() {
     if (_isErrorPacket()) {
-      _reusableRowPacket.free();
-
       return _readErrorPacket();
     } else if (_isEOFPacket()) {
-      _reusableRowPacket.free();
-
       return _readEOFPacket();
     } else {
       return _skipResultSetRowPacket();
@@ -212,12 +216,8 @@ class PreparedStatementProtocol extends ProtocolDelegate {
 
   Packet _readResultSetRowResponsePacket(List<int> columnTypes) {
     if (_isErrorPacket()) {
-      _reusableRowPacket.free();
-
       return _readErrorPacket();
     } else if (_isEOFPacket()) {
-      _reusableRowPacket.free();
-
       return _readEOFPacket();
     } else {
       return _readResultSetRowPacket(columnTypes);
@@ -241,8 +241,6 @@ class PreparedStatementProtocol extends ProtocolDelegate {
     // warning_count (2) -- number of warnings
     packet._warningCount = _readFixedLengthInteger(2);
 
-    _freeReusables();
-
     return packet;
   }
 
@@ -251,8 +249,6 @@ class PreparedStatementProtocol extends ProtocolDelegate {
 
     // A packet containing a Protocol::LengthEncodedInteger column_count
     packet._columnCount = _readByte();
-
-    _freeReusables();
 
     _reusableRowPacket =
         new PreparedResultSetRowPacket.reusable(_protocol, packet._columnCount);
@@ -264,8 +260,6 @@ class PreparedStatementProtocol extends ProtocolDelegate {
     var packet = _reusableRowPacket.reuse(_sequenceId, _payloadLength);
 
     _skipBytes(_payloadLength);
-
-    _freeReusables();
 
     return packet;
   }
@@ -306,8 +300,6 @@ class PreparedStatementProtocol extends ProtocolDelegate {
         reusableRange.reuseNil();
       }
     }
-
-    _freeReusables();
 
     return packet;
   }

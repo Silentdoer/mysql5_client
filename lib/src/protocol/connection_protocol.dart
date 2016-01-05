@@ -158,7 +158,7 @@ class ConnectionProtocol extends ProtocolDelegate {
       }
     }
 
-    _freeReusables();
+    _serverCapabilityFlags = packet._serverCapabilityFlags;
 
     return packet;
   }

@@ -28,6 +28,10 @@ abstract class ProtocolDelegate {
 
   ProtocolDelegate(this._protocol);
 
+  void freeReusables() {
+    _protocol._freeReusables();
+  }
+
   int get _clientCapabilityFlags => _protocol._clientCapabilityFlags;
 
   void set _clientCapabilityFlags(int clientCapabilityFlags) {
@@ -35,6 +39,10 @@ abstract class ProtocolDelegate {
   }
 
   int get _serverCapabilityFlags => _protocol._serverCapabilityFlags;
+
+  void set _serverCapabilityFlags(int serverCapabilityFlags) {
+    _protocol._serverCapabilityFlags = serverCapabilityFlags;
+  }
 
   int get _sequenceId => _protocol._sequenceId;
 
@@ -88,10 +96,6 @@ abstract class ProtocolDelegate {
   DataRange _readLengthEncodedDataRange(DataRange reusable) =>
       _protocol._readLengthEncodedDataRange(reusable);
 
-  void _freeReusables() {
-    _protocol._freeReusables();
-  }
-
   _readPacketBuffer() => _protocol._readPacketBuffer();
 
   bool _isOkPacket() => _protocol._isOkPacket();
@@ -114,76 +118,35 @@ abstract class ProtocolDelegate {
 }
 
 class Protocol {
-  final PacketBuffer _reusablePacketBuffer = new PacketBuffer.reusable();
-
-  final DataRange _reusableDataRange = new DataRange.reusable();
-
-  DataWriter _writer;
-
-  DataReader _reader;
-
   int _serverCapabilityFlags;
-
   int _clientCapabilityFlags;
 
-  ConnectionProtocol _connectionProtocol;
+  final PacketBuffer __reusablePacketBuffer = new PacketBuffer.reusable();
+  final DataRange __reusableDataRange = new DataRange.reusable();
 
-  QueryCommandTextProtocol _queryCommandTextProtocol;
+  DataWriter __writer;
+  DataReader __reader;
 
-  PreparedStatementProtocol _preparedStatementProtocol;
+  ConnectionProtocol __connectionProtocol;
+  QueryCommandTextProtocol __queryCommandTextProtocol;
+  PreparedStatementProtocol __preparedStatementProtocol;
 
   Protocol(Socket socket) {
-    _reader = new DataReader(socket);
-    _writer = new DataWriter(socket);
+    __reader = new DataReader(socket);
+    __writer = new DataWriter(socket);
 
-    _connectionProtocol = new ConnectionProtocol(this);
-    _queryCommandTextProtocol = new QueryCommandTextProtocol(this);
-    _preparedStatementProtocol = new PreparedStatementProtocol(this);
+    __connectionProtocol = new ConnectionProtocol(this);
+    __queryCommandTextProtocol = new QueryCommandTextProtocol(this);
+    __preparedStatementProtocol = new PreparedStatementProtocol(this);
   }
 
-  ConnectionProtocol get connectionProtocol => _connectionProtocol;
+  ConnectionProtocol get connectionProtocol => __connectionProtocol;
 
   QueryCommandTextProtocol get queryCommandTextProtocol =>
-      _queryCommandTextProtocol;
+      __queryCommandTextProtocol;
 
   PreparedStatementProtocol get preparedStatementProtocol =>
-      _preparedStatementProtocol;
-
-  void set serverCapabilityFlags(int serverCapabilityFlags) {
-    _serverCapabilityFlags = serverCapabilityFlags;
-  }
-
-  WriterBuffer _createBuffer() => _writer.createBuffer();
-
-  void _writeBuffer(WriterBuffer buffer) => _writer.writeBuffer(buffer);
-
-  _readPacketBuffer() {
-    var value = _reader.readBuffer(4);
-    return value is Future
-        ? value.then((headerReaderBuffer) =>
-            _readPacketBufferPayload(headerReaderBuffer))
-        : _readPacketBufferPayload(value);
-  }
-
-  _readPacketBufferPayload(ReaderBuffer headerReaderBuffer) {
-    var payloadLength = _getInteger(
-        headerReaderBuffer.readFixedLengthDataRange(3, _reusableDataRange));
-    var sequenceId = headerReaderBuffer.readByte();
-
-    _reusableDataRange.free();
-
-    var value = _reader.readBuffer(payloadLength);
-    if (value is Future) {
-      return value.then((payloadReaderBuffer) {
-        var header = payloadReaderBuffer.checkByte();
-        return _reusablePacketBuffer.reuse(
-            sequenceId, header, payloadReaderBuffer);
-      });
-    } else {
-      var header = value.checkByte();
-      return _reusablePacketBuffer.reuse(sequenceId, header, value);
-    }
-  }
+      __preparedStatementProtocol;
 
   Future<Packet> readCommandResponse() {
     var value = _readPacketBuffer();
@@ -193,31 +156,49 @@ class Protocol {
     return value2 is Future ? value2 : new Future.value(value2);
   }
 
+  void _freeReusables() {
+    __reusablePacketBuffer.free();
+    __reusableDataRange.free();
+  }
+
+  int get _sequenceId => __reusablePacketBuffer.sequenceId;
+
+  int get _payloadLength => __reusablePacketBuffer.payloadLength;
+
+  bool get _isAllRead => __reusablePacketBuffer.payload.isNotDataLeft;
+
+  int get _header => __reusablePacketBuffer.header;
+
+  WriterBuffer _createBuffer() => __writer.createBuffer();
+
+  void _writeBuffer(WriterBuffer buffer) => __writer.writeBuffer(buffer);
+
+  _readPacketBuffer() {
+    var value = __reader.readBuffer(4);
+    return value is Future
+        ? value.then((headerReaderBuffer) =>
+            __readPacketBufferPayload(headerReaderBuffer))
+        : __readPacketBufferPayload(value);
+  }
+
   bool _isOkPacket() => _header == 0 && _payloadLength >= 7;
 
   bool _isEOFPacket() => _header == 0xfe && _payloadLength < 9;
 
   bool _isErrorPacket() => _header == 0xff;
 
-  OkPacket _readOkPacket() {
-    var packet = new OkPacket(_sequenceId, _payloadLength);
-
-    __completeSuccessResponsePacket(packet);
-
-    _freeReusables();
-
-    return packet;
-  }
+  OkPacket _readOkPacket() => __completeSuccessResponsePacket(
+      new OkPacket(_sequenceId, _payloadLength));
 
   EOFPacket _readEOFPacket() {
-    var packet = new EOFPacket(_sequenceId, _payloadLength);
-
     // TODO check CLIENT_DEPRECATE_EOF flag
     bool isEOFDeprecated = false;
 
     if (isEOFDeprecated) {
-      __completeSuccessResponsePacket(packet);
+      return __completeSuccessResponsePacket(
+          new EOFPacket(_sequenceId, _payloadLength));
     } else {
+      var packet = new EOFPacket(_sequenceId, _payloadLength);
       // EOF packet
       // int<1>	header	[00] or [fe] the OK packet header
       packet._header = _readByte();
@@ -228,11 +209,8 @@ class Protocol {
         // int<2>	status_flags	Status Flags
         packet._statusFlags = _readFixedLengthInteger(2);
       }
+      return packet;
     }
-
-    _freeReusables();
-
-    return packet;
   }
 
   ErrorPacket _readErrorPacket() {
@@ -251,62 +229,7 @@ class Protocol {
     // string<EOF>	error_message	human readable error message
     packet._errorMessage = _readRestOfPacketString();
 
-    _freeReusables();
-
     return packet;
-  }
-
-  Packet __readCommandResponsePacket() {
-    if (_isOkPacket()) {
-      return _readOkPacket();
-    } else if (_isErrorPacket()) {
-      return _readErrorPacket();
-    } else {
-      throw new UnsupportedError("header: ${_header}");
-    }
-  }
-
-  void __completeSuccessResponsePacket(SuccessResponsePacket packet) {
-    // int<1>	header	[00] or [fe] the OK packet header
-    packet._header = _readByte();
-    // int<lenenc>	affected_rows	affected rows
-    packet._affectedRows = _readLengthEncodedInteger();
-    // int<lenenc>	last_insert_id	last insert-id
-    packet._lastInsertId = _readLengthEncodedInteger();
-
-    // if capabilities & CLIENT_PROTOCOL_41 {
-    if (_serverCapabilityFlags & CLIENT_PROTOCOL_41 != 0) {
-      // int<2>	status_flags	Status Flags
-      packet._statusFlags = _readFixedLengthInteger(2);
-      // int<2>	warnings	number of warnings
-      packet._warnings = _readFixedLengthInteger(2);
-      // } elseif capabilities & CLIENT_TRANSACTIONS {
-    } else if (_serverCapabilityFlags & CLIENT_TRANSACTIONS != 0) {
-      // int<2>	status_flags	Status Flags
-      packet._statusFlags = _readFixedLengthInteger(2);
-    } else {
-      packet._statusFlags = 0;
-    }
-
-    // if capabilities & CLIENT_SESSION_TRACK {
-    if (_serverCapabilityFlags & CLIENT_SESSION_TRACK != 0) {
-      // string<lenenc>	info	human readable status information
-      if (!_isAllRead) {
-        packet._info = _readLengthEncodedString();
-      }
-
-      // if status_flags & SERVER_SESSION_STATE_CHANGED {
-      if (packet.statusFlags & SERVER_SESSION_STATE_CHANGED != 0) {
-        // string<lenenc>	session_state_changes	session state info
-        if (!_isAllRead) {
-          packet._sessionStateChanges = _readLengthEncodedString();
-        }
-      }
-      // } else {
-    } else {
-      // string<EOF>	info	human readable status information
-      packet._info = _readRestOfPacketString();
-    }
   }
 
   int _getInteger(DataRange range) {
@@ -443,64 +366,56 @@ class Protocol {
     }
   }
 
-  int get _sequenceId => _reusablePacketBuffer.sequenceId;
-
-  int get _payloadLength => _reusablePacketBuffer.payloadLength;
-
-  bool get _isAllRead => _reusablePacketBuffer.payload.isNotDataLeft;
-
-  int get _header => _reusablePacketBuffer.header;
-
-  int _checkByte() => _reusablePacketBuffer.payload.checkByte();
+  int _checkByte() => __reusablePacketBuffer.payload.checkByte();
 
   void _skipByte() {
-    _reusablePacketBuffer.payload.readByte();
+    __reusablePacketBuffer.payload.readByte();
   }
 
   void _skipBytes(int length) {
-    _reusablePacketBuffer.payload
-        .readFixedLengthDataRange(length, _reusableDataRange);
+    __reusablePacketBuffer.payload
+        .readFixedLengthDataRange(length, __reusableDataRange);
   }
 
-  int _readByte() => _reusablePacketBuffer.payload.readByte();
+  int _readByte() => __reusablePacketBuffer.payload.readByte();
 
-  int _readFixedLengthInteger(int length) => _getInteger(_reusablePacketBuffer
-      .payload.readFixedLengthDataRange(length, _reusableDataRange));
+  int _readFixedLengthInteger(int length) => _getInteger(__reusablePacketBuffer
+      .payload.readFixedLengthDataRange(length, __reusableDataRange));
 
   int _readLengthEncodedInteger() =>
-      _getInteger(_readLengthEncodedDataRange(_reusableDataRange));
+      _getInteger(_readLengthEncodedDataRange(__reusableDataRange));
 
-  String _readFixedLengthString(int length) => _getString(_reusablePacketBuffer
-      .payload.readFixedLengthDataRange(length, _reusableDataRange));
+  String _readFixedLengthString(int length) => _getString(__reusablePacketBuffer
+      .payload.readFixedLengthDataRange(length, __reusableDataRange));
 
   String _readFixedLengthUTF8String(int length) =>
-      _getUTF8String(_reusablePacketBuffer.payload
-          .readFixedLengthDataRange(length, _reusableDataRange));
+      _getUTF8String(__reusablePacketBuffer.payload
+          .readFixedLengthDataRange(length, __reusableDataRange));
 
   String _readLengthEncodedString() =>
-      _getString(_readLengthEncodedDataRange(_reusableDataRange));
+      _getString(_readLengthEncodedDataRange(__reusableDataRange));
 
   String _readLengthEncodedUTF8String() =>
-      _getUTF8String(_readLengthEncodedDataRange(_reusableDataRange));
+      _getUTF8String(_readLengthEncodedDataRange(__reusableDataRange));
 
-  String _readNulTerminatedString() => _getString(_reusablePacketBuffer.payload
-      .readUpToDataRange(NULL_TERMINATOR, _reusableDataRange));
+  String _readNulTerminatedString() => _getString(__reusablePacketBuffer.payload
+      .readUpToDataRange(NULL_TERMINATOR, __reusableDataRange));
 
-  String _readNulTerminatedUTF8String() => _getUTF8String(_reusablePacketBuffer
-      .payload.readUpToDataRange(NULL_TERMINATOR, _reusableDataRange));
+  String _readNulTerminatedUTF8String() => _getUTF8String(__reusablePacketBuffer
+      .payload.readUpToDataRange(NULL_TERMINATOR, __reusableDataRange));
 
   String _readRestOfPacketString() =>
-      _getString(_readRestOfPacketDataRange(_reusableDataRange));
+      _getString(_readRestOfPacketDataRange(__reusableDataRange));
 
   String _readRestOfPacketUTF8String() =>
-      _getUTF8String(_readRestOfPacketDataRange(_reusableDataRange));
+      _getUTF8String(_readRestOfPacketDataRange(__reusableDataRange));
 
   DataRange _readFixedLengthDataRange(int length, DataRange reusable) =>
-      _reusablePacketBuffer.payload.readFixedLengthDataRange(length, reusable);
+      __reusablePacketBuffer.payload.readFixedLengthDataRange(length, reusable);
 
   DataRange _readRestOfPacketDataRange(DataRange reusableRange) =>
-      _reusablePacketBuffer.payload.readFixedLengthDataRange(
-          _reusablePacketBuffer.payload.leftCount, reusableRange);
+      __reusablePacketBuffer.payload.readFixedLengthDataRange(
+          __reusablePacketBuffer.payload.leftCount, reusableRange);
 
   DataRange _readLengthEncodedDataRange(DataRange reusableRange) {
     var firstByte = _readByte();
@@ -513,7 +428,7 @@ class Protocol {
         bytesLength = 4;
         break;
       case PREFIX_INT_8:
-        if (_reusablePacketBuffer.payload.leftCount >= 8) {
+        if (__reusablePacketBuffer.payload.leftCount >= 8) {
           bytesLength = 9;
         } else {
           throw new EOFError();
@@ -526,31 +441,83 @@ class Protocol {
       default:
         return reusableRange.reuseByte(firstByte);
     }
-    return _reusablePacketBuffer.payload
+    return __reusablePacketBuffer.payload
         .readFixedLengthDataRange(bytesLength - 1, reusableRange);
   }
 
-  void _freeReusables() {
-    _reusablePacketBuffer.free();
-    _reusableDataRange.free();
+  __readPacketBufferPayload(ReaderBuffer headerReaderBuffer) {
+    var payloadLength = _getInteger(
+        headerReaderBuffer.readFixedLengthDataRange(3, __reusableDataRange));
+    var sequenceId = headerReaderBuffer.readByte();
+
+    var value = __reader.readBuffer(payloadLength);
+    if (value is Future) {
+      return value.then((payloadReaderBuffer) {
+        var header = payloadReaderBuffer.checkByte();
+        return __reusablePacketBuffer.reuse(
+            sequenceId, header, payloadReaderBuffer);
+      });
+    } else {
+      var header = value.checkByte();
+      return __reusablePacketBuffer.reuse(sequenceId, header, value);
+    }
   }
-}
 
-abstract class ProtocolResult {
-  Future free();
+  Packet __readCommandResponsePacket() {
+    if (_isOkPacket()) {
+      return _readOkPacket();
+    } else if (_isErrorPacket()) {
+      return _readErrorPacket();
+    } else {
+      throw new UnsupportedError("header: ${_header}");
+    }
+  }
 
-  Future close();
-}
+  SuccessResponsePacket __completeSuccessResponsePacket(
+      SuccessResponsePacket packet) {
+    // int<1>	header	[00] or [fe] the OK packet header
+    packet._header = _readByte();
+    // int<lenenc>	affected_rows	affected rows
+    packet._affectedRows = _readLengthEncodedInteger();
+    // int<lenenc>	last_insert_id	last insert-id
+    packet._lastInsertId = _readLengthEncodedInteger();
 
-abstract class PacketIterator {
-  bool isClosed;
+    // if capabilities & CLIENT_PROTOCOL_41 {
+    if (_serverCapabilityFlags & CLIENT_PROTOCOL_41 != 0) {
+      // int<2>	status_flags	Status Flags
+      packet._statusFlags = _readFixedLengthInteger(2);
+      // int<2>	warnings	number of warnings
+      packet._warnings = _readFixedLengthInteger(2);
+      // } elseif capabilities & CLIENT_TRANSACTIONS {
+    } else if (_serverCapabilityFlags & CLIENT_TRANSACTIONS != 0) {
+      // int<2>	status_flags	Status Flags
+      packet._statusFlags = _readFixedLengthInteger(2);
+    } else {
+      packet._statusFlags = 0;
+    }
 
-  Future<bool> nextAsFuture();
+    // if capabilities & CLIENT_SESSION_TRACK {
+    if (_serverCapabilityFlags & CLIENT_SESSION_TRACK != 0) {
+      // string<lenenc>	info	human readable status information
+      if (!_isAllRead) {
+        packet._info = _readLengthEncodedString();
+      }
 
-  // TODO qui si potrebbe utilizzare il FutureWrapper
-  next();
+      // if status_flags & SERVER_SESSION_STATE_CHANGED {
+      if (packet.statusFlags & SERVER_SESSION_STATE_CHANGED != 0) {
+        // string<lenenc>	session_state_changes	session state info
+        if (!_isAllRead) {
+          packet._sessionStateChanges = _readLengthEncodedString();
+        }
+      }
+      // } else {
+    } else {
+      // string<EOF>	info	human readable status information
+      packet._info = _readRestOfPacketString();
+    }
 
-  Future close();
+    return packet;
+  }
 }
 
 abstract class Packet {
@@ -560,6 +527,7 @@ abstract class Packet {
   Packet(this._payloadLength, this._sequenceId);
 
   int get payloadLength => _payloadLength;
+
   int get sequenceId => _sequenceId;
 }
 
@@ -582,9 +550,9 @@ class ReusablePacket extends Packet {
 
   DataRange _getReusableDataRange(int index) => _dataRanges[index];
 
-  void free() {
-    for (var range in _dataRanges) {
-      range?.free();
+  void _free() {
+    for (int i = 0; i < _dataRanges.length; i++) {
+      _dataRanges[i].free();
     }
   }
 

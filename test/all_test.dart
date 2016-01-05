@@ -42,7 +42,7 @@ Future testMySqlClient() async {
     var rows = [];
     var rowSetReader = await queryResult.rowIterator();
     while (true) {
-      var next = await rowSetReader.nextAsFuture();
+      var next = await rowSetReader.next();
       if (!next) {
         break;
       }

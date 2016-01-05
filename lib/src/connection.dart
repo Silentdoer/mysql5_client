@@ -101,7 +101,7 @@ class Connection {
       var hasColumn = true;
       var i = 0;
       while (hasColumn) {
-        hasColumn = await columnIterator.next();
+        hasColumn = await columnIterator.rawNext();
         if (hasColumn) {
           columns[i++] =
               new ColumnDefinition(columnIterator.name, columnIterator.type);
@@ -142,7 +142,7 @@ class Connection {
       var hasParameter = true;
       var i = 0;
       while (hasParameter) {
-        hasParameter = await parameterIterator.next();
+        hasParameter = await parameterIterator.rawNext();
         if (hasParameter) {
           parameters[i++] = new ColumnDefinition(
               parameterIterator.name, parameterIterator.type);
@@ -154,7 +154,7 @@ class Connection {
       var hasColumn = true;
       var l = 0;
       while (hasColumn) {
-        hasColumn = await columnIterator.next();
+        hasColumn = await columnIterator.rawNext();
         if (hasColumn) {
           columns[l++] =
               new ColumnDefinition(columnIterator.name, columnIterator.type);
@@ -196,10 +196,10 @@ abstract class ProtocolResult {
 abstract class ProtocolIterator {
   bool isClosed;
 
-  Future<bool> nextAsFuture();
+  Future<bool> next();
 
   // TODO qui si potrebbe utilizzare il FutureWrapper
-  next();
+  rawNext();
 
   Future close();
 }
@@ -284,12 +284,12 @@ class QueryColumnIterator extends ProtocolIterator {
     }
   }
 
-  Future<bool> nextAsFuture() {
-    var value = next();
+  Future<bool> next() {
+    var value = rawNext();
     return value is Future ? value : new Future.value(value);
   }
 
-  next() {
+  rawNext() {
     if (isClosed) {
       throw new StateError("Column iterator closed");
     }
@@ -373,12 +373,12 @@ class QueryRowIterator extends ProtocolIterator {
     }
   }
 
-  Future<bool> nextAsFuture() {
-    var value = next();
+  Future<bool> next() {
+    var value = rawNext();
     return value is Future ? value : new Future.value(value);
   }
 
-  next() {
+  rawNext() {
     if (isClosed) {
       throw new StateError("Column iterator closed");
     }
@@ -596,12 +596,12 @@ class PreparedQueryRowIterator extends ProtocolIterator {
     }
   }
 
-  Future<bool> nextAsFuture() {
-    var value = next();
+  Future<bool> next() {
+    var value = rawNext();
     return value is Future ? value : new Future.value(value);
   }
 
-  next() {
+  rawNext() {
     if (isClosed) {
       throw new StateError("Column iterator closed");
     }

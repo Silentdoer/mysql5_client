@@ -90,7 +90,7 @@ Future test10() async {
 
     // rows
     rowIterator = await result.rowIterator();
-    while (await rowIterator.nextAsFuture()) {
+    while (await rowIterator.next()) {
       print([
         rowIterator.getNumValue(0),
         rowIterator.getStringValue(1),
@@ -108,7 +108,7 @@ Future test10() async {
 
     // rows
     rowIterator = await result.rowIterator();
-    while (await rowIterator.nextAsFuture()) {
+    while (await rowIterator.next()) {
       print([
         rowIterator.getNumValue(0),
         rowIterator.getStringValue(1),
@@ -153,7 +153,7 @@ Future test9() async {
     // rows
     var rowSetReader = await queryResult.rowIterator();
     while (true) {
-      var next = await rowSetReader.nextAsFuture();
+      var next = await rowSetReader.next();
       if (!next) {
         break;
       }
@@ -185,7 +185,7 @@ Future test8() async {
     // rows
     var rowSetReader = await queryResult.rowIterator();
     while (true) {
-      var next = await rowSetReader.nextAsFuture();
+      var next = await rowSetReader.next();
       if (!next) {
         break;
       }
@@ -238,7 +238,7 @@ Future test7() async {
     // rows
     var rowSetReader = await queryResult.rowIterator();
     while (true) {
-      var next = await rowSetReader.nextAsFuture();
+      var next = await rowSetReader.next();
       if (!next) {
         break;
       }
@@ -270,7 +270,7 @@ Future test6() async {
     // rows
     var rowSetReader = await queryResult.rowIterator();
     while (true) {
-      var next = await rowSetReader.nextAsFuture();
+      var next = await rowSetReader.next();
       if (!next) {
         break;
       }
@@ -285,7 +285,7 @@ Future test6() async {
     // rows
     rowSetReader = await queryResult.rowIterator();
     while (true) {
-      var next = await rowSetReader.nextAsFuture();
+      var next = await rowSetReader.next();
       if (!next) {
         break;
       }
@@ -318,7 +318,7 @@ Future test5() async {
     // rows
     var rowSetReader = await queryResult.rowIterator();
     while (true) {
-      var next = await rowSetReader.nextAsFuture();
+      var next = await rowSetReader.next();
       if (!next) {
         break;
       }

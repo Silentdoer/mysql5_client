@@ -87,7 +87,7 @@ abstract class SpeedTest {
       var hasRow = true;
       while (hasRow) {
         // var hasRow = await rowIterator.next();
-        hasRow = rowIterator.next();
+        hasRow = rowIterator.rawNext();
         hasRow = hasRow is Future ? await hasRow : hasRow;
       }
     }

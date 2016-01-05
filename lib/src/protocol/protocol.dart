@@ -452,7 +452,7 @@ class Protocol {
         .readFixedLengthDataRange(length, _reusableDataRange);
   }
 
-  int _readByte() => _reusablePacketBuffer.payload.checkByte();
+  int _readByte() => _reusablePacketBuffer.payload.readByte();
 
   int _readFixedLengthInteger(int length) => _getInteger(_reusablePacketBuffer
       .payload.readFixedLengthDataRange(length, _reusableDataRange));
@@ -523,7 +523,6 @@ class Protocol {
   void _freeReusables() {
     _reusablePacketBuffer.free();
     _reusableDataRange.free();
-    throw new UnsupportedError("TODO implementare");
   }
 }
 

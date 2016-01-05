@@ -149,7 +149,6 @@ class ConnectionProtocol extends ProtocolDelegate {
     _skipByte();
     // 2              capability flags (lower 2 bytes)
     packet._capabilityFlags1 = _readFixedLengthInteger(2);
-    print(packet._capabilityFlags1);
     // if more data in the packet:
     if (!_isAllRead) {
       // 1              character set
@@ -158,14 +157,12 @@ class ConnectionProtocol extends ProtocolDelegate {
       packet._statusFlags = _readFixedLengthInteger(2);
       // 2              capability flags (upper 2 bytes)
       packet._capabilityFlags2 = _readFixedLengthInteger(2);
-      print(packet._capabilityFlags2);
       packet._serverCapabilityFlags =
           packet.capabilityFlags1 | (packet.capabilityFlags2 << 16);
       // if capabilities & CLIENT_PLUGIN_AUTH {
       if (packet._serverCapabilityFlags & CLIENT_PLUGIN_AUTH != 0) {
         // 1              length of auth-plugin-data
         packet._authPluginDataLength = _readByte();
-        print(packet._authPluginDataLength);
       } else {
         // 1              [00]
         _skipByte();

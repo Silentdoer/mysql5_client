@@ -14,8 +14,8 @@ class ConnectionProtocol extends ProtocolDelegate {
   var _clientConnectAttributes = {};
 
   ConnectionProtocol(Protocol protocol) : super(protocol) {
-    _protocol._clientCapabilityFlags =
-        _decodeFixedLengthInteger([0x0d, 0xa2, 0x00, 0x00]); // TODO sistemare
+    _clientCapabilityFlags = _protocol
+        ._decodeFixedLengthInteger([0x0d, 0xa2, 0x00, 0x00]); // TODO sistemare
   }
 
   Future<ConnectionResult> connect(
@@ -26,39 +26,38 @@ class ConnectionProtocol extends ProtocolDelegate {
       throw new ConnectionError(response.errorMessage);
     }
 
-    _protocol._serverCapabilityFlags = response.serverCapabilityFlags;
+    _serverCapabilityFlags = response.serverCapabilityFlags;
 
     _writeHandshakeResponsePacket(userName, password, database,
         response.authPluginData, response.authPluginName);
 
-    response = await _protocol._readCommandResponse();
+    response = await _readCommandResponse();
 
     if (response is ErrorPacket) {
       throw new ConnectionError(response.errorMessage);
     }
 
-    return new ConnectionResult(
-        _protocol._serverCapabilityFlags, _protocol._clientCapabilityFlags);
+    return new ConnectionResult(_serverCapabilityFlags, _clientCapabilityFlags);
   }
 
   void _writeHandshakeResponsePacket(String userName, String password,
       String database, String authPluginData, String authPluginName) {
-    WriterBuffer buffer = _protocol._createBuffer();
+    WriterBuffer buffer = _createBuffer();
 
     // TODO rivedere utilizzo capability flags
-    if (_protocol._clientCapabilityFlags & CLIENT_CONNECT_WITH_DB != 0) {
+    if (_clientCapabilityFlags & CLIENT_CONNECT_WITH_DB != 0) {
       if (database == null) {
-        _protocol._clientCapabilityFlags ^= CLIENT_CONNECT_WITH_DB;
+        _clientCapabilityFlags ^= CLIENT_CONNECT_WITH_DB;
       }
     } else if (database != null) {
-      _protocol._clientCapabilityFlags ^= CLIENT_CONNECT_WITH_DB;
+      _clientCapabilityFlags ^= CLIENT_CONNECT_WITH_DB;
     }
 
     var sequenceId =
         0x01; // penso dipenda dalla sequenza a cui era arrivato il server
 
     // 4              capability flags, CLIENT_PROTOCOL_41 always set
-    buffer.writeFixedLengthInteger(_protocol._clientCapabilityFlags, 4);
+    buffer.writeFixedLengthInteger(_clientCapabilityFlags, 4);
     // 4              max-packet size
     buffer.writeFixedLengthInteger(_maxPacketSize, 4);
     // 1              character set
@@ -69,17 +68,14 @@ class ConnectionProtocol extends ProtocolDelegate {
     buffer.writeNulTerminatedUTF8String(userName);
 
     // if capabilities & CLIENT_PLUGIN_AUTH_LENENC_CLIENT_DATA {
-    if (_protocol._serverCapabilityFlags &
-            CLIENT_PLUGIN_AUTH_LENENC_CLIENT_DATA !=
-        0) {
+    if (_serverCapabilityFlags & CLIENT_PLUGIN_AUTH_LENENC_CLIENT_DATA != 0) {
       // lenenc-int     length of auth-response
       // string[n]      auth-response
       buffer.writeLengthEncodedString(_generateAuthResponse(
           password, authPluginData, authPluginName,
           utf8Encoded: true));
       // else if capabilities & CLIENT_SECURE_CONNECTION {
-    } else if (_protocol._serverCapabilityFlags & CLIENT_SECURE_CONNECTION !=
-        0) {
+    } else if (_serverCapabilityFlags & CLIENT_SECURE_CONNECTION != 0) {
       // 1              length of auth-response
       // string[n]      auth-response
       // TODO to implement auth-response
@@ -91,22 +87,22 @@ class ConnectionProtocol extends ProtocolDelegate {
       throw new UnsupportedError("TODO to implement");
     }
     // if capabilities & CLIENT_CONNECT_WITH_DB {
-    if (_protocol._clientCapabilityFlags & CLIENT_CONNECT_WITH_DB != 0) {
+    if (_clientCapabilityFlags & CLIENT_CONNECT_WITH_DB != 0) {
       // string[NUL]    database
       buffer.writeNulTerminatedUTF8String(database);
     }
     // if capabilities & CLIENT_PLUGIN_AUTH {
-    if (_protocol._serverCapabilityFlags & CLIENT_PLUGIN_AUTH != 0) {
+    if (_serverCapabilityFlags & CLIENT_PLUGIN_AUTH != 0) {
       // string[NUL]    auth plugin name
       buffer.writeNulTerminatedUTF8String(authPluginName);
     }
     // if capabilities & CLIENT_CONNECT_ATTRS {
-    if (_protocol._serverCapabilityFlags & CLIENT_CONNECT_ATTRS != 0) {
+    if (_serverCapabilityFlags & CLIENT_CONNECT_ATTRS != 0) {
       // lenenc-int     length of all key-values
       // lenenc-str     key
       // lenenc-str     value
       // if-more data in 'length of all key-values', more keys and value pairs
-      var valuesBuffer = _protocol._createBuffer();
+      var valuesBuffer = _createBuffer();
       _clientConnectAttributes.forEach((key, value) {
         valuesBuffer.writeLengthEncodedString(key);
         valuesBuffer.writeLengthEncodedString(value);
@@ -115,16 +111,16 @@ class ConnectionProtocol extends ProtocolDelegate {
       buffer.writeBuffer(valuesBuffer);
     }
 
-    var headerBuffer = _protocol._createBuffer();
+    var headerBuffer = _createBuffer();
     headerBuffer.writeFixedLengthInteger(buffer.length, 3);
     headerBuffer.writeOneLengthInteger(sequenceId);
 
-    _protocol._writeBuffer(headerBuffer);
-    _protocol._writeBuffer(buffer);
+    _writeBuffer(headerBuffer);
+    _writeBuffer(buffer);
   }
 
   Future<Packet> _readInitialHandshakeResponse() {
-    var value = _protocol._readPacketBuffer();
+    var value = _readPacketBuffer();
     var value2 = value is Future
         ? value.then((_) => _readInitialHandshakeResponsePacket())
         : _readInitialHandshakeResponsePacket();
@@ -132,79 +128,56 @@ class ConnectionProtocol extends ProtocolDelegate {
   }
 
   Packet _readInitialHandshakeResponsePacket() {
-    if (_protocol._isErrorPacket()) {
-      return _protocol._readErrorPacket();
+    if (_isErrorPacket()) {
+      return _readErrorPacket();
     } else {
       return _readInitialHandshakePacket();
     }
   }
 
   InitialHandshakePacket _readInitialHandshakePacket() {
-    var packet = new InitialHandshakePacket(
-        _protocol._reusablePacketBuffer.sequenceId,
-        _protocol._reusablePacketBuffer.payloadLength);
-
+    var packet = new InitialHandshakePacket(_sequenceId, _payloadLength);
     // 1              [0a] protocol version
-    packet._protocolVersion = _protocol._reusablePacketBuffer.payload
-        .readFixedLengthDataRange(1, _protocol._reusableDataRange)
-        .toInt();
+    packet._protocolVersion = _header;
     // string[NUL]    server version
-    packet._serverVersion = _protocol._reusablePacketBuffer.payload
-        .readNulTerminatedDataRange(_protocol._reusableDataRange)
-        .toString();
+    packet._serverVersion = _readNulTerminatedString();
     // 4              connection id
-    packet._connectionId = _protocol._reusablePacketBuffer.payload
-        .readFixedLengthDataRange(4, _protocol._reusableDataRange)
-        .toInt();
+    packet._connectionId = _readFixedLengthInteger(4);
     // string[8]      auth-plugin-data-part-1
-    packet._authPluginDataPart1 = _protocol._reusablePacketBuffer.payload
-        .readFixedLengthDataRange(8, _protocol._reusableDataRange)
-        .toString();
+    packet._authPluginDataPart1 = _readFixedLengthString(8);
     // 1              [00] filler
-    _protocol._reusablePacketBuffer.payload
-        .readFixedLengthDataRange(1, _protocol._reusableDataRange);
+    _skipByte();
     // 2              capability flags (lower 2 bytes)
-    packet._capabilityFlags1 = _protocol._reusablePacketBuffer.payload
-        .readFixedLengthDataRange(2, _protocol._reusableDataRange)
-        .toInt();
+    packet._capabilityFlags1 = _readFixedLengthInteger(2);
+    print(packet._capabilityFlags1);
     // if more data in the packet:
-    if (!_protocol._reusablePacketBuffer.payload.isAllRead) {
+    if (!_isAllRead) {
       // 1              character set
-      packet._characterSet = _protocol._reusablePacketBuffer.payload
-          .readFixedLengthDataRange(1, _protocol._reusableDataRange)
-          .toInt();
+      packet._characterSet = _readByte();
       // 2              status flags
-      packet._statusFlags = _protocol._reusablePacketBuffer.payload
-          .readFixedLengthDataRange(2, _protocol._reusableDataRange)
-          .toInt();
+      packet._statusFlags = _readFixedLengthInteger(2);
       // 2              capability flags (upper 2 bytes)
-      packet._capabilityFlags2 = _protocol._reusablePacketBuffer.payload
-          .readFixedLengthDataRange(2, _protocol._reusableDataRange)
-          .toInt();
+      packet._capabilityFlags2 = _readFixedLengthInteger(2);
+      print(packet._capabilityFlags2);
       packet._serverCapabilityFlags =
           packet.capabilityFlags1 | (packet.capabilityFlags2 << 16);
       // if capabilities & CLIENT_PLUGIN_AUTH {
       if (packet._serverCapabilityFlags & CLIENT_PLUGIN_AUTH != 0) {
         // 1              length of auth-plugin-data
-        packet._authPluginDataLength = _protocol._reusablePacketBuffer.payload
-            .readFixedLengthDataRange(1, _protocol._reusableDataRange)
-            .toInt();
+        packet._authPluginDataLength = _readByte();
+        print(packet._authPluginDataLength);
       } else {
         // 1              [00]
-        _protocol._reusablePacketBuffer.payload
-            .readFixedLengthDataRange(1, _protocol._reusableDataRange);
+        _skipByte();
         packet._authPluginDataLength = 0;
       }
       // string[10]     reserved (all [00])
-      _protocol._reusablePacketBuffer.payload
-          .readFixedLengthDataRange(10, _protocol._reusableDataRange);
+      _skipBytes(10);
       // if capabilities & CLIENT_SECURE_CONNECTION {
       if (packet._serverCapabilityFlags & CLIENT_SECURE_CONNECTION != 0) {
         // string[$len]   auth-plugin-data-part-2 ($len=MAX(13, length of auth-plugin-data - 8))
         var len = max(packet._authPluginDataLength - 8, 13);
-        packet._authPluginDataPart2 = _protocol._reusablePacketBuffer.payload
-            .readFixedLengthDataRange(len, _protocol._reusableDataRange)
-            .toString();
+        packet._authPluginDataPart2 = _readFixedLengthString(len);
       } else {
         packet.authPluginDataPart2 = "";
       }
@@ -214,14 +187,11 @@ class ConnectionProtocol extends ProtocolDelegate {
       // if capabilities & CLIENT_PLUGIN_AUTH {
       if (packet._serverCapabilityFlags & CLIENT_PLUGIN_AUTH != 0) {
         // string[NUL]    auth-plugin name
-        packet._authPluginName = _protocol._reusablePacketBuffer.payload
-            .readNulTerminatedDataRange(_protocol._reusableDataRange)
-            .toString();
+        packet._authPluginName = _readNulTerminatedString();
       }
     }
 
-    _protocol._reusablePacketBuffer.free();
-    _protocol._reusableDataRange.free();
+    _freeReusables();
 
     return packet;
   }
@@ -257,51 +227,6 @@ class ConnectionProtocol extends ProtocolDelegate {
 
   List<int> _encodeString(String value, {utf8Encoded: false}) {
     return !utf8Encoded ? value.codeUnits : UTF8.encode(value);
-  }
-
-  int _decodeFixedLengthInteger(List<int> data) {
-    switch (data.length) {
-      case 1:
-        return data[0];
-      case 2:
-        return data[0] | data[1] << 8;
-      case 3:
-        return data[0] | data[1] << 8 | data[2] << 16;
-      case 4:
-        return data[0] | data[1] << 8 | data[2] << 16 | data[3] << 24;
-      case 5:
-        return data[0] |
-            data[1] << 8 |
-            data[2] << 16 |
-            data[3] << 24 |
-            data[4] << 32;
-      case 6:
-        return data[0] |
-            data[1] << 8 |
-            data[2] << 16 |
-            data[3] << 24 |
-            data[4] << 32 |
-            data[5] << 40;
-      case 7:
-        return data[0] |
-            data[1] << 8 |
-            data[2] << 16 |
-            data[3] << 24 |
-            data[4] << 32 |
-            data[5] << 40 |
-            data[6] << 48;
-      case 8:
-        return data[0] |
-            data[1] << 8 |
-            data[2] << 16 |
-            data[3] << 24 |
-            data[4] << 32 |
-            data[5] << 40 |
-            data[6] << 48 |
-            data[7] << 56;
-    }
-
-    throw new UnsupportedError("${data.length} length");
   }
 }
 

@@ -10,10 +10,12 @@ import "package:stack_trace/stack_trace.dart";
 
 Future main() async {
   Chain.capture(() async {
-    await test10();
-  }, onError: (e, s) {
-    print(e);
-    print(s.terse);
+    try {
+      await test10();
+    } catch (e, s) {
+      print(e);
+      print(new Chain.forTrace(s));
+    }
   });
 }
 
@@ -89,7 +91,13 @@ Future test10() async {
     // rows
     rowIterator = await result.rowIterator();
     while (await rowIterator.nextAsFuture()) {
-      print([rowIterator.getNumValue(0), rowIterator.getStringValue(1), rowIterator.getNumValue(2), rowIterator.getNumValue(3), rowIterator.getBoolValue(4)].join(","));
+      print([
+        rowIterator.getNumValue(0),
+        rowIterator.getStringValue(1),
+        rowIterator.getNumValue(2),
+        rowIterator.getNumValue(3),
+        rowIterator.getBoolValue(4)
+      ].join(","));
     }
 
     statement = await connection.prepareQuery("""
@@ -101,10 +109,20 @@ Future test10() async {
     // rows
     rowIterator = await result.rowIterator();
     while (await rowIterator.nextAsFuture()) {
-      print([rowIterator.getNumValue(0), rowIterator.getStringValue(1), rowIterator.getNumValue(2), rowIterator.getNumValue(3), rowIterator.getBoolValue(4)].join(","));
+      print([
+        rowIterator.getNumValue(0),
+        rowIterator.getStringValue(1),
+        rowIterator.getNumValue(2),
+        rowIterator.getNumValue(3),
+        rowIterator.getBoolValue(4)
+      ].join(","));
     }
   } finally {
-    await connection.close();
+    try {
+      // TODO problema nelle catch credo
+      // await connection.close();
+    } catch (e) {
+    }
   }
 }
 
@@ -140,7 +158,8 @@ Future test9() async {
         break;
       }
 
-      print("${rowSetReader.getNumValue(0)}: ${rowSetReader.getStringValue(1)}");
+      print(
+          "${rowSetReader.getNumValue(0)}: ${rowSetReader.getStringValue(1)}");
     }
 
     await queryResult.close();
@@ -171,7 +190,8 @@ Future test8() async {
         break;
       }
 
-      print("${rowSetReader.getNumValue(0)}: ${rowSetReader.getStringValue(1)}");
+      print(
+          "${rowSetReader.getNumValue(0)}: ${rowSetReader.getStringValue(1)}");
     }
   } catch (e, s) {
     print("Error: $e");
@@ -223,7 +243,8 @@ Future test7() async {
         break;
       }
 
-      print("${rowSetReader.getNumValue(0)}: ${rowSetReader.getStringValue(1)}");
+      print(
+          "${rowSetReader.getNumValue(0)}: ${rowSetReader.getStringValue(1)}");
     }
   } finally {
     await connection.close();

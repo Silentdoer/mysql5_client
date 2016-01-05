@@ -61,53 +61,22 @@ class ReaderBuffer {
 
   int get payloadLength => _payloadLength;
 
-  bool get isAllRead => _payloadLength == _readCount;
+  int get available => _payloadLength - _readCount;
 
-  void skipByte() {
-    _readOneByte();
+  bool get isAllRead => available == 0;
+
+  int checkByte() => _chunks[_chunkIndex].checkOneByte();
+
+  int readByte() {
+    var chunk = _chunks[_chunkIndex];
+    var byte = chunk.extractOneByte();
+    if (chunk.isEmpty) {
+      chunk.free();
+      _chunkIndex++;
+    }
+    _readCount++;
+    return byte;
   }
-
-  void skipBytes(int length) {
-    readFixedLengthDataRange(length, new DataRange.reusable());
-  }
-
-  int checkOneLengthInteger() => _chunks[_chunkIndex].checkOneByte();
-
-  int readOneLengthInteger() => _readOneByte();
-
-  int readFixedLengthInteger(int length) =>
-      readFixedLengthDataRange(length, new DataRange.reusable()).toInt();
-
-  int readLengthEncodedInteger() =>
-      readLengthEncodedDataRange(new DataRange.reusable()).toInt();
-
-  String readFixedLengthString(int length) =>
-      readFixedLengthDataRange(length, new DataRange.reusable()).toString();
-
-  String readFixedLengthUTF8String(int length) =>
-      readFixedLengthDataRange(length, new DataRange.reusable()).toUTF8String();
-
-  String readLengthEncodedString() =>
-      readFixedLengthString(readLengthEncodedInteger());
-
-  String readLengthEncodedUTF8String() =>
-      readFixedLengthUTF8String(readLengthEncodedInteger());
-
-  String readNulTerminatedString() =>
-      readUpToDataRange(NULL_TERMINATOR, new DataRange.reusable()).toString();
-
-  String readNulTerminatedUTF8String() =>
-      readUpToDataRange(NULL_TERMINATOR, new DataRange.reusable())
-          .toUTF8String();
-
-  String readRestOfPacketString() =>
-      readFixedLengthString(_payloadLength - _readCount);
-
-  String readRestOfPacketUTF8String() =>
-      readFixedLengthUTF8String(_payloadLength - _readCount);
-
-  DataRange readNulTerminatedDataRange(DataRange reusableRange) =>
-      readUpToDataRange(NULL_TERMINATOR, reusableRange);
 
   DataRange readFixedLengthDataRange(int length, DataRange reusableRange) {
     if (length > 0) {
@@ -169,46 +138,5 @@ class ReaderBuffer {
     // skip the terminator
     _readCount++;
     return range;
-  }
-
-  DataRange readLengthEncodedDataRange(DataRange reusableRange) {
-    var firstByte = _readOneByte();
-    var bytesLength;
-    switch (firstByte) {
-      case PREFIX_INT_2:
-        bytesLength = 3;
-        break;
-      case PREFIX_INT_3:
-        bytesLength = 4;
-        break;
-      case PREFIX_INT_8:
-        if (_payloadLength - _readCount >= 8) {
-          bytesLength = 9;
-        } else {
-          throw new EOFError();
-        }
-        break;
-      case PREFIX_NULL:
-        throw new NullError();
-      case PREFIX_UNDEFINED:
-        throw new UndefinedError();
-      default:
-        return reusableRange.reuseByte(firstByte);
-    }
-    return readFixedLengthDataRange(bytesLength - 1, reusableRange);
-  }
-
-  DataRange readRestOfPacketDataRange(DataRange reusableRange) =>
-      readFixedLengthDataRange(_payloadLength - _readCount, reusableRange);
-
-  int _readOneByte() {
-    var chunk = _chunks[_chunkIndex];
-    var byte = chunk.extractOneByte();
-    if (chunk.isEmpty) {
-      chunk.free();
-      _chunkIndex++;
-    }
-    _readCount++;
-    return byte;
   }
 }

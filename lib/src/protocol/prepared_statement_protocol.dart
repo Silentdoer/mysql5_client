@@ -96,7 +96,7 @@ class PreparedStatementProtocol extends ProtocolDelegate {
   }
 
   void _writeCommandStatementPreparePacket(String query) {
-    WriterBuffer buffer = _protocol._createBuffer();
+    WriterBuffer buffer = _createBuffer();
 
     var sequenceId = 0x00;
 
@@ -105,16 +105,16 @@ class PreparedStatementProtocol extends ProtocolDelegate {
     // query (string.EOF) -- the query to prepare
     buffer.writeFixedLengthUTF8String(query);
 
-    var headerBuffer = _protocol._createBuffer();
+    var headerBuffer = _createBuffer();
     headerBuffer.writeFixedLengthInteger(buffer.length, 3);
     headerBuffer.writeOneLengthInteger(sequenceId);
 
-    _protocol._writeBuffer(headerBuffer);
-    _protocol._writeBuffer(buffer);
+    _writeBuffer(headerBuffer);
+    _writeBuffer(buffer);
   }
 
   void _writeCommandStatementExecutePacket(PreparedStatement statement) {
-    WriterBuffer buffer = _protocol._createBuffer();
+    WriterBuffer buffer = _createBuffer();
 
     var sequenceId = 0x00;
 
@@ -174,16 +174,16 @@ class PreparedStatementProtocol extends ProtocolDelegate {
       }
     }
 
-    var headerBuffer = _protocol._createBuffer();
+    var headerBuffer = _createBuffer();
     headerBuffer.writeFixedLengthInteger(buffer.length, 3);
     headerBuffer.writeOneLengthInteger(sequenceId);
 
-    _protocol._writeBuffer(headerBuffer);
-    _protocol._writeBuffer(buffer);
+    _writeBuffer(headerBuffer);
+    _writeBuffer(buffer);
   }
 
   void _writeCommandStatementResetPacket(int statementId) {
-    WriterBuffer buffer = _protocol._createBuffer();
+    WriterBuffer buffer = _createBuffer();
 
     var sequenceId = 0x00;
 
@@ -192,16 +192,16 @@ class PreparedStatementProtocol extends ProtocolDelegate {
     // 4              statement-id
     buffer.writeFixedLengthInteger(statementId, 4);
 
-    var headerBuffer = _protocol._createBuffer();
+    var headerBuffer = _createBuffer();
     headerBuffer.writeFixedLengthInteger(buffer.length, 3);
     headerBuffer.writeOneLengthInteger(sequenceId);
 
-    _protocol._writeBuffer(headerBuffer);
-    _protocol._writeBuffer(buffer);
+    _writeBuffer(headerBuffer);
+    _writeBuffer(buffer);
   }
 
   void _writeCommandStatementClosePacket(int statementId) {
-    WriterBuffer buffer = _protocol._createBuffer();
+    WriterBuffer buffer = _createBuffer();
 
     var sequenceId = 0x00;
 
@@ -210,16 +210,16 @@ class PreparedStatementProtocol extends ProtocolDelegate {
     // 4              statement-id
     buffer.writeFixedLengthInteger(statementId, 4);
 
-    var headerBuffer = _protocol._createBuffer();
+    var headerBuffer = _createBuffer();
     headerBuffer.writeFixedLengthInteger(buffer.length, 3);
     headerBuffer.writeOneLengthInteger(sequenceId);
 
-    _protocol._writeBuffer(headerBuffer);
-    _protocol._writeBuffer(buffer);
+    _writeBuffer(headerBuffer);
+    _writeBuffer(buffer);
   }
 
   Future<Packet> _readCommandStatementPrepareResponse() {
-    var value = _protocol._readPacketBuffer();
+    var value = _readPacketBuffer();
     var value2 = value is Future
         ? value.then((_) => _readCommandStatementPrepareResponsePacket())
         : _readCommandStatementPrepareResponsePacket();
@@ -227,7 +227,7 @@ class PreparedStatementProtocol extends ProtocolDelegate {
   }
 
   Future<Packet> _readCommandStatementExecuteResponse() {
-    var value = _protocol._readPacketBuffer();
+    var value = _readPacketBuffer();
     var value2 = value is Future
         ? value.then((_) => _readCommandStatementExecuteResponsePacket())
         : _readCommandStatementExecuteResponsePacket();
@@ -235,60 +235,60 @@ class PreparedStatementProtocol extends ProtocolDelegate {
   }
 
   _skipResultSetRowResponse(PreparedQueryResult result) {
-    var value = _protocol._readPacketBuffer();
+    var value = _readPacketBuffer();
     return value is Future
         ? value.then((_) => _skipResultSetRowResponsePacket(result))
         : _skipResultSetRowResponsePacket(result);
   }
 
   _readResultSetRowResponse(PreparedQueryResult result) {
-    var value = _protocol._readPacketBuffer();
+    var value = _readPacketBuffer();
     return value is Future
         ? value.then((_) => _readResultSetRowResponsePacket(result))
         : _readResultSetRowResponsePacket(result);
   }
 
   Packet _readCommandStatementPrepareResponsePacket() {
-    if (_protocol._isErrorPacket()) {
-      return _protocol._readErrorPacket();
+    if (_isErrorPacket()) {
+      return _readErrorPacket();
     } else {
       return _readCommandStatementPrepareOkResponsePacket();
     }
   }
 
   Packet _readCommandStatementExecuteResponsePacket() {
-    if (_protocol._isOkPacket()) {
-      return _protocol._readOkPacket();
-    } else if (_protocol._isErrorPacket()) {
-      return _protocol._readErrorPacket();
+    if (_isOkPacket()) {
+      return _readOkPacket();
+    } else if (_isErrorPacket()) {
+      return _readErrorPacket();
     } else {
       return _readResultSetColumnCountPacket();
     }
   }
 
   Packet _skipResultSetRowResponsePacket(PreparedQueryResult result) {
-    if (_protocol._isErrorPacket()) {
+    if (_isErrorPacket()) {
       _reusableRowPacket.free();
 
-      return _protocol._readErrorPacket();
-    } else if (_protocol._isEOFPacket()) {
+      return _readErrorPacket();
+    } else if (_isEOFPacket()) {
       _reusableRowPacket.free();
 
-      return _protocol._readEOFPacket();
+      return _readEOFPacket();
     } else {
       return _skipResultSetRowPacket(result);
     }
   }
 
   Packet _readResultSetRowResponsePacket(PreparedQueryResult result) {
-    if (_protocol._isErrorPacket()) {
+    if (_isErrorPacket()) {
       _reusableRowPacket.free();
 
-      return _protocol._readErrorPacket();
-    } else if (_protocol._isEOFPacket()) {
+      return _readErrorPacket();
+    } else if (_isEOFPacket()) {
       _reusableRowPacket.free();
 
-      return _protocol._readEOFPacket();
+      return _readEOFPacket();
     } else {
       return _readResultSetRowPacket(result);
     }
@@ -296,109 +296,80 @@ class PreparedStatementProtocol extends ProtocolDelegate {
 
   CommandStatementPrepareOkResponsePacket _readCommandStatementPrepareOkResponsePacket() {
     var packet = new CommandStatementPrepareOkResponsePacket(
-        _protocol._reusablePacketBuffer.sequenceId,
-        _protocol._reusablePacketBuffer.payloadLength);
+        _sequenceId, _payloadLength);
 
     // status (1) -- [00] OK
-    packet._status = _protocol._reusablePacketBuffer.payload
-        .readFixedLengthDataRange(1, _protocol._reusableDataRange)
-        .toInt();
+    packet._status = _readByte();
     // statement_id (4) -- statement-id
-    packet._statementId = _protocol._reusablePacketBuffer.payload
-        .readFixedLengthDataRange(4, _protocol._reusableDataRange)
-        .toInt();
+    packet._statementId = _readFixedLengthInteger(4);
     // num_columns (2) -- number of columns
-    packet._numColumns = _protocol._reusablePacketBuffer.payload
-        .readFixedLengthDataRange(2, _protocol._reusableDataRange)
-        .toInt();
+    packet._numColumns = _readFixedLengthInteger(2);
     // num_params (2) -- number of params
-    packet._numParams = _protocol._reusablePacketBuffer.payload
-        .readFixedLengthDataRange(2, _protocol._reusableDataRange)
-        .toInt();
+    packet._numParams = _readFixedLengthInteger(2);
     // reserved_1 (1) -- [00] filler
-    _protocol._reusablePacketBuffer.payload
-        .readFixedLengthDataRange(1, _protocol._reusableDataRange);
+    _skipByte();
     // warning_count (2) -- number of warnings
-    packet._warningCount = _protocol._reusablePacketBuffer.payload
-        .readFixedLengthDataRange(2, _protocol._reusableDataRange)
-        .toInt();
+    packet._warningCount = _readFixedLengthInteger(2);
 
-    _protocol._reusablePacketBuffer.free();
-    _protocol._reusableDataRange.free();
+    _freeReusables();
 
     return packet;
   }
 
   ResultSetColumnCountPacket _readResultSetColumnCountPacket() {
-    var packet = new ResultSetColumnCountPacket(
-        _protocol._reusablePacketBuffer.sequenceId,
-        _protocol._reusablePacketBuffer.payloadLength);
+    var packet = new ResultSetColumnCountPacket(_sequenceId, _payloadLength);
 
     // A packet containing a Protocol::LengthEncodedInteger column_count
-    packet._columnCount = _protocol._reusablePacketBuffer.payload
-        .readFixedLengthDataRange(1, _protocol._reusableDataRange)
-        .toInt();
+    packet._columnCount = _readByte();
 
-    _protocol._reusablePacketBuffer.free();
-    _protocol._reusableDataRange.free();
+    _freeReusables();
 
     _reusableRowPacket =
-        new PreparedResultSetRowPacket.reusable(packet._columnCount);
+        new PreparedResultSetRowPacket.reusable(_protocol, packet._columnCount);
 
     return packet;
   }
 
   PreparedResultSetRowPacket _skipResultSetRowPacket(
       PreparedQueryResult result) {
-    var packet = _reusableRowPacket.reuse(
-        _protocol._reusablePacketBuffer.sequenceId,
-        _protocol._reusablePacketBuffer.payloadLength);
+    var packet = _reusableRowPacket.reuse(_sequenceId, _payloadLength);
 
-    _protocol._reusablePacketBuffer.payload
-        .skipBytes(_protocol._reusablePacketBuffer.payloadLength);
+    _skipBytes(_payloadLength);
 
-    _protocol._reusablePacketBuffer.free();
+    _freeReusables();
 
     return packet;
   }
 
   PreparedResultSetRowPacket _readResultSetRowPacket(
       PreparedQueryResult result) {
-    var packet = _reusableRowPacket.reuse(
-        _protocol._reusablePacketBuffer.sequenceId,
-        _protocol._reusablePacketBuffer.payloadLength);
+    var packet = _reusableRowPacket.reuse(_sequenceId, _payloadLength);
 
-    var header = _protocol._reusablePacketBuffer.payload.readOneLengthInteger();
+    var header = _readByte();
 
-    var nullBitmap = _protocol._reusablePacketBuffer.payload
-        .readFixedLengthString((result.columnCount + 7 + 2) ~/ 8)
-        .codeUnits;
+    var nullBitmap =
+        _readFixedLengthString((result.columnCount + 7 + 2) ~/ 8).codeUnits;
 
     for (var i = 0; i < result.columnCount; i++) {
-      var reusableRange = _reusableRowPacket._getDataRange(i);
+      var reusableRange = _reusableRowPacket._getReusableDataRange(i);
 
+      // TODO ottimizzare la verifica null
       if (!_isNullInNullBitmap(nullBitmap, i, 2)) {
         var column = result._statement.columns[i];
         var dataType = _getDataTypeFromSqlType(column.type);
         switch (dataType) {
           case DataType.STRING:
-            _protocol._reusablePacketBuffer.payload.readFixedLengthDataRange(
-                _protocol._reusablePacketBuffer.payload
-                    .readLengthEncodedDataRange(reusableRange)
-                    .toInt(),
-                reusableRange);
+            _readFixedLengthDataRange(
+                _readLengthEncodedInteger(), reusableRange);
             break;
           case DataType.DOUBLE:
-            _protocol._reusablePacketBuffer.payload
-                .readFixedLengthDataRange(8, reusableRange);
+            _readFixedLengthDataRange(8, reusableRange);
             break;
           case DataType.INTEGER_4:
-            _protocol._reusablePacketBuffer.payload
-                .readFixedLengthDataRange(4, reusableRange);
+            _readFixedLengthDataRange(4, reusableRange);
             break;
           case DataType.INTEGER_1:
-            _protocol._reusablePacketBuffer.payload
-                .readFixedLengthDataRange(1, reusableRange);
+            _readFixedLengthDataRange(1, reusableRange);
             break;
           default:
             throw new UnsupportedError("Data type not supported $dataType");
@@ -408,8 +379,7 @@ class PreparedStatementProtocol extends ProtocolDelegate {
       }
     }
 
-    _protocol._reusablePacketBuffer.free();
-    _protocol._reusableDataRange.free();
+    _freeReusables();
 
     return packet;
   }
@@ -662,10 +632,10 @@ class PreparedQueryRowIterator extends PacketIterator {
       case MYSQL_TYPE_LONG:
       case MYSQL_TYPE_LONGLONG:
         return _result._statement._protocol._preparedStatementProtocol
-            ._reusableRowPacket._getInt(index);
+            ._reusableRowPacket._getInteger(index);
       case MYSQL_TYPE_DOUBLE:
         return _result._statement._protocol._preparedStatementProtocol
-            ._reusableRowPacket._getDataRange(index).toDouble();
+            ._reusableRowPacket._getDouble(index);
       default:
         throw new UnsupportedError("Sql type not supported ${column.type}");
     }
@@ -709,8 +679,8 @@ class CommandStatementPrepareOkResponsePacket extends Packet {
 }
 
 class PreparedResultSetRowPacket extends ReusablePacket {
-  PreparedResultSetRowPacket.reusable(int columnCount)
-      : super.reusable(columnCount);
+  PreparedResultSetRowPacket.reusable(Protocol protocol, int columnCount)
+      : super.reusable(protocol, columnCount);
 
   PreparedResultSetRowPacket reuse(int payloadLength, int sequenceId) =>
       _reuse(payloadLength, sequenceId);

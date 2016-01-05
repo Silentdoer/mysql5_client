@@ -79,7 +79,12 @@ class DataRange {
   }
 
   bool get isPending => _isPending;
+  List<int> get data => _data;
+  int get start => _start;
   int get length => _length;
+  int get end => _start + _length;
+  bool get isByte => _data == null;
+  int get byteValue => _length;
 
   void addExtraRange(DataRange extraRange) {
     if (_extraRanges == null) {
@@ -90,89 +95,11 @@ class DataRange {
     _mergeLength += extraRange._length;
   }
 
-  int toInt() {
-    if (_data == null) {
-      return _length;
-    }
-
-    _mergeExtraRanges();
-
-    var i = _start;
-    switch (_length) {
-      case 1:
-        return _data[i++];
-      case 2:
-        return _data[i++] | _data[i++] << 8;
-      case 3:
-        return _data[i++] | _data[i++] << 8 | _data[i++] << 16;
-      case 4:
-        return _data[i++] |
-            _data[i++] << 8 |
-            _data[i++] << 16 |
-            _data[i++] << 24;
-      case 5:
-        return _data[i++] |
-            _data[i++] << 8 |
-            _data[i++] << 16 |
-            _data[i++] << 24 |
-            _data[i++] << 32;
-      case 6:
-        return _data[i++] |
-            _data[i++] << 8 |
-            _data[i++] << 16 |
-            _data[i++] << 24 |
-            _data[i++] << 32 |
-            _data[i++] << 40;
-      case 7:
-        return _data[i++] |
-            _data[i++] << 8 |
-            _data[i++] << 16 |
-            _data[i++] << 24 |
-            _data[i++] << 32 |
-            _data[i++] << 40 |
-            _data[i++] << 48;
-      case 8:
-        return _data[i++] |
-            _data[i++] << 8 |
-            _data[i++] << 16 |
-            _data[i++] << 24 |
-            _data[i++] << 32 |
-            _data[i++] << 40 |
-            _data[i++] << 48 |
-            _data[i++] << 56;
-    }
-
-    throw new UnsupportedError("${_data.length} length");
-  }
-
-  String toString() {
+  DataRange mergeExtras() {
     if (_data != null) {
       _mergeExtraRanges();
 
-      return new String.fromCharCodes(_data, _start, _start + _length);
-    } else {
-      return null;
-    }
-  }
-
-  String toUTF8String() {
-    if (_data != null) {
-      _mergeExtraRanges();
-
-      return UTF8.decoder.convert(_data, _start, _start + _length);
-    } else {
-      return null;
-    }
-  }
-
-  double toDouble() {
-    if (_data != null) {
-      _mergeExtraRanges();
-
-      // TODO verificare se esistono conversioni più snelle
-      return new Uint8List.fromList(_data.sublist(_start, _start + _length))
-          .buffer
-          .asFloat64List()[0];
+      return this;
     } else {
       return null;
     }

@@ -5,14 +5,17 @@ import "package:mysql_client/src/reader_buffer.dart";
 class PacketBuffer {
   int _sequenceId;
 
+  int _header;
+
   ReaderBuffer _payload;
 
-  PacketBuffer(this._sequenceId, this._payload);
+  PacketBuffer(this._sequenceId, this._header, this._payload);
 
   PacketBuffer.reusable();
 
-  PacketBuffer reuse(int sequenceId, ReaderBuffer payload) {
+  PacketBuffer reuse(int sequenceId, int header, ReaderBuffer payload) {
     _sequenceId = sequenceId;
+    _header = header;
     _payload = payload;
 
     return this;
@@ -27,7 +30,7 @@ class PacketBuffer {
 
   ReaderBuffer get payload => _payload;
 
-  int get header => _payload.checkOneLengthInteger();
+  int get header => _header;
 
   int get payloadLength => _payload.payloadLength;
 }

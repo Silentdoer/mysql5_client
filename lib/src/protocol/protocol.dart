@@ -11,6 +11,19 @@ const int CLIENT_SESSION_TRACK = 0x00800000;
 
 const int SERVER_SESSION_STATE_CHANGED = 0x4000;
 
+const int NULL_TERMINATOR = 0x00;
+
+const int PREFIX_NULL = 0xfb;
+const int PREFIX_UNDEFINED = 0xff;
+const int PREFIX_INT_2 = 0xfc;
+const int PREFIX_INT_3 = 0xfd;
+const int PREFIX_INT_8 = 0xfe;
+
+const int MAX_INT_1 = 0xfb;
+const int MAX_INT_2 = 2 << (2 * 8 - 1);
+const int MAX_INT_3 = 2 << (3 * 8 - 1);
+const int MAX_INT_8 = 2 << (8 * 8 - 1);
+
 class NullError extends Error {
   String toString() => "Null value";
 }
@@ -96,6 +109,63 @@ abstract class ProtocolDelegate {
   DataRange _readLengthEncodedDataRange(DataRange reusable) =>
       _protocol._readLengthEncodedDataRange(reusable);
 
+  WriterBuffer _createBuffer() => _protocol._createBuffer();
+
+  void _writeBuffer(WriterBuffer buffer, WriterBuffer value) {
+    _protocol._writeBuffer(buffer, value);
+  }
+
+  void _writePacket(int sequenceId, WriterBuffer payloadBuffer) {
+    _protocol._writePacket(sequenceId, payloadBuffer);
+  }
+
+  void _writeByte(WriterBuffer buffer, int value) {
+    _protocol._writeByte(buffer, value);
+  }
+
+  void _writeBytes(WriterBuffer buffer, List<int> value) {
+    _protocol._writeBytes(buffer, value);
+  }
+
+  void _writeFixedLengthInteger(WriterBuffer buffer, int value, int length) {
+    _protocol._writeFixedLengthInteger(buffer, value, length);
+  }
+
+  void _writeLengthEncodedInteger(WriterBuffer buffer, int value) {
+    _protocol._writeLengthEncodedInteger(buffer, value);
+  }
+
+  void _writeFixedLengthString(WriterBuffer buffer, String value,
+      [int length]) {
+    _protocol._writeFixedLengthString(buffer, value, length);
+  }
+
+  void _writeFixedLengthUTF8String(WriterBuffer buffer, String value,
+      [int length]) {
+    _protocol._writeFixedLengthUTF8String(buffer, value, length);
+  }
+
+  void _writeFixedFilledLengthString(
+      WriterBuffer buffer, int fillValue, int length) {
+    _protocol._writeFixedFilledLengthString(buffer, fillValue, length);
+  }
+
+  void _writeLengthEncodedString(WriterBuffer buffer, String value) {
+    _protocol._writeLengthEncodedString(buffer, value);
+  }
+
+  void _writeLengthEncodedUTF8String(WriterBuffer buffer, String value) {
+    _protocol._writeLengthEncodedUTF8String(buffer, value);
+  }
+
+  void _writeNulTerminatedString(WriterBuffer buffer, String value) {
+    _protocol._writeNulTerminatedString(buffer, value);
+  }
+
+  void _writeNulTerminatedUTF8String(WriterBuffer buffer, String value) {
+    _protocol._writeNulTerminatedUTF8String(buffer, value);
+  }
+
   _readPacketBuffer() => _protocol._readPacketBuffer();
 
   bool _isOkPacket() => _protocol._isOkPacket();
@@ -109,12 +179,6 @@ abstract class ProtocolDelegate {
   EOFPacket _readEOFPacket() => _protocol._readEOFPacket();
 
   ErrorPacket _readErrorPacket() => _protocol._readErrorPacket();
-
-  WriterBuffer _createBuffer() => _protocol._createBuffer();
-
-  void _writeBuffer(WriterBuffer buffer) {
-    _protocol._writeBuffer(buffer);
-  }
 }
 
 class Protocol {
@@ -168,10 +232,6 @@ class Protocol {
   bool get _isAllRead => __reusablePacketBuffer.payload.isNotDataLeft;
 
   int get _header => __reusablePacketBuffer.header;
-
-  WriterBuffer _createBuffer() => __writer.createBuffer();
-
-  void _writeBuffer(WriterBuffer buffer) => __writer.writeBuffer(buffer);
 
   _readPacketBuffer() {
     var value = __reader.readBuffer(4);
@@ -443,6 +503,113 @@ class Protocol {
     }
     return __reusablePacketBuffer.payload
         .readFixedLengthDataRange(bytesLength - 1, reusableRange);
+  }
+
+  WriterBuffer _createBuffer() => __writer.createBuffer();
+
+  void _writeBuffer(WriterBuffer buffer, WriterBuffer value) {
+    buffer.writeBuffer(value);
+  }
+
+  void _writePacket(int sequenceId, WriterBuffer payloadBuffer) {
+    var headerBuffer = _createBuffer();
+    _writeFixedLengthInteger(headerBuffer, payloadBuffer.length, 3);
+    _writeByte(headerBuffer, sequenceId);
+
+    __writer.writeBuffer(headerBuffer);
+    __writer.writeBuffer(payloadBuffer);
+  }
+
+  void _writeByte(WriterBuffer buffer, int value) {
+    buffer.writeByte(value);
+  }
+
+  // TODO verificare se possibile eliminarlo
+  void _writeBytes(WriterBuffer buffer, List<int> value) {
+    buffer.writeBytes(value);
+  }
+
+  void _writeFixedLengthInteger(WriterBuffer buffer, int value, int length) {
+    for (var i = 0, rotation = 0, mask = 0xff;
+        i < length;
+        i++, rotation += 8, mask <<= 8) {
+      buffer.writeByte((value & mask) >> rotation);
+    }
+  }
+
+  void _writeLengthEncodedInteger(WriterBuffer buffer, int value) {
+    if (value < MAX_INT_1) {
+      buffer.writeByte(value);
+    } else {
+      var bytesLength;
+      if (value < MAX_INT_2) {
+        bytesLength = 2;
+        buffer.writeByte(PREFIX_INT_2);
+      } else if (value < MAX_INT_3) {
+        bytesLength = 3;
+        buffer.writeByte(PREFIX_INT_3);
+      } else if (value < MAX_INT_8) {
+        bytesLength = 8;
+        buffer.writeByte(PREFIX_INT_8);
+      } else {
+        throw new UnsupportedError("Undefined value");
+      }
+
+      _writeFixedLengthInteger(buffer, value, bytesLength);
+    }
+  }
+
+  void _writeFixedLengthString(WriterBuffer buffer, String value,
+      [int length]) {
+    int start = buffer.length;
+
+    buffer.writeBytes(value.codeUnits);
+
+    if (length != null && buffer.length - start != length) {
+      throw new ArgumentError("${buffer.length - start} != $length");
+    }
+  }
+
+  void _writeFixedLengthUTF8String(WriterBuffer buffer, String value,
+      [int length]) {
+    int start = buffer.length;
+
+    buffer.writeBytes(UTF8.encoder.convert(value));
+
+    if (length != null && buffer.length - start != length) {
+      throw new ArgumentError("${buffer.length - start} != $length");
+    }
+  }
+
+  void _writeFixedFilledLengthString(
+      WriterBuffer buffer, int fillValue, int length) {
+    buffer.writeBytes(new List.filled(length, fillValue));
+  }
+
+  void _writeLengthEncodedString(WriterBuffer buffer, String value) {
+    _writeLengthEncodedInteger(buffer, value.length);
+
+    buffer.writeBytes(value.codeUnits);
+  }
+
+  void _writeLengthEncodedUTF8String(WriterBuffer buffer, String value) {
+    var encoded = UTF8.encoder.convert(value);
+
+    _writeLengthEncodedInteger(buffer, encoded.length);
+
+    buffer.writeBytes(encoded);
+  }
+
+  void _writeNulTerminatedString(WriterBuffer buffer, String value) {
+    buffer.writeBytes(value.codeUnits);
+
+    buffer.writeByte(NULL_TERMINATOR);
+  }
+
+  void _writeNulTerminatedUTF8String(WriterBuffer buffer, String value) {
+    buffer.writeBytes(UTF8.encoder.convert(value));
+
+    buffer.writeByte(NULL_TERMINATOR);
   }
 
   __readPacketBufferPayload(ReaderBuffer headerReaderBuffer) {

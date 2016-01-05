@@ -8,7 +8,6 @@ import 'dart:typed_data';
 
 import "package:crypto/crypto.dart";
 
-import 'package:mysql_client/src/data_commons.dart';
 import 'package:mysql_client/src/data_range.dart';
 import "package:mysql_client/src/reader_buffer.dart";
 import "package:mysql_client/src/packet_buffer.dart";

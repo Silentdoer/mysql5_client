@@ -30,7 +30,7 @@ class QueryCommandTextProtocol extends ProtocolDelegate {
     super.freeReusables();
 
     _reusableColumnPacket._free();
-    _reusableRowPacket._free();
+    _reusableRowPacket?._free();
   }
 
   void writeCommandQueryPacket(String query) {
@@ -39,16 +39,11 @@ class QueryCommandTextProtocol extends ProtocolDelegate {
     var sequenceId = 0x00;
 
     // 1              [03] COM_QUERY
-    buffer.writeFixedLengthInteger(COM_QUERY, 1);
+    _writeFixedLengthInteger(buffer, COM_QUERY, 1);
     // string[EOF]    the query the server shall execute
-    buffer.writeFixedLengthUTF8String(query);
+    _writeFixedLengthUTF8String(buffer, query);
 
-    var headerBuffer = _createBuffer();
-    headerBuffer.writeFixedLengthInteger(buffer.length, 3);
-    headerBuffer.writeOneLengthInteger(sequenceId);
-
-    _writeBuffer(headerBuffer);
-    _writeBuffer(buffer);
+    _writePacket(sequenceId, buffer);
   }
 
   Future<Packet> readCommandQueryResponse() {

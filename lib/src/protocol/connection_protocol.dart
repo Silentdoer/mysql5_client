@@ -3,7 +3,7 @@ part of mysql_client.protocol;
 class ConnectionProtocol extends ProtocolDelegate {
   var _characterSet = 0x21; // corrisponde a utf8_general_ci
   var _maxPacketSize = (2 << (24 - 1)) - 1;
-  var _clientConnectAttributes = {};
+  var _clientConnectAttributes = {"prova": "ciao"};
 
   ConnectionProtocol(Protocol protocol) : super(protocol) {
     _clientCapabilityFlags = _protocol
@@ -27,23 +27,24 @@ class ConnectionProtocol extends ProtocolDelegate {
         0x01; // penso dipenda dalla sequenza a cui era arrivato il server
 
     // 4              capability flags, CLIENT_PROTOCOL_41 always set
-    buffer.writeFixedLengthInteger(_clientCapabilityFlags, 4);
+    _writeFixedLengthInteger(buffer, _clientCapabilityFlags, 4);
     // 4              max-packet size
-    buffer.writeFixedLengthInteger(_maxPacketSize, 4);
+    _writeFixedLengthInteger(buffer, _maxPacketSize, 4);
     // 1              character set
-    buffer.writeFixedLengthInteger(_characterSet, 1);
+    _writeByte(buffer, _characterSet);
     // string[23]     reserved (all [0])
-    buffer.writeFixedFilledLengthString(0x00, 23);
+    _writeFixedFilledLengthString(buffer, 0x00, 23);
     // string[NUL]    username
-    buffer.writeNulTerminatedUTF8String(userName);
+    _writeNulTerminatedUTF8String(buffer, userName);
 
     // if capabilities & CLIENT_PLUGIN_AUTH_LENENC_CLIENT_DATA {
     if (_serverCapabilityFlags & CLIENT_PLUGIN_AUTH_LENENC_CLIENT_DATA != 0) {
       // lenenc-int     length of auth-response
       // string[n]      auth-response
-      buffer.writeLengthEncodedString(_generateAuthResponse(
-          password, authPluginData, authPluginName,
-          utf8Encoded: true));
+      _writeLengthEncodedString(
+          buffer,
+          _generateAuthResponse(password, authPluginData, authPluginName,
+              utf8Encoded: true));
       // else if capabilities & CLIENT_SECURE_CONNECTION {
     } else if (_serverCapabilityFlags & CLIENT_SECURE_CONNECTION != 0) {
       // 1              length of auth-response
@@ -59,12 +60,12 @@ class ConnectionProtocol extends ProtocolDelegate {
     // if capabilities & CLIENT_CONNECT_WITH_DB {
     if (_clientCapabilityFlags & CLIENT_CONNECT_WITH_DB != 0) {
       // string[NUL]    database
-      buffer.writeNulTerminatedUTF8String(database);
+      _writeNulTerminatedUTF8String(buffer, database);
     }
     // if capabilities & CLIENT_PLUGIN_AUTH {
     if (_serverCapabilityFlags & CLIENT_PLUGIN_AUTH != 0) {
       // string[NUL]    auth plugin name
-      buffer.writeNulTerminatedUTF8String(authPluginName);
+      _writeNulTerminatedUTF8String(buffer, authPluginName);
     }
     // if capabilities & CLIENT_CONNECT_ATTRS {
     if (_serverCapabilityFlags & CLIENT_CONNECT_ATTRS != 0) {
@@ -74,19 +75,14 @@ class ConnectionProtocol extends ProtocolDelegate {
       // if-more data in 'length of all key-values', more keys and value pairs
       var valuesBuffer = _createBuffer();
       _clientConnectAttributes.forEach((key, value) {
-        valuesBuffer.writeLengthEncodedString(key);
-        valuesBuffer.writeLengthEncodedString(value);
+        _writeLengthEncodedString(valuesBuffer, key);
+        _writeLengthEncodedString(valuesBuffer, value);
       });
-      buffer.writeLengthEncodedInteger(valuesBuffer.length);
-      buffer.writeBuffer(valuesBuffer);
+      _writeLengthEncodedInteger(buffer, valuesBuffer.length);
+      _writeBuffer(buffer, valuesBuffer);
     }
 
-    var headerBuffer = _createBuffer();
-    headerBuffer.writeFixedLengthInteger(buffer.length, 3);
-    headerBuffer.writeOneLengthInteger(sequenceId);
-
-    _writeBuffer(headerBuffer);
-    _writeBuffer(buffer);
+    _writePacket(sequenceId, buffer);
   }
 
   Future<Packet> readInitialHandshakeResponse() {

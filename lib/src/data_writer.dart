@@ -13,7 +13,7 @@ class DataWriter {
 
   DataWriter(this._sink);
 
-  WriterBuffer createBuffer() => new WriterBufferImpl();
+  WriterBuffer createBuffer() => new WriterBuffer();
 
   void writeBuffer(WriterBuffer buffer) {
     buffer.addToSink(_sink);

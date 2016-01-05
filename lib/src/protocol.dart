@@ -8,12 +8,12 @@ import 'dart:typed_data';
 
 import "package:crypto/crypto.dart";
 
-import 'package:mysql_client/src/data_range.dart';
-import "package:mysql_client/src/reader_buffer.dart";
-import "package:mysql_client/src/packet_buffer.dart";
-import 'package:mysql_client/src/data_reader.dart';
-import 'package:mysql_client/src/data_writer.dart';
+import 'package:mysql_client/src/reader/data_range.dart';
+import "package:mysql_client/src/reader/reader_buffer.dart";
+import 'package:mysql_client/src/reader/data_reader.dart';
+import 'package:mysql_client/src/writer/data_writer.dart';
 
+part "protocol/packet_buffer.dart";
 part "protocol/protocol.dart";
 part "protocol/connection_protocol.dart";
 part "protocol/text_protocol.dart";

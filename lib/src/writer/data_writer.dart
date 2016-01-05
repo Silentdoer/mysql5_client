@@ -5,8 +5,8 @@ library mysql_client.data_writer;
 
 import "dart:io";
 
-import "package:mysql_client/src/writer_buffer.dart";
-export "package:mysql_client/src/writer_buffer.dart" show WriterBuffer;
+import "package:mysql_client/src/writer/writer_buffer.dart";
+export "package:mysql_client/src/writer/writer_buffer.dart" show WriterBuffer;
 
 class DataWriter {
   final IOSink _sink;

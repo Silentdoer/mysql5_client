@@ -185,7 +185,7 @@ class Protocol {
   int _serverCapabilityFlags;
   int _clientCapabilityFlags;
 
-  final PacketBuffer __reusablePacketBuffer = new PacketBuffer.reusable();
+  final _PacketBuffer __reusablePacketBuffer = new _PacketBuffer.reusable();
   final DataRange __reusableDataRange = new DataRange.reusable();
 
   DataWriter __writer;
@@ -524,7 +524,6 @@ class Protocol {
     buffer.writeByte(value);
   }
 
-  // TODO verificare se possibile eliminarlo
   void _writeBytes(WriterBuffer buffer, List<int> value) {
     buffer.writeBytes(value);
   }

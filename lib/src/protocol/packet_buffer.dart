@@ -1,21 +1,19 @@
-library mysql_client.packet_buffer;
+part of mysql_client.protocol;
 
-import "package:mysql_client/src/reader_buffer.dart";
-
-class PacketBuffer {
+class _PacketBuffer {
   int _sequenceId;
 
   int _header;
 
   ReaderBuffer _payload;
 
-  PacketBuffer(int sequenceId, int header, ReaderBuffer payload) {
+  _PacketBuffer(int sequenceId, int header, ReaderBuffer payload) {
     reuse(sequenceId, header, payload);
   }
 
-  PacketBuffer.reusable();
+  _PacketBuffer.reusable();
 
-  PacketBuffer reuse(int sequenceId, int header, ReaderBuffer payload) {
+  _PacketBuffer reuse(int sequenceId, int header, ReaderBuffer payload) {
     _sequenceId = sequenceId;
     _header = header;
     _payload = payload;

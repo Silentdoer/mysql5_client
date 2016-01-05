@@ -36,10 +36,6 @@ abstract class ProtocolDelegate {
 
   int get _serverCapabilityFlags => _protocol._serverCapabilityFlags;
 
-  void set _serverCapabilityFlags(int serverCapabilityFlags) {
-    _protocol._serverCapabilityFlags = serverCapabilityFlags;
-  }
-
   int get _sequenceId => _protocol._sequenceId;
 
   int get _payloadLength => _protocol._payloadLength;
@@ -98,8 +94,6 @@ abstract class ProtocolDelegate {
 
   _readPacketBuffer() => _protocol._readPacketBuffer();
 
-  Future<Packet> _readCommandResponse() => _protocol._readCommandResponse();
-
   bool _isOkPacket() => _protocol._isOkPacket();
 
   bool _isEOFPacket() => _protocol._isEOFPacket();
@@ -155,6 +149,10 @@ class Protocol {
   PreparedStatementProtocol get preparedStatementProtocol =>
       _preparedStatementProtocol;
 
+  void set serverCapabilityFlags(int serverCapabilityFlags) {
+    _serverCapabilityFlags = serverCapabilityFlags;
+  }
+
   WriterBuffer _createBuffer() => _writer.createBuffer();
 
   void _writeBuffer(WriterBuffer buffer) => _writer.writeBuffer(buffer);
@@ -187,7 +185,7 @@ class Protocol {
     }
   }
 
-  Future<Packet> _readCommandResponse() {
+  Future<Packet> readCommandResponse() {
     var value = _readPacketBuffer();
     var value2 = value is Future
         ? value.then((_) => __readCommandResponsePacket())

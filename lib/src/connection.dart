@@ -5,6 +5,14 @@ import "dart:io";
 
 import "package:mysql_client/src/protocol.dart";
 
+class ConnectionError extends Error {
+  final String message;
+
+  ConnectionError(this.message);
+
+  String toString() => "ConnectionError: $message";
+}
+
 class SqlError extends Error {}
 
 abstract class Connection {
@@ -42,8 +50,23 @@ class ConnectionImpl implements Connection {
 
     var protocol = new Protocol(socket);
 
-    await protocol.connectionProtocol
-        .connect(host, port, userName, password, database);
+    var response =
+        await protocol.connectionProtocol.readInitialHandshakeResponse();
+
+    if (response is! InitialHandshakePacket) {
+      throw new ConnectionError(response.errorMessage);
+    }
+
+    protocol.serverCapabilityFlags = response.serverCapabilityFlags;
+
+    protocol.connectionProtocol.writeHandshakeResponsePacket(userName, password,
+        database, response.authPluginData, response.authPluginName);
+
+    response = await protocol.readCommandResponse();
+
+    if (response is ErrorPacket) {
+      throw new ConnectionError(response.errorMessage);
+    }
 
     _socket = socket;
     _protocol = protocol;

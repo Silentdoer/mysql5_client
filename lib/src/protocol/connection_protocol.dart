@@ -1,13 +1,5 @@
 part of mysql_client.protocol;
 
-class ConnectionError extends Error {
-  final String message;
-
-  ConnectionError(this.message);
-
-  String toString() => "ConnectionError: $message";
-}
-
 class ConnectionProtocol extends ProtocolDelegate {
   var _characterSet = 0x21; // corrisponde a utf8_general_ci
   var _maxPacketSize = (2 << (24 - 1)) - 1;
@@ -18,29 +10,7 @@ class ConnectionProtocol extends ProtocolDelegate {
         ._decodeFixedLengthInteger([0x0d, 0xa2, 0x00, 0x00]); // TODO sistemare
   }
 
-  Future<ConnectionResult> connect(
-      host, int port, String userName, String password, String database) async {
-    var response = await _readInitialHandshakeResponse();
-
-    if (response is! InitialHandshakePacket) {
-      throw new ConnectionError(response.errorMessage);
-    }
-
-    _serverCapabilityFlags = response.serverCapabilityFlags;
-
-    _writeHandshakeResponsePacket(userName, password, database,
-        response.authPluginData, response.authPluginName);
-
-    response = await _readCommandResponse();
-
-    if (response is ErrorPacket) {
-      throw new ConnectionError(response.errorMessage);
-    }
-
-    return new ConnectionResult(_serverCapabilityFlags, _clientCapabilityFlags);
-  }
-
-  void _writeHandshakeResponsePacket(String userName, String password,
+  void writeHandshakeResponsePacket(String userName, String password,
       String database, String authPluginData, String authPluginName) {
     WriterBuffer buffer = _createBuffer();
 
@@ -119,7 +89,7 @@ class ConnectionProtocol extends ProtocolDelegate {
     _writeBuffer(buffer);
   }
 
-  Future<Packet> _readInitialHandshakeResponse() {
+  Future<Packet> readInitialHandshakeResponse() {
     var value = _readPacketBuffer();
     var value2 = value is Future
         ? value.then((_) => _readInitialHandshakeResponsePacket())
@@ -258,11 +228,4 @@ class InitialHandshakePacket extends Packet {
   String get authPluginDataPart2 => _authPluginDataPart2;
   String get authPluginData => _authPluginData;
   String get authPluginName => _authPluginName;
-}
-
-class ConnectionResult {
-  final int serverCapabilityFlags;
-  final int clientCapabilityFlags;
-
-  ConnectionResult(this.serverCapabilityFlags, this.clientCapabilityFlags);
 }

@@ -33,6 +33,25 @@ class PreparedStatementProtocol extends ProtocolDelegate {
     _reusableRowPacket?._free();
   }
 
+  int getSqlTypeFromValue(value) {
+    if (value == null) {
+      return null;
+    } else if (value is String) {
+      return MYSQL_TYPE_VAR_STRING;
+    } else if (value is int) {
+      return MYSQL_TYPE_LONGLONG;
+    } else if (value is double) {
+      return MYSQL_TYPE_DOUBLE;
+    } else if (value is bool) {
+      return MYSQL_TYPE_TINY;
+    } else if (value is DateTime) {
+      return MYSQL_TYPE_DATETIME;
+    } else {
+      throw new UnsupportedError(
+          "Value type not supported ${value.runtimeType}");
+    }
+  }
+
   void writeCommandStatementPreparePacket(String query) {
     _createWriterBuffer();
 
@@ -250,14 +269,17 @@ class PreparedStatementProtocol extends ProtocolDelegate {
     // header
     _skipByte();
 
+    var offset = 2;
     var nullBitmap =
-        _readFixedLengthString((columnTypes.length + 7 + 2) ~/ 8).codeUnits;
+        _readFixedLengthString((columnTypes.length + 7 + offset) ~/ 8)
+            .codeUnits;
 
+    var l = offset ~/ 8;
+    var n = offset % 8;
+    var mask = 1 << n;
     for (var i = 0; i < columnTypes.length; i++) {
       var reusableRange = _reusableRowPacket._getReusableDataRange(i);
-
-      // TODO ottimizzare la verifica null
-      if (!_isNullInNullBitmap(nullBitmap, i, 2)) {
+      if ((nullBitmap[l] & mask) == 0) {
         var dataType = _getDataTypeFromSqlType(columnTypes[i]);
         switch (dataType) {
           case DataType.STRING:
@@ -279,28 +301,18 @@ class PreparedStatementProtocol extends ProtocolDelegate {
       } else {
         reusableRange.reuseNil();
       }
+
+      n++;
+      if (n == 8) {
+        l++;
+        n = 0;
+        mask = 1;
+      } else {
+        mask <<= 1;
+      }
     }
 
     return packet;
-  }
-
-  int getSqlTypeFromValue(value) {
-    if (value == null) {
-      return null;
-    } else if (value is String) {
-      return MYSQL_TYPE_VAR_STRING;
-    } else if (value is int) {
-      return MYSQL_TYPE_LONGLONG;
-    } else if (value is double) {
-      return MYSQL_TYPE_DOUBLE;
-    } else if (value is bool) {
-      return MYSQL_TYPE_TINY;
-    } else if (value is DateTime) {
-      return MYSQL_TYPE_DATETIME;
-    } else {
-      throw new UnsupportedError(
-          "Value type not supported ${value.runtimeType}");
-    }
   }
 
   DataType _getDataTypeFromSqlType(int sqlType) {
@@ -351,13 +363,6 @@ class PreparedStatementProtocol extends ProtocolDelegate {
     }
 
     return bitmap;
-  }
-
-  bool _isNullInNullBitmap(List<int> nullBitmap, int index, [int offset = 0]) {
-    var l = (index + offset) ~/ 8;
-    var i = (index + offset) % 8;
-    var mask = 1 << i;
-    return (nullBitmap[l] & mask) != 0;
   }
 }
 

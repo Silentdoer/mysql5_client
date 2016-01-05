@@ -21,12 +21,12 @@ class QueryError extends Error {
   String toString() => "QueryError: $message";
 }
 
-class PrepareStatementError extends Error {
+class PreparedStatementError extends Error {
   final String message;
 
-  PrepareStatementError(this.message);
+  PreparedStatementError(this.message);
 
-  String toString() => "PrepareStatementError: $message";
+  String toString() => "PreparedStatementError: $message";
 }
 
 class Connection {
@@ -97,7 +97,7 @@ class Connection {
       }
 
       List<ColumnDefinition> columns = new List(response.columnCount);
-      var columnIterator = new QueryColumnIterator(columns.length, _protocol);
+      var columnIterator = new _QueryColumnIterator(columns.length, _protocol);
       var hasColumn = true;
       var i = 0;
       while (hasColumn) {
@@ -133,12 +133,12 @@ class Connection {
           .readCommandStatementPrepareResponse();
 
       if (response is! CommandStatementPrepareOkResponsePacket) {
-        throw new PrepareStatementError(response.errorMessage);
+        throw new PreparedStatementError(response.errorMessage);
       }
 
       List<ColumnDefinition> parameters = new List(response.numParams);
       var parameterIterator =
-          new QueryColumnIterator(parameters.length, _protocol);
+          new _QueryColumnIterator(parameters.length, _protocol);
       var hasParameter = true;
       var i = 0;
       while (hasParameter) {
@@ -150,7 +150,7 @@ class Connection {
       }
 
       List<ColumnDefinition> columns = new List(response.numColumns);
-      var columnIterator = new QueryColumnIterator(columns.length, _protocol);
+      var columnIterator = new _QueryColumnIterator(columns.length, _protocol);
       var hasColumn = true;
       var l = 0;
       while (hasColumn) {
@@ -259,14 +259,14 @@ class QueryResult implements ProtocolResult {
   }
 }
 
-class QueryColumnIterator extends ProtocolIterator {
+class _QueryColumnIterator extends ProtocolIterator {
   final int columnCount;
 
   final Protocol _protocol;
 
   bool _isClosed;
 
-  QueryColumnIterator(this.columnCount, this._protocol) {
+  _QueryColumnIterator(this.columnCount, this._protocol) {
     _isClosed = false;
   }
 
@@ -499,7 +499,7 @@ class PreparedStatement implements ProtocolResult {
         return new PreparedQueryResult.ok(
             response.affectedRows, response.lastInsertId);
       } else {
-        var columnIterator = new QueryColumnIterator(columnCount, _protocol);
+        var columnIterator = new _QueryColumnIterator(columnCount, _protocol);
         var hasColumn = true;
         while (hasColumn) {
           hasColumn = await columnIterator._skip();

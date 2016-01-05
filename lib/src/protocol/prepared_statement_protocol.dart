@@ -89,7 +89,6 @@ class PreparedStatementProtocol extends ProtocolDelegate {
             case DataType.DOUBLE:
               // value (string.fix_len) -- (len=8) double
               _writeBytes(_encodeDouble(value));
-              _writeFixedLengthInteger(value ? 1 : 0, 1);
               break;
             case DataType.INTEGER_8:
               // value (8) -- integer

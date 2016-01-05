@@ -88,7 +88,7 @@ class PreparedStatementProtocol extends ProtocolDelegate {
               break;
             case DataType.DOUBLE:
               // value (string.fix_len) -- (len=8) double
-              _writeBytes(_encodeDouble(value));
+              _writeDouble(value);
               break;
             case DataType.INTEGER_8:
               // value (8) -- integer
@@ -328,15 +328,6 @@ class PreparedStatementProtocol extends ProtocolDelegate {
     }
   }
 
-  // TODO verificare se esistono conversioni più snelle
-  List<int> _encodeDouble(double value) =>
-      new Float64List.fromList([value]).buffer.asUint8List();
-
-  // TODO verificare se esistono conversioni più snelle
-/*
-  double _decodeDouble(List<int> data) =>
-      new Uint8List.fromList(data).buffer.asFloat64List()[0];
-*/
   List<int> _encodeNullBitmap(List parameters, [int offset = 0]) {
     //   n              NULL-bitmap, length: (num-params+7)/8
     var bitmap = new List.filled((parameters.length + 7 + offset) ~/ 8, 0);

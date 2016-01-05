@@ -6,10 +6,11 @@ class ConnectionProtocol extends ProtocolDelegate {
   var _clientConnectAttributes = {"prova": "ciao"};
 
   ConnectionProtocol(Protocol protocol) : super(protocol) {
-    _clientCapabilityFlags = _protocol
-        ._decodeFixedLengthInteger([0x0d, 0xa2, 0x00, 0x00]); // TODO sistemare
+    _clientCapabilityFlags =
+        _protocol._decodeInteger([0x0d, 0xa2, 0x00, 0x00]); // TODO sistemare
   }
 
+  // TODO passare clientCapabilityFlags, clientConnectAttributes, characterSet e maxPacketSize come parametri
   void writeHandshakeResponsePacket(String userName, String password,
       String database, String authPluginData, String authPluginName) {
     _createWriterBuffer();
@@ -41,9 +42,9 @@ class ConnectionProtocol extends ProtocolDelegate {
     if (_serverCapabilityFlags & CLIENT_PLUGIN_AUTH_LENENC_CLIENT_DATA != 0) {
       // lenenc-int     length of auth-response
       // string[n]      auth-response
-      _writeLengthEncodedString(
-          _generateAuthResponse(password, authPluginData, authPluginName,
-              utf8Encoded: true));
+      _writeLengthEncodedString(_generateAuthResponse(
+          password, authPluginData, authPluginName,
+          utf8Encoded: true));
       // else if capabilities & CLIENT_SECURE_CONNECTION {
     } else if (_serverCapabilityFlags & CLIENT_SECURE_CONNECTION != 0) {
       // 1              length of auth-response

@@ -83,11 +83,10 @@ abstract class SpeedTest {
       var queryResult = await executeQuery("select * from people");
 
       // rows
-      var rowIterator = await queryResult.rowIterator();
       var hasRow = true;
       while (hasRow) {
-        // var hasRow = await rowIterator.next();
-        hasRow = rowIterator.rawNext();
+        // var hasRow = await queryResult.next();
+        hasRow = queryResult.rawNext();
         hasRow = hasRow is Future ? await hasRow : hasRow;
       }
     }

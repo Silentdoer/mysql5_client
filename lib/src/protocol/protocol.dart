@@ -167,6 +167,10 @@ abstract class ProtocolDelegate {
     _protocol._writeNulTerminatedUTF8String(value);
   }
 
+  void _writeDouble(num value) {
+    _protocol._writeDouble(value);
+  }
+
   _readPacketBuffer() => _protocol._readPacketBuffer();
 
   bool _isOkPacket() => _protocol._isOkPacket();
@@ -308,105 +312,61 @@ class Protocol {
 
     range.mergeExtraRanges();
 
-    var i = range.start;
-    switch (range.length) {
-      case 1:
-        return range.data[i++];
-      case 2:
-        return range.data[i++] | range.data[i++] << 8;
-      case 3:
-        return range.data[i++] | range.data[i++] << 8 | range.data[i++] << 16;
-      case 4:
-        return range.data[i++] |
-            range.data[i++] << 8 |
-            range.data[i++] << 16 |
-            range.data[i++] << 24;
-      case 5:
-        return range.data[i++] |
-            range.data[i++] << 8 |
-            range.data[i++] << 16 |
-            range.data[i++] << 24 |
-            range.data[i++] << 32;
-      case 6:
-        return range.data[i++] |
-            range.data[i++] << 8 |
-            range.data[i++] << 16 |
-            range.data[i++] << 24 |
-            range.data[i++] << 32 |
-            range.data[i++] << 40;
-      case 7:
-        return range.data[i++] |
-            range.data[i++] << 8 |
-            range.data[i++] << 16 |
-            range.data[i++] << 24 |
-            range.data[i++] << 32 |
-            range.data[i++] << 40 |
-            range.data[i++] << 48;
-      case 8:
-        return range.data[i++] |
-            range.data[i++] << 8 |
-            range.data[i++] << 16 |
-            range.data[i++] << 24 |
-            range.data[i++] << 32 |
-            range.data[i++] << 40 |
-            range.data[i++] << 48 |
-            range.data[i++] << 56;
-    }
-
-    throw new UnsupportedError("${range.data.length} length");
+    return _decodeInteger(range.data, range.start, range.length);
   }
 
-  // TODO uniformare con getInteger
-  int _decodeFixedLengthInteger(List<int> data) {
-    switch (data.length) {
+  int _decodeInteger(List<int> data, [int start = 0, int length]) {
+    var i = start;
+    length ??= data.length;
+    switch (length) {
       case 1:
-        return data[0];
+        return data[i++];
       case 2:
-        return data[0] | data[1] << 8;
+        return data[i++] | data[i++] << 8;
       case 3:
-        return data[0] | data[1] << 8 | data[2] << 16;
+        return data[i++] | data[i++] << 8 | data[i++] << 16;
       case 4:
-        return data[0] | data[1] << 8 | data[2] << 16 | data[3] << 24;
+        return data[i++] | data[i++] << 8 | data[i++] << 16 | data[i++] << 24;
       case 5:
-        return data[0] |
-            data[1] << 8 |
-            data[2] << 16 |
-            data[3] << 24 |
-            data[4] << 32;
+        return data[i++] |
+            data[i++] << 8 |
+            data[i++] << 16 |
+            data[i++] << 24 |
+            data[i++] << 32;
       case 6:
-        return data[0] |
-            data[1] << 8 |
-            data[2] << 16 |
-            data[3] << 24 |
-            data[4] << 32 |
-            data[5] << 40;
+        return data[i++] |
+            data[i++] << 8 |
+            data[i++] << 16 |
+            data[i++] << 24 |
+            data[i++] << 32 |
+            data[i++] << 40;
       case 7:
-        return data[0] |
-            data[1] << 8 |
-            data[2] << 16 |
-            data[3] << 24 |
-            data[4] << 32 |
-            data[5] << 40 |
-            data[6] << 48;
+        return data[i++] |
+            data[i++] << 8 |
+            data[i++] << 16 |
+            data[i++] << 24 |
+            data[i++] << 32 |
+            data[i++] << 40 |
+            data[i++] << 48;
       case 8:
-        return data[0] |
-            data[1] << 8 |
-            data[2] << 16 |
-            data[3] << 24 |
-            data[4] << 32 |
-            data[5] << 40 |
-            data[6] << 48 |
-            data[7] << 56;
+        return data[i++] |
+            data[i++] << 8 |
+            data[i++] << 16 |
+            data[i++] << 24 |
+            data[i++] << 32 |
+            data[i++] << 40 |
+            data[i++] << 48 |
+            data[i++] << 56;
     }
 
-    throw new UnsupportedError("${data.length} length");
+    throw new UnsupportedError("${length} length");
   }
 
   double _getDouble(DataRange range) {
     range.mergeExtraRanges();
 
     if (!range.isNil) {
-      // TODO verificare se esistono conversioni più snelle
+      // TODO verificare se esistono conversioni più snelle del double
       return new Uint8List.fromList(range.data.sublist(range.start, range.end))
           .buffer
           .asFloat64List()[0];
@@ -414,6 +374,10 @@ class Protocol {
       return null;
     }
   }
+
+  // TODO verificare se esistono conversioni più snelle del double
+  List<int> _encodeDouble(num value) =>
+      new Float64List.fromList([value.toDouble()]).buffer.asUint8List();
 
   String _getString(DataRange range) {
     range.mergeExtraRanges();
@@ -615,6 +579,10 @@ class Protocol {
     __writerBuffer.addAll(UTF8.encoder.convert(value));
 
     __writerBuffer.add(NULL_TERMINATOR);
+  }
+
+  void _writeDouble(num value) {
+    __writerBuffer.addAll(_encodeDouble(value));
   }
 
   __readPacketBufferPayload(ReaderBuffer headerReaderBuffer) {

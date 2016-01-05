@@ -39,7 +39,6 @@ Future test10() async {
 
     var statement;
     var result;
-    var rowIterator;
 
     // inserimento
 
@@ -89,14 +88,13 @@ Future test10() async {
     """);
 
     // rows
-    rowIterator = await result.rowIterator();
-    while (await rowIterator.next()) {
+    while (await result.next()) {
       print([
-        rowIterator.getNumValue(0),
-        rowIterator.getStringValue(1),
-        rowIterator.getNumValue(2),
-        rowIterator.getNumValue(3),
-        rowIterator.getBoolValue(4)
+        result.getNumValue(0),
+        result.getStringValue(1),
+        result.getNumValue(2),
+        result.getNumValue(3),
+        result.getBoolValue(4)
       ].join(","));
     }
 
@@ -107,14 +105,13 @@ Future test10() async {
     result = await statement.executeQuery();
 
     // rows
-    rowIterator = await result.rowIterator();
-    while (await rowIterator.next()) {
+    while (await result.next()) {
       print([
-        rowIterator.getNumValue(0),
-        rowIterator.getStringValue(1),
-        rowIterator.getNumValue(2),
-        rowIterator.getNumValue(3),
-        rowIterator.getBoolValue(4)
+        result.getNumValue(0),
+        result.getStringValue(1),
+        result.getNumValue(2),
+        result.getNumValue(3),
+        result.getBoolValue(4)
       ].join(","));
     }
   } finally {
@@ -151,15 +148,14 @@ Future test9() async {
     }
 
     // rows
-    var rowSetReader = await queryResult.rowIterator();
     while (true) {
-      var next = await rowSetReader.next();
+      var next = await queryResult.next();
       if (!next) {
         break;
       }
 
       print(
-          "${rowSetReader.getNumValue(0)}: ${rowSetReader.getStringValue(1)}");
+          "${queryResult.getNumValue(0)}: ${queryResult.getStringValue(1)}");
     }
 
     await queryResult.close();
@@ -183,15 +179,14 @@ Future test8() async {
     print(queryResult.columnCount);
 
     // rows
-    var rowSetReader = await queryResult.rowIterator();
     while (true) {
-      var next = await rowSetReader.next();
+      var next = await queryResult.next();
       if (!next) {
         break;
       }
 
       print(
-          "${rowSetReader.getNumValue(0)}: ${rowSetReader.getStringValue(1)}");
+          "${queryResult.getNumValue(0)}: ${queryResult.getStringValue(1)}");
     }
   } catch (e, s) {
     print("Error: $e");
@@ -236,15 +231,14 @@ Future test7() async {
         await connection.executeQuery("SELECT * FROM people WHERE age = 42");
 
     // rows
-    var rowSetReader = await queryResult.rowIterator();
     while (true) {
-      var next = await rowSetReader.next();
+      var next = await queryResult.next();
       if (!next) {
         break;
       }
 
       print(
-          "${rowSetReader.getNumValue(0)}: ${rowSetReader.getStringValue(1)}");
+          "${queryResult.getNumValue(0)}: ${queryResult.getStringValue(1)}");
     }
   } finally {
     await connection.close();
@@ -268,14 +262,13 @@ Future test6() async {
     print(queryResult.columnCount);
 
     // rows
-    var rowSetReader = await queryResult.rowIterator();
     while (true) {
-      var next = await rowSetReader.next();
+      var next = await queryResult.next();
       if (!next) {
         break;
       }
 
-      print(rowSetReader.getNumValue(0));
+      print(queryResult.getNumValue(0));
     }
 
     queryResult = await connection.executeQuery("SELECT * FROM people LIMIT 5");
@@ -283,14 +276,13 @@ Future test6() async {
     print(queryResult.columnCount);
 
     // rows
-    rowSetReader = await queryResult.rowIterator();
     while (true) {
-      var next = await rowSetReader.next();
+      var next = await queryResult.next();
       if (!next) {
         break;
       }
 
-      print(rowSetReader.getNumValue(0));
+      print(queryResult.getNumValue(0));
     }
 
     queryResult = await connection.executeQuery("SELECT * FROM people LIMIT 0");
@@ -316,14 +308,13 @@ Future test5() async {
     print(columnCount);
 
     // rows
-    var rowSetReader = await queryResult.rowIterator();
     while (true) {
-      var next = await rowSetReader.next();
+      var next = await queryResult.next();
       if (!next) {
         break;
       }
 
-      print(rowSetReader.getNumValue(0));
+      print(queryResult.getNumValue(0));
     }
   } catch (e, s) {
     print("Error: $e");

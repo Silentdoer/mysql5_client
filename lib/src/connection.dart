@@ -194,7 +194,7 @@ abstract class ProtocolResult {
 }
 
 abstract class ProtocolIterator {
-  bool isClosed;
+  bool get isClosed;
 
   Future<bool> next();
 
@@ -211,7 +211,7 @@ class ColumnDefinition {
   ColumnDefinition(this.name, this.type);
 }
 
-class QueryResult implements ProtocolResult {
+class QueryResult implements ProtocolResult, ProtocolIterator {
   final Protocol _protocol;
 
   final int affectedRows;
@@ -220,13 +220,13 @@ class QueryResult implements ProtocolResult {
 
   final List<ColumnDefinition> columns;
 
-  QueryRowIterator _rowIterator;
+  _QueryRowIterator _rowIterator;
 
   QueryResult.resultSet(this.columns, Protocol protocol)
       : this.affectedRows = null,
         this.lastInsertId = null,
         this._protocol = protocol {
-    this._rowIterator = new QueryRowIterator(this);
+    this._rowIterator = new _QueryRowIterator(this);
   }
 
   QueryResult.ok(this.affectedRows, this.lastInsertId)
@@ -238,13 +238,15 @@ class QueryResult implements ProtocolResult {
 
   bool get isClosed => _rowIterator == null || _rowIterator.isClosed;
 
-  Future<QueryRowIterator> rowIterator() async {
-    if (isClosed) {
-      throw new StateError("Query result closed");
-    }
+  Future<bool> next() => _rowIterator.next();
 
-    return _rowIterator;
-  }
+  rawNext() => _rowIterator.rawNext();
+
+  String getStringValue(int index) => _rowIterator.getStringValue(index);
+
+  num getNumValue(int index) => _rowIterator.getNumValue(index);
+
+  bool getBoolValue(int index) => _rowIterator.getBoolValue(index);
 
   @override
   Future free() async {
@@ -259,7 +261,156 @@ class QueryResult implements ProtocolResult {
   }
 }
 
-class _QueryColumnIterator extends ProtocolIterator {
+class PreparedStatement implements ProtocolResult {
+  final Protocol _protocol;
+
+  final int _statementId;
+
+  final List<ColumnDefinition> parameters;
+  final List<ColumnDefinition> columns;
+
+  final List<int> _parameterTypes;
+  final List _parameterValues;
+  List<int> _columnTypes;
+
+  bool _isClosed;
+  bool _isNewParamsBoundFlag;
+
+  PreparedStatement(this._statementId, List<ColumnDefinition> parameters,
+      List<ColumnDefinition> columns, Protocol protocol)
+      : this.parameters = parameters,
+        this.columns = columns,
+        this._parameterTypes = new List(parameters.length),
+        this._parameterValues = new List(parameters.length),
+        this._protocol = protocol {
+    _isClosed = false;
+    _isNewParamsBoundFlag = true;
+    _columnTypes = new List.generate(
+        columns.length, (index) => columns[index].type,
+        growable: false);
+  }
+
+  int get parameterCount => parameters.length;
+
+  int get columnCount => columns.length;
+
+  bool get isClosed => _isClosed;
+
+  void setParameter(int index, value, [int sqlType]) {
+    if (index >= parameterCount) {
+      throw new IndexError(index, _parameterValues);
+    }
+
+    sqlType ??= _protocol.preparedStatementProtocol.getSqlTypeFromValue(value);
+
+    if (sqlType != null && _parameterTypes[index] != sqlType) {
+      _parameterTypes[index] = sqlType;
+      _isNewParamsBoundFlag = true;
+    }
+
+    _parameterValues[index] = value;
+  }
+
+  Future<PreparedQueryResult> executeQuery() async {
+    // TODO check dello stato
+
+    try {
+      _protocol.preparedStatementProtocol.writeCommandStatementExecutePacket(
+          _statementId,
+          _parameterValues,
+          _isNewParamsBoundFlag,
+          _parameterTypes);
+
+      var response = await _protocol.preparedStatementProtocol
+          .readCommandStatementExecuteResponse();
+
+      if (response is ErrorPacket) {
+        throw new QueryError(response.errorMessage);
+      }
+
+      _isNewParamsBoundFlag = false;
+
+      if (response is OkPacket) {
+        return new PreparedQueryResult.ok(
+            response.affectedRows, response.lastInsertId);
+      } else {
+        var columnIterator = new _QueryColumnIterator(columnCount, _protocol);
+        var hasColumn = true;
+        while (hasColumn) {
+          hasColumn = await columnIterator._skip();
+        }
+
+        return new PreparedQueryResult.resultSet(this);
+      }
+    } finally {
+      _protocol.preparedStatementProtocol.freeReusables();
+    }
+  }
+
+  @override
+  Future free() async {}
+
+  @override
+  Future close() async {
+    // TODO implementare PreparedStatement.close
+
+    try {
+      _protocol.preparedStatementProtocol
+          .writeCommandStatementClosePacket(_statementId);
+    } finally {
+      _protocol.preparedStatementProtocol.freeReusables();
+    }
+  }
+}
+
+class PreparedQueryResult implements ProtocolResult {
+  final PreparedStatement _statement;
+
+  final int affectedRows;
+
+  final int lastInsertId;
+
+  _PreparedQueryRowIterator _rowIterator;
+
+  PreparedQueryResult.resultSet(PreparedStatement statement)
+      : this._statement = statement,
+        this.affectedRows = null,
+        this.lastInsertId = null {
+    this._rowIterator = new _PreparedQueryRowIterator(this);
+  }
+
+  PreparedQueryResult.ok(this.affectedRows, this.lastInsertId)
+      : this._statement = null,
+        this._rowIterator = null;
+
+  int get columnCount => _statement?.columnCount;
+
+  bool get isClosed => _rowIterator == null || _rowIterator.isClosed;
+
+  Future<bool> next() => _rowIterator.next();
+
+  rawNext() => _rowIterator.rawNext();
+
+  String getStringValue(int index) => _rowIterator.getStringValue(index);
+
+  num getNumValue(int index) => _rowIterator.getNumValue(index);
+
+  bool getBoolValue(int index) => _rowIterator.getBoolValue(index);
+
+  @override
+  Future free() async {
+    await close();
+  }
+
+  @override
+  Future close() async {
+    if (_rowIterator != null && !_rowIterator.isClosed) {
+      await _rowIterator.close();
+    }
+  }
+}
+
+class _QueryColumnIterator implements ProtocolIterator {
   final int columnCount;
 
   final Protocol _protocol;
@@ -350,12 +501,12 @@ class _QueryColumnIterator extends ProtocolIterator {
   }
 }
 
-class QueryRowIterator extends ProtocolIterator {
+class _QueryRowIterator implements ProtocolIterator {
   final QueryResult _result;
 
   bool _isClosed;
 
-  QueryRowIterator(this._result) {
+  _QueryRowIterator(this._result) {
     _isClosed = false;
   }
 
@@ -425,160 +576,12 @@ class QueryRowIterator extends ProtocolIterator {
   }
 }
 
-class PreparedStatement implements ProtocolResult {
-  final Protocol _protocol;
-
-  final int _statementId;
-
-  final List<ColumnDefinition> parameters;
-  final List<ColumnDefinition> columns;
-
-  final List<int> _parameterTypes;
-  final List _parameterValues;
-  List<int> _columnTypes;
-
-  bool _isClosed;
-  bool _isNewParamsBoundFlag;
-
-  PreparedStatement(this._statementId, List<ColumnDefinition> parameters,
-      List<ColumnDefinition> columns, Protocol protocol)
-      : this.parameters = parameters,
-        this.columns = columns,
-        this._parameterTypes = new List(parameters.length),
-        this._parameterValues = new List(parameters.length),
-        this._protocol = protocol {
-    _isClosed = false;
-    _isNewParamsBoundFlag = true;
-    _columnTypes = new List.generate(
-        columns.length, (index) => columns[index].type,
-        growable: false);
-  }
-
-  int get parameterCount => parameters.length;
-
-  int get columnCount => columns.length;
-
-  bool get isClosed => _isClosed;
-
-  void setParameter(int index, value, [int sqlType]) {
-    if (index >= parameterCount) {
-      throw new IndexError(index, _parameterValues);
-    }
-
-    // TODO non mi piace molto questo metodo del protocol
-    sqlType ??= _protocol.preparedStatementProtocol.getSqlTypeFromValue(value);
-
-    if (sqlType != null && _parameterTypes[index] != sqlType) {
-      _parameterTypes[index] = sqlType;
-      _isNewParamsBoundFlag = true;
-    }
-
-    _parameterValues[index] = value;
-  }
-
-  Future<PreparedQueryResult> executeQuery() async {
-    // TODO check dello stato
-
-    try {
-      _protocol.preparedStatementProtocol.writeCommandStatementExecutePacket(
-          _statementId,
-          _parameterValues,
-          _isNewParamsBoundFlag,
-          _parameterTypes);
-
-      var response = await _protocol.preparedStatementProtocol
-          .readCommandStatementExecuteResponse();
-
-      if (response is ErrorPacket) {
-        throw new QueryError(response.errorMessage);
-      }
-
-      _isNewParamsBoundFlag = false;
-
-      if (response is OkPacket) {
-        return new PreparedQueryResult.ok(
-            response.affectedRows, response.lastInsertId);
-      } else {
-        var columnIterator = new _QueryColumnIterator(columnCount, _protocol);
-        var hasColumn = true;
-        while (hasColumn) {
-          hasColumn = await columnIterator._skip();
-        }
-
-        return new PreparedQueryResult.resultSet(this);
-      }
-    } finally {
-      _protocol.preparedStatementProtocol.freeReusables();
-    }
-  }
-
-  @override
-  Future free() async {}
-
-  @override
-  Future close() async {
-    // TODO implementare PreparedStatement.close
-
-    try {
-      _protocol.preparedStatementProtocol
-          .writeCommandStatementClosePacket(_statementId);
-    } finally {
-      _protocol.preparedStatementProtocol.freeReusables();
-    }
-  }
-}
-
-class PreparedQueryResult implements ProtocolResult {
-  final PreparedStatement _statement;
-
-  final int affectedRows;
-
-  final int lastInsertId;
-
-  PreparedQueryRowIterator _rowIterator;
-
-  PreparedQueryResult.resultSet(PreparedStatement statement)
-      : this._statement = statement,
-        this.affectedRows = null,
-        this.lastInsertId = null {
-    this._rowIterator = new PreparedQueryRowIterator(this);
-  }
-
-  PreparedQueryResult.ok(this.affectedRows, this.lastInsertId)
-      : this._statement = null,
-        this._rowIterator = null;
-
-  int get columnCount => _statement?.columnCount;
-
-  bool get isClosed => _rowIterator == null || _rowIterator.isClosed;
-
-  Future<PreparedQueryRowIterator> rowIterator() async {
-    if (isClosed) {
-      throw new StateError("Query result closed");
-    }
-
-    return _rowIterator;
-  }
-
-  @override
-  Future free() async {
-    await close();
-  }
-
-  @override
-  Future close() async {
-    if (_rowIterator != null && !_rowIterator.isClosed) {
-      await _rowIterator.close();
-    }
-  }
-}
-
-class PreparedQueryRowIterator extends ProtocolIterator {
+class _PreparedQueryRowIterator implements ProtocolIterator {
   final PreparedQueryResult _result;
 
   bool _isClosed;
 
-  PreparedQueryRowIterator(this._result) {
+  _PreparedQueryRowIterator(this._result) {
     _isClosed = false;
   }
 

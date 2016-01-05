@@ -40,16 +40,15 @@ Future testMySqlClient() async {
 
     // rows
     var rows = [];
-    var rowSetReader = await queryResult.rowIterator();
     while (true) {
-      var next = await rowSetReader.next();
+      var next = await queryResult.next();
       if (!next) {
         break;
       }
 
       var row = [];
       for (var i = 0; i < columnCount; i++) {
-        row.add(rowSetReader.getStringValue(i));
+        row.add(queryResult.getStringValue(i));
       }
       rows.add(row);
     }

@@ -588,13 +588,13 @@ class ReusablePacket extends Packet {
     }
   }
 
-  double _getDouble(int index) => _protocol._getDouble(_dataRanges[index]);
+  double getDouble(int index) => _protocol._getDouble(_dataRanges[index]);
 
-  int _getInteger(int index) => _protocol._getInteger(_dataRanges[index]);
+  int getInteger(int index) => _protocol._getInteger(_dataRanges[index]);
 
-  String _getString(int index) => _protocol._getString(_dataRanges[index]);
+  String getString(int index) => _protocol._getString(_dataRanges[index]);
 
-  String _getUTF8String(int index) =>
+  String getUTF8String(int index) =>
       _protocol._getUTF8String(_dataRanges[index]);
 }
 

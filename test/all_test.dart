@@ -22,7 +22,7 @@ Future testMySqlClient() async {
   var connection;
 
   try {
-    connection = new ConnectionImpl();
+    connection = new Connection();
 
     await connection.connect("104.155.81.67", 3306, "sysadmin_vpd", "oracle");
 

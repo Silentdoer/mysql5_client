@@ -18,84 +18,14 @@ enum DataType {
   DATETIME
 }
 
-class PrepareStatementError extends Error {
-  final String message;
-
-  PrepareStatementError(this.message);
-
-  String toString() => "PrepareStatementError: $message";
-}
-
 class PreparedStatementProtocol extends ProtocolDelegate {
   PreparedResultSetRowPacket _reusableRowPacket;
 
   PreparedStatementProtocol(Protocol protocol) : super(protocol);
 
-  Future<PreparedStatement> prepareQuery(String query) async {
-    _writeCommandStatementPreparePacket(query);
+  PreparedResultSetRowPacket get reusableRowPacket => _reusableRowPacket;
 
-    var response = await _readCommandStatementPrepareResponse();
-
-    if (response is! CommandStatementPrepareOkResponsePacket) {
-      throw new PrepareStatementError(response.errorMessage);
-    }
-
-    List<ColumnDefinition> parameters = new List(response.numParams);
-    var parameterIterator =
-        new QueryColumnIterator(parameters.length, _protocol);
-    var hasParameter = true;
-    var i = 0;
-    while (hasParameter) {
-      hasParameter = await parameterIterator.next();
-      if (hasParameter) {
-        parameters[i++] = new ColumnDefinition(
-            parameterIterator.name, parameterIterator.type);
-      }
-    }
-
-    List<ColumnDefinition> columns = new List(response.numColumns);
-    var columnIterator = new QueryColumnIterator(columns.length, _protocol);
-    var hasColumn = true;
-    var l = 0;
-    while (hasColumn) {
-      hasColumn = await columnIterator.next();
-      if (hasColumn) {
-        columns[l++] =
-            new ColumnDefinition(columnIterator.name, columnIterator.type);
-      }
-    }
-
-    return new PreparedStatement(
-        response.statementId, parameters, columns, _protocol);
-  }
-
-  Future<PreparedQueryResult> executeQuery(PreparedStatement statement) async {
-    _writeCommandStatementExecutePacket(statement);
-
-    var response = await _readCommandStatementExecuteResponse();
-
-    if (response is ErrorPacket) {
-      throw new QueryError(response.errorMessage);
-    }
-
-    statement._isNewParamsBoundFlag = false;
-
-    if (response is OkPacket) {
-      return new PreparedQueryResult.ok(
-          response.affectedRows, response.lastInsertId);
-    } else {
-      var columnIterator =
-          new QueryColumnIterator(statement.columnCount, _protocol);
-      var hasColumn = true;
-      while (hasColumn) {
-        hasColumn = await columnIterator._skip();
-      }
-
-      return new PreparedQueryResult.resultSet(statement);
-    }
-  }
-
-  void _writeCommandStatementPreparePacket(String query) {
+  void writeCommandStatementPreparePacket(String query) {
     WriterBuffer buffer = _createBuffer();
 
     var sequenceId = 0x00;
@@ -113,7 +43,8 @@ class PreparedStatementProtocol extends ProtocolDelegate {
     _writeBuffer(buffer);
   }
 
-  void _writeCommandStatementExecutePacket(PreparedStatement statement) {
+  void writeCommandStatementExecutePacket(int statementId, List parameterValues,
+      bool isNewParamsBoundFlag, List<int> parameterTypes) {
     WriterBuffer buffer = _createBuffer();
 
     var sequenceId = 0x00;
@@ -121,22 +52,21 @@ class PreparedStatementProtocol extends ProtocolDelegate {
     // 1              [17] COM_STMT_EXECUTE
     buffer.writeFixedLengthInteger(COM_STMT_EXECUTE, 1);
     // 4              stmt-id
-    buffer.writeFixedLengthInteger(statement._statementId, 4);
+    buffer.writeFixedLengthInteger(statementId, 4);
     // 1              flags
     buffer.writeFixedLengthInteger(CURSOR_TYPE_NO_CURSOR, 1);
     // 4              iteration-count
     buffer.writeFixedLengthInteger(1, 4);
     // if num-params > 0:
-    if (statement._parameterValues.isNotEmpty) {
+    if (parameterValues.isNotEmpty) {
       //   n              NULL-bitmap, length: (num-params+7)/8
-      buffer.writeBytes(_encodeNullBitmap(statement._parameterValues));
+      buffer.writeBytes(_encodeNullBitmap(parameterValues));
       //   1              new-params-bound-flag
-      buffer.writeFixedLengthInteger(
-          statement._isNewParamsBoundFlag ? 1 : 0, 1);
+      buffer.writeFixedLengthInteger(isNewParamsBoundFlag ? 1 : 0, 1);
       //   if new-params-bound-flag == 1:
-      if (statement._isNewParamsBoundFlag) {
+      if (isNewParamsBoundFlag) {
         //     n              type of each parameter, length: num-params * 2
-        for (var type in statement._parameterTypes) {
+        for (var type in parameterTypes) {
           // the type as in Protocol::ColumnType
           buffer.writeFixedLengthInteger(type, 1);
           // a flag byte which has the highest bit set if the type is unsigned [80]
@@ -144,10 +74,10 @@ class PreparedStatementProtocol extends ProtocolDelegate {
         }
       }
       //   n              value of each parameter
-      for (int i = 0; i < statement._parameterTypes.length; i++) {
-        var value = statement._parameterValues[i];
+      for (int i = 0; i < parameterTypes.length; i++) {
+        var value = parameterValues[i];
         if (value != null) {
-          var dataType = _getDataTypeFromSqlType(statement._parameterTypes[i]);
+          var dataType = _getDataTypeFromSqlType(parameterTypes[i]);
           switch (dataType) {
             case DataType.INTEGER_1:
               // value (1) -- integer
@@ -182,7 +112,7 @@ class PreparedStatementProtocol extends ProtocolDelegate {
     _writeBuffer(buffer);
   }
 
-  void _writeCommandStatementResetPacket(int statementId) {
+  void writeCommandStatementResetPacket(int statementId) {
     WriterBuffer buffer = _createBuffer();
 
     var sequenceId = 0x00;
@@ -200,7 +130,7 @@ class PreparedStatementProtocol extends ProtocolDelegate {
     _writeBuffer(buffer);
   }
 
-  void _writeCommandStatementClosePacket(int statementId) {
+  void writeCommandStatementClosePacket(int statementId) {
     WriterBuffer buffer = _createBuffer();
 
     var sequenceId = 0x00;
@@ -218,7 +148,7 @@ class PreparedStatementProtocol extends ProtocolDelegate {
     _writeBuffer(buffer);
   }
 
-  Future<Packet> _readCommandStatementPrepareResponse() {
+  Future<Packet> readCommandStatementPrepareResponse() {
     var value = _readPacketBuffer();
     var value2 = value is Future
         ? value.then((_) => _readCommandStatementPrepareResponsePacket())
@@ -226,7 +156,7 @@ class PreparedStatementProtocol extends ProtocolDelegate {
     return value2 is Future ? value2 : new Future.value(value2);
   }
 
-  Future<Packet> _readCommandStatementExecuteResponse() {
+  Future<Packet> readCommandStatementExecuteResponse() {
     var value = _readPacketBuffer();
     var value2 = value is Future
         ? value.then((_) => _readCommandStatementExecuteResponsePacket())
@@ -234,18 +164,18 @@ class PreparedStatementProtocol extends ProtocolDelegate {
     return value2 is Future ? value2 : new Future.value(value2);
   }
 
-  _skipResultSetRowResponse(PreparedQueryResult result) {
+  skipResultSetRowResponse() {
     var value = _readPacketBuffer();
     return value is Future
-        ? value.then((_) => _skipResultSetRowResponsePacket(result))
-        : _skipResultSetRowResponsePacket(result);
+        ? value.then((_) => _skipResultSetRowResponsePacket())
+        : _skipResultSetRowResponsePacket();
   }
 
-  _readResultSetRowResponse(PreparedQueryResult result) {
+  readResultSetRowResponse(List<int> columnTypes) {
     var value = _readPacketBuffer();
     return value is Future
-        ? value.then((_) => _readResultSetRowResponsePacket(result))
-        : _readResultSetRowResponsePacket(result);
+        ? value.then((_) => _readResultSetRowResponsePacket(columnTypes))
+        : _readResultSetRowResponsePacket(columnTypes);
   }
 
   Packet _readCommandStatementPrepareResponsePacket() {
@@ -266,7 +196,7 @@ class PreparedStatementProtocol extends ProtocolDelegate {
     }
   }
 
-  Packet _skipResultSetRowResponsePacket(PreparedQueryResult result) {
+  Packet _skipResultSetRowResponsePacket() {
     if (_isErrorPacket()) {
       _reusableRowPacket.free();
 
@@ -276,11 +206,11 @@ class PreparedStatementProtocol extends ProtocolDelegate {
 
       return _readEOFPacket();
     } else {
-      return _skipResultSetRowPacket(result);
+      return _skipResultSetRowPacket();
     }
   }
 
-  Packet _readResultSetRowResponsePacket(PreparedQueryResult result) {
+  Packet _readResultSetRowResponsePacket(List<int> columnTypes) {
     if (_isErrorPacket()) {
       _reusableRowPacket.free();
 
@@ -290,7 +220,7 @@ class PreparedStatementProtocol extends ProtocolDelegate {
 
       return _readEOFPacket();
     } else {
-      return _readResultSetRowPacket(result);
+      return _readResultSetRowPacket(columnTypes);
     }
   }
 
@@ -330,8 +260,7 @@ class PreparedStatementProtocol extends ProtocolDelegate {
     return packet;
   }
 
-  PreparedResultSetRowPacket _skipResultSetRowPacket(
-      PreparedQueryResult result) {
+  PreparedResultSetRowPacket _skipResultSetRowPacket() {
     var packet = _reusableRowPacket.reuse(_sequenceId, _payloadLength);
 
     _skipBytes(_payloadLength);
@@ -341,22 +270,21 @@ class PreparedStatementProtocol extends ProtocolDelegate {
     return packet;
   }
 
-  PreparedResultSetRowPacket _readResultSetRowPacket(
-      PreparedQueryResult result) {
+  PreparedResultSetRowPacket _readResultSetRowPacket(List<int> columnTypes) {
     var packet = _reusableRowPacket.reuse(_sequenceId, _payloadLength);
 
-    var header = _readByte();
+    // header
+    _skipByte();
 
     var nullBitmap =
-        _readFixedLengthString((result.columnCount + 7 + 2) ~/ 8).codeUnits;
+        _readFixedLengthString((columnTypes.length + 7 + 2) ~/ 8).codeUnits;
 
-    for (var i = 0; i < result.columnCount; i++) {
+    for (var i = 0; i < columnTypes.length; i++) {
       var reusableRange = _reusableRowPacket._getReusableDataRange(i);
 
       // TODO ottimizzare la verifica null
       if (!_isNullInNullBitmap(nullBitmap, i, 2)) {
-        var column = result._statement.columns[i];
-        var dataType = _getDataTypeFromSqlType(column.type);
+        var dataType = _getDataTypeFromSqlType(columnTypes[i]);
         switch (dataType) {
           case DataType.STRING:
             _readFixedLengthDataRange(
@@ -384,7 +312,7 @@ class PreparedStatementProtocol extends ProtocolDelegate {
     return packet;
   }
 
-  int _getSqlTypeFromValue(value) {
+  int getSqlTypeFromValue(value) {
     if (value == null) {
       return null;
     } else if (value is String) {
@@ -433,9 +361,10 @@ class PreparedStatementProtocol extends ProtocolDelegate {
       new Float64List.fromList([value]).buffer.asUint8List();
 
   // TODO verificare se esistono conversioni più snelle
+/*
   double _decodeDouble(List<int> data) =>
       new Uint8List.fromList(data).buffer.asFloat64List()[0];
-
+*/
   List<int> _encodeNullBitmap(List parameters, [int offset = 0]) {
     //   n              NULL-bitmap, length: (num-params+7)/8
     var bitmap = new List.filled((parameters.length + 7 + offset) ~/ 8, 0);
@@ -466,198 +395,6 @@ class PreparedStatementProtocol extends ProtocolDelegate {
     var i = (index + offset) % 8;
     var mask = 1 << i;
     return (nullBitmap[l] & mask) != 0;
-  }
-}
-
-class PreparedStatement implements ProtocolResult {
-  final Protocol _protocol;
-
-  final int _statementId;
-
-  final List<ColumnDefinition> parameters;
-  final List<ColumnDefinition> columns;
-
-  final List<int> _parameterTypes;
-  final List _parameterValues;
-
-  bool _isClosed;
-  bool _isNewParamsBoundFlag;
-
-  PreparedStatement(this._statementId, List<ColumnDefinition> parameters,
-      List<ColumnDefinition> columns, Protocol protocol)
-      : this.parameters = parameters,
-        this.columns = columns,
-        this._parameterTypes = new List(parameters.length),
-        this._parameterValues = new List(parameters.length),
-        this._protocol = protocol {
-    _isClosed = false;
-    _isNewParamsBoundFlag = true;
-  }
-
-  int get parameterCount => parameters.length;
-
-  int get columnCount => columns.length;
-
-  bool get isClosed => _isClosed;
-
-  void setParameter(int index, value, [int sqlType]) {
-    if (index >= parameterCount) {
-      throw new IndexError(index, _parameterValues);
-    }
-
-    sqlType ??=
-        _protocol._preparedStatementProtocol._getSqlTypeFromValue(value);
-
-    if (sqlType != null && _parameterTypes[index] != sqlType) {
-      _parameterTypes[index] = sqlType;
-      _isNewParamsBoundFlag = true;
-    }
-
-    _parameterValues[index] = value;
-  }
-
-  Future<PreparedQueryResult> executeQuery() async {
-    // TODO check dello stato
-
-    var result = await _protocol.preparedStatementProtocol.executeQuery(this);
-
-    return result;
-  }
-
-  @override
-  Future free() async {}
-
-  @override
-  Future close() async {
-    // TODO implementare PreparedStatement.close
-
-    _protocol._preparedStatementProtocol
-        ._writeCommandStatementClosePacket(_statementId);
-  }
-}
-
-class PreparedQueryResult implements ProtocolResult {
-  final PreparedStatement _statement;
-
-  final int affectedRows;
-
-  final int lastInsertId;
-
-  PreparedQueryRowIterator _rowIterator;
-
-  PreparedQueryResult.resultSet(PreparedStatement statement)
-      : this._statement = statement,
-        this.affectedRows = null,
-        this.lastInsertId = null {
-    this._rowIterator = new PreparedQueryRowIterator(this);
-  }
-
-  PreparedQueryResult.ok(this.affectedRows, this.lastInsertId)
-      : this._statement = null,
-        this._rowIterator = null;
-
-  int get columnCount => _statement?.columnCount;
-
-  bool get isClosed => _rowIterator == null || _rowIterator.isClosed;
-
-  Future<PreparedQueryRowIterator> rowIterator() async {
-    if (isClosed) {
-      throw new StateError("Query result closed");
-    }
-
-    return _rowIterator;
-  }
-
-  @override
-  Future free() async {
-    await close();
-  }
-
-  @override
-  Future close() async {
-    if (_rowIterator != null && !_rowIterator.isClosed) {
-      await _rowIterator.close();
-    }
-  }
-}
-
-class PreparedQueryRowIterator extends PacketIterator {
-  final PreparedQueryResult _result;
-
-  bool _isClosed;
-
-  PreparedQueryRowIterator(this._result) {
-    _isClosed = false;
-  }
-
-  bool get isClosed => _isClosed;
-
-  Future close() async {
-    if (!isClosed) {
-      var hasNext = true;
-      while (hasNext) {
-        hasNext = _skip();
-        hasNext = hasNext is Future ? await hasNext : hasNext;
-      }
-
-      _isClosed = true;
-    }
-  }
-
-  Future<bool> nextAsFuture() {
-    var value = next();
-    return value is Future ? value : new Future.value(value);
-  }
-
-  next() {
-    if (isClosed) {
-      throw new StateError("Column iterator closed");
-    }
-
-    var response = _result._statement._protocol._preparedStatementProtocol
-        ._readResultSetRowResponse(_result);
-
-    return response is Future
-        ? response.then((response) => _checkLast(response))
-        : _checkLast(response);
-  }
-
-  String getStringValue(int index) => _result._statement._protocol
-      ._preparedStatementProtocol._reusableRowPacket._getUTF8String(index);
-
-  num getNumValue(int index) {
-    var column = _result._statement.columns[index];
-    switch (column.type) {
-      case MYSQL_TYPE_TINY:
-      case MYSQL_TYPE_LONG:
-      case MYSQL_TYPE_LONGLONG:
-        return _result._statement._protocol._preparedStatementProtocol
-            ._reusableRowPacket._getInteger(index);
-      case MYSQL_TYPE_DOUBLE:
-        return _result._statement._protocol._preparedStatementProtocol
-            ._reusableRowPacket._getDouble(index);
-      default:
-        throw new UnsupportedError("Sql type not supported ${column.type}");
-    }
-  }
-
-  bool getBoolValue(int index) {
-    var formatted = getNumValue(index);
-    return formatted != null ? formatted != 0 : null;
-  }
-
-  _skip() {
-    var response = _result._statement._protocol._preparedStatementProtocol
-        ._skipResultSetRowResponse(_result);
-
-    return response is Future
-        ? response.then((response) => _checkLast(response))
-        : _checkLast(response);
-  }
-
-  bool _checkLast(Packet response) {
-    _isClosed = response is! PreparedResultSetRowPacket;
-    return !_isClosed;
   }
 }
 

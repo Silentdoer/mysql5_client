@@ -11,14 +11,6 @@ const int MYSQL_TYPE_LONGLONG = 0x08;
 const int MYSQL_TYPE_DATETIME = 0x0c;
 const int MYSQL_TYPE_VAR_STRING = 0xfd;
 
-class QueryError extends Error {
-  final String message;
-
-  QueryError(this.message);
-
-  String toString() => "QueryError: $message";
-}
-
 class QueryCommandTextProtocol extends ProtocolDelegate {
   final ResultSetColumnDefinitionPacket _reusableColumnPacket;
 
@@ -29,35 +21,12 @@ class QueryCommandTextProtocol extends ProtocolDelegate {
             new ResultSetColumnDefinitionPacket.reusable(protocol),
         super(protocol);
 
-  Future<QueryResult> executeQuery(String query) async {
-    _writeCommandQueryPacket(query);
+  ResultSetColumnDefinitionPacket get reusableColumnPacket =>
+      _reusableColumnPacket;
 
-    var response = await _readCommandQueryResponse();
+  ResultSetRowPacket get reusableRowPacket => _reusableRowPacket;
 
-    if (response is OkPacket) {
-      return new QueryResult.ok(response.affectedRows, response.lastInsertId);
-    }
-
-    if (response is! ResultSetColumnCountPacket) {
-      throw new QueryError(response.errorMessage);
-    }
-
-    List<ColumnDefinition> columns = new List(response.columnCount);
-    var columnIterator = new QueryColumnIterator(columns.length, _protocol);
-    var hasColumn = true;
-    var i = 0;
-    while (hasColumn) {
-      hasColumn = await columnIterator.next();
-      if (hasColumn) {
-        columns[i++] =
-            new ColumnDefinition(columnIterator.name, columnIterator.type);
-      }
-    }
-
-    return new QueryResult.resultSet(columns, _protocol);
-  }
-
-  void _writeCommandQueryPacket(String query) {
+  void writeCommandQueryPacket(String query) {
     WriterBuffer buffer = _createBuffer();
 
     var sequenceId = 0x00;
@@ -75,7 +44,7 @@ class QueryCommandTextProtocol extends ProtocolDelegate {
     _writeBuffer(buffer);
   }
 
-  Future<Packet> _readCommandQueryResponse() {
+  Future<Packet> readCommandQueryResponse() {
     var value = _readPacketBuffer();
     var value2 = value is Future
         ? value.then((_) => _readCommandQueryResponsePacket())
@@ -83,28 +52,28 @@ class QueryCommandTextProtocol extends ProtocolDelegate {
     return value2 is Future ? value2 : new Future.value(value2);
   }
 
-  _skipResultSetColumnDefinitionResponse() {
+  skipResultSetColumnDefinitionResponse() {
     var value = _readPacketBuffer();
     return value is Future
         ? value.then((_) => _skipResultSetColumnDefinitionResponsePacket())
         : _skipResultSetColumnDefinitionResponsePacket();
   }
 
-  _readResultSetColumnDefinitionResponse() {
+  readResultSetColumnDefinitionResponse() {
     var value = _readPacketBuffer();
     return value is Future
         ? value.then((_) => _readResultSetColumnDefinitionResponsePacket())
         : _readResultSetColumnDefinitionResponsePacket();
   }
 
-  _skipResultSetRowResponse() {
+  skipResultSetRowResponse() {
     var value = _readPacketBuffer();
     return value is Future
         ? value.then((_) => _skipResultSetRowResponsePacket())
         : _skipResultSetRowResponsePacket();
   }
 
-  _readResultSetRowResponse() {
+  readResultSetRowResponse() {
     var value = _readPacketBuffer();
     return value is Future
         ? value.then((_) => _readResultSetRowResponsePacket())
@@ -285,218 +254,6 @@ class QueryCommandTextProtocol extends ProtocolDelegate {
   bool _isLocalInFilePacket() => _header == 0xfb;
 }
 
-class ColumnDefinition {
-  final String name;
-  final int type;
-
-  ColumnDefinition(this.name, this.type);
-}
-
-class QueryResult implements ProtocolResult {
-  final Protocol _protocol;
-
-  final int affectedRows;
-
-  final int lastInsertId;
-
-  final List<ColumnDefinition> columns;
-
-  QueryRowIterator _rowIterator;
-
-  QueryResult.resultSet(this.columns, Protocol protocol)
-      : this.affectedRows = null,
-        this.lastInsertId = null,
-        this._protocol = protocol {
-    this._rowIterator = new QueryRowIterator(this);
-  }
-
-  QueryResult.ok(this.affectedRows, this.lastInsertId)
-      : this.columns = null,
-        this._rowIterator = null,
-        this._protocol = null;
-
-  int get columnCount => columns.length;
-
-  bool get isClosed => _rowIterator == null || _rowIterator.isClosed;
-
-  Future<QueryRowIterator> rowIterator() async {
-    if (isClosed) {
-      throw new StateError("Query result closed");
-    }
-
-    return _rowIterator;
-  }
-
-  @override
-  Future free() async {
-    await close();
-  }
-
-  @override
-  Future close() async {
-    if (_rowIterator != null && !_rowIterator.isClosed) {
-      await _rowIterator.close();
-    }
-  }
-}
-
-class QueryColumnIterator extends PacketIterator {
-  final int columnCount;
-
-  final Protocol _protocol;
-
-  bool _isClosed;
-
-  QueryColumnIterator(this.columnCount, this._protocol) {
-    _isClosed = false;
-  }
-
-  bool get isClosed => _isClosed;
-
-  Future close() async {
-    if (!isClosed) {
-      var hasNext = true;
-      while (hasNext) {
-        hasNext = _skip();
-        hasNext = hasNext is Future ? await hasNext : hasNext;
-      }
-
-      _isClosed = true;
-    }
-  }
-
-  Future<bool> nextAsFuture() {
-    var value = next();
-    return value is Future ? value : new Future.value(value);
-  }
-
-  next() {
-    if (isClosed) {
-      throw new StateError("Column iterator closed");
-    }
-
-    if (columnCount > 0) {
-      var response = _protocol._queryCommandTextProtocol
-          ._readResultSetColumnDefinitionResponse();
-
-      return response is Future
-          ? response.then((response) => _checkLast(response))
-          : _checkLast(response);
-    } else {
-      return false;
-    }
-  }
-
-  String get catalog =>
-      _protocol._queryCommandTextProtocol._reusableColumnPacket.catalog;
-  String get schema =>
-      _protocol._queryCommandTextProtocol._reusableColumnPacket.schema;
-  String get table =>
-      _protocol._queryCommandTextProtocol._reusableColumnPacket.table;
-  String get orgTable =>
-      _protocol._queryCommandTextProtocol._reusableColumnPacket.orgTable;
-  String get name =>
-      _protocol._queryCommandTextProtocol._reusableColumnPacket.name;
-  String get orgName =>
-      _protocol._queryCommandTextProtocol._reusableColumnPacket.orgName;
-  int get fieldsLength =>
-      _protocol._queryCommandTextProtocol._reusableColumnPacket.fieldsLength;
-  int get characterSet =>
-      _protocol._queryCommandTextProtocol._reusableColumnPacket.characterSet;
-  int get columnLength =>
-      _protocol._queryCommandTextProtocol._reusableColumnPacket.columnLength;
-  int get type =>
-      _protocol._queryCommandTextProtocol._reusableColumnPacket.type;
-  int get flags =>
-      _protocol._queryCommandTextProtocol._reusableColumnPacket.flags;
-  int get decimals =>
-      _protocol._queryCommandTextProtocol._reusableColumnPacket.decimals;
-
-  _skip() {
-    var response = _protocol._queryCommandTextProtocol
-        ._skipResultSetColumnDefinitionResponse();
-
-    return response is Future
-        ? response.then((response) => _checkLast(response))
-        : _checkLast(response);
-  }
-
-  bool _checkLast(Packet response) {
-    _isClosed = response is! ResultSetColumnDefinitionPacket;
-    return !_isClosed;
-  }
-}
-
-class QueryRowIterator extends PacketIterator {
-  final QueryResult _result;
-
-  bool _isClosed;
-
-  QueryRowIterator(this._result) {
-    _isClosed = false;
-  }
-
-  bool get isClosed => _isClosed;
-
-  Future close() async {
-    if (!isClosed) {
-      var hasNext = true;
-      while (hasNext) {
-        hasNext = _skip();
-        hasNext = hasNext is Future ? await hasNext : hasNext;
-      }
-
-      _isClosed = true;
-    }
-  }
-
-  Future<bool> nextAsFuture() {
-    var value = next();
-    return value is Future ? value : new Future.value(value);
-  }
-
-  next() {
-    if (isClosed) {
-      throw new StateError("Column iterator closed");
-    }
-
-    var response =
-        _result._protocol._queryCommandTextProtocol._readResultSetRowResponse();
-
-    return response is Future
-        ? response.then((response) => _checkLast(response))
-        : _checkLast(response);
-  }
-
-  String getStringValue(int index) => _result._protocol
-      ._queryCommandTextProtocol._reusableRowPacket._getUTF8String(index);
-
-  num getNumValue(int index) {
-    var formatted = _result._protocol._queryCommandTextProtocol
-        ._reusableRowPacket._getString(index);
-    return formatted != null ? num.parse(formatted) : null;
-  }
-
-  bool getBoolValue(int index) {
-    var formatted = getNumValue(index);
-    return formatted != null ? formatted != 0 : null;
-  }
-
-  _skip() {
-    var response =
-        _result._protocol._queryCommandTextProtocol._skipResultSetRowResponse();
-
-    return response is Future
-        ? response.then((response) => _checkLast(response))
-        : _checkLast(response);
-  }
-
-  bool _checkLast(Packet response) {
-    _isClosed = response is! ResultSetRowPacket;
-    return !_isClosed;
-  }
-}
-
 class ResultSetColumnCountPacket extends Packet {
   int _columnCount;
 
@@ -513,18 +270,18 @@ class ResultSetColumnDefinitionPacket extends ReusablePacket {
   ResultSetColumnDefinitionPacket reuse(int payloadLength, int sequenceId) =>
       _reuse(payloadLength, sequenceId);
 
-  String get catalog => _getString(0);
-  String get schema => _getString(1);
-  String get table => _getString(2);
-  String get orgTable => _getString(3);
-  String get name => _getString(4);
-  String get orgName => _getString(5);
-  int get fieldsLength => _getInteger(6);
-  int get characterSet => _getInteger(7);
-  int get columnLength => _getInteger(8);
-  int get type => _getInteger(9);
-  int get flags => _getInteger(10);
-  int get decimals => _getInteger(11);
+  String get catalog => getString(0);
+  String get schema => getString(1);
+  String get table => getString(2);
+  String get orgTable => getString(3);
+  String get name => getString(4);
+  String get orgName => getString(5);
+  int get fieldsLength => getInteger(6);
+  int get characterSet => getInteger(7);
+  int get columnLength => getInteger(8);
+  int get type => getInteger(9);
+  int get flags => getInteger(10);
+  int get decimals => getInteger(11);
 }
 
 class ResultSetRowPacket extends ReusablePacket {

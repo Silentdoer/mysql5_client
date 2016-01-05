@@ -20,7 +20,7 @@ Future main() async {
 }
 
 Future test10() async {
-  var connection = new ConnectionImpl();
+  var connection = new Connection();
 
   try {
     await connection.connect("localhost", 3306, "root", "mysql", "test");
@@ -127,7 +127,7 @@ Future test10() async {
 }
 
 Future test9() async {
-  var connection = new ConnectionImpl();
+  var connection = new Connection();
 
   try {
     await connection.connect("localhost", 3306, "root", "mysql", "test");
@@ -171,7 +171,7 @@ Future test9() async {
 }
 
 Future test8() async {
-  var connection = new ConnectionImpl();
+  var connection = new Connection();
 
   try {
     await connection.connect("localhost", 3306, "root", "mysql", "test");
@@ -202,7 +202,7 @@ Future test8() async {
 }
 
 Future test4() async {
-  var connection = new ConnectionImpl();
+  var connection = new Connection();
 
   try {
     await connection.connect("localhost", 3306, "root", "mysql", "test");
@@ -220,7 +220,7 @@ Future test4() async {
 }
 
 Future test7() async {
-  var connection = new ConnectionImpl();
+  var connection = new Connection();
 
   try {
     await connection.connect("localhost", 3306, "root", "mysql", "test");
@@ -252,7 +252,7 @@ Future test7() async {
 }
 
 Future test6() async {
-  var connection = new ConnectionImpl();
+  var connection = new Connection();
 
   try {
     await connection.connect("localhost", 3306, "root", "mysql", "test");
@@ -303,7 +303,7 @@ Future test6() async {
 }
 
 Future test5() async {
-  var connection = new ConnectionImpl();
+  var connection = new Connection();
 
   try {
     await connection.connect("localhost", 3306, "root", "mysql", "test");

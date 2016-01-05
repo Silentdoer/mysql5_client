@@ -102,10 +102,10 @@ abstract class SpeedTest {
 }
 
 class MySqlClientSpeedTest extends SpeedTest {
-  ConnectionImpl connection;
+  Connection connection;
 
   Future run() async {
-    connection = new ConnectionImpl();
+    connection = new Connection();
 
     await connection.connect("localhost", 3306, "root", "mysql", "test");
 

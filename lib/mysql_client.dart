@@ -5,4 +5,3 @@
 library mysql_client;
 
 export 'package:mysql_client/src/connection.dart';
-export 'package:mysql_client/src/protocol.dart';

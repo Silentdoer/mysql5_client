@@ -3,9 +3,6 @@
 
 library mysql_client.data_range;
 
-import "dart:typed_data";
-import "dart:convert";
-
 class DataRange {
   bool _isPending;
   List<int> _data;
@@ -14,18 +11,21 @@ class DataRange {
   List<DataRange> _extraRanges;
   int _mergeLength;
 
-  DataRange(this._data, [this._start = 0, this._length])
-      : this._isPending = false {
-    _length ??= _data.length - _start;
+  DataRange(List<int> data, [int start = 0, int length]) {
+    reuse(data, start, length);
   }
 
-  DataRange.pending(this._data, [this._start = 0]) : this._isPending = true {
-    _length = _data.length - _start;
+  DataRange.pending(List<int> data, [int start = 0]) {
+    reusePending(data, start);
   }
 
-  DataRange.nil();
+  DataRange.nil() {
+    reuseNil();
+  }
 
-  DataRange.byte(int byte) : this._length = byte;
+  DataRange.byte(int byte) {
+    reuseByte(byte);
+  }
 
   DataRange.reusable();
 
@@ -79,12 +79,13 @@ class DataRange {
   }
 
   bool get isPending => _isPending;
-  List<int> get data => _data;
+  bool get isNil => _data == null;
+  bool get isByte => _data == null;
+  int get byteValue => _length;
   int get start => _start;
   int get length => _length;
   int get end => _start + _length;
-  bool get isByte => _data == null;
-  int get byteValue => _length;
+  List<int> get data => _data;
 
   void addExtraRange(DataRange extraRange) {
     if (_extraRanges == null) {
@@ -95,17 +96,7 @@ class DataRange {
     _mergeLength += extraRange._length;
   }
 
-  DataRange mergeExtras() {
-    if (_data != null) {
-      _mergeExtraRanges();
-
-      return this;
-    } else {
-      return null;
-    }
-  }
-
-  void _mergeExtraRanges() {
+  void mergeExtraRanges() {
     if (_extraRanges != null) {
       var range = this;
       var start = 0;

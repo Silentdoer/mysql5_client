@@ -3,6 +3,8 @@
 
 library mysql_client.data_commons;
 
+// TODO spostarli nel protocollo se possibile
+
 const int NULL_TERMINATOR = 0x00;
 
 const int PREFIX_NULL = 0xfb;

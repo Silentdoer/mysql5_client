@@ -6,6 +6,7 @@ library mysql_client.writer_buffer;
 import "dart:convert";
 import "dart:io";
 
+// TODO eliminare la dipendenza spostando quello che serve nel protocollo
 import "package:mysql_client/src/data_commons.dart";
 
 abstract class WriterBuffer {

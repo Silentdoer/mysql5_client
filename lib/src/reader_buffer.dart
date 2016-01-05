@@ -5,36 +5,23 @@ library mysql_client.data_buffer;
 
 import "data_chunk.dart";
 import "data_range.dart";
-import "data_commons.dart";
-
-class NullError extends Error {
-  String toString() => "Null value";
-}
-
-class UndefinedError extends Error {
-  String toString() => "Undefined value";
-}
-
-class EOFError extends Error {
-  String toString() => "EOF value";
-}
 
 class ReaderBuffer {
   List<DataChunk> _chunks;
-  int _payloadLength;
+  int _dataLength;
 
   int _chunkIndex;
   int _readCount;
 
-  ReaderBuffer(this._chunks, this._payloadLength) {
-    _chunkIndex = 0;
-    _readCount = 0;
+  ReaderBuffer(int reusableChunks, int dataLength)
+      : this._chunks = new List<DataChunk>() {
+    reuse(reusableChunks, dataLength);
   }
 
   ReaderBuffer.reusable() : this._chunks = new List<DataChunk>();
 
-  ReaderBuffer reuse(int reusableChunks, int payloadLength) {
-    _payloadLength = payloadLength;
+  ReaderBuffer reuse(int reusableChunks, int dataLength) {
+    _dataLength = dataLength;
     _chunkIndex = 0;
     _readCount = 0;
     return this;
@@ -44,7 +31,7 @@ class ReaderBuffer {
     for (var chunk in _chunks) {
       chunk.free();
     }
-    _payloadLength = null;
+    _dataLength = null;
     _chunkIndex = null;
     _readCount = null;
   }
@@ -59,11 +46,15 @@ class ReaderBuffer {
     }
   }
 
-  int get payloadLength => _payloadLength;
+  int get dataLength => _dataLength;
 
-  int get available => _payloadLength - _readCount;
+  int get readCount => _readCount;
 
-  bool get isAllRead => available == 0;
+  int get leftCount => _dataLength - _readCount;
+
+  bool get isDataLeft => _readCount < _dataLength;
+
+  bool get isNotDataLeft => _readCount == _dataLength;
 
   int checkByte() => _chunks[_chunkIndex].checkOneByte();
 

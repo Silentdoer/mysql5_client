@@ -11,6 +11,18 @@ const int CLIENT_SESSION_TRACK = 0x00800000;
 
 const int SERVER_SESSION_STATE_CHANGED = 0x4000;
 
+class NullError extends Error {
+  String toString() => "Null value";
+}
+
+class UndefinedError extends Error {
+  String toString() => "Undefined value";
+}
+
+class EOFError extends Error {
+  String toString() => "EOF value";
+}
+
 abstract class ProtocolDelegate {
   Protocol _protocol;
 
@@ -304,7 +316,7 @@ class Protocol {
       return range.byteValue;
     }
 
-    range = range.mergeExtras();
+    range.mergeExtraRanges();
 
     var i = range.start;
     switch (range.length) {
@@ -401,9 +413,9 @@ class Protocol {
   }
 
   double _getDouble(DataRange range) {
-    range = range.mergeExtras();
+    range.mergeExtraRanges();
 
-    if (range != null) {
+    if (!range.isNil) {
       // TODO verificare se esistono conversioni più snelle
       return new Uint8List.fromList(range.data.sublist(range.start, range.end))
           .buffer
@@ -414,9 +426,9 @@ class Protocol {
   }
 
   String _getString(DataRange range) {
-    range = range.mergeExtras();
+    range.mergeExtraRanges();
 
-    if (range != null) {
+    if (!range.isNil) {
       return new String.fromCharCodes(range.data, range.start, range.end);
     } else {
       return null;
@@ -424,9 +436,9 @@ class Protocol {
   }
 
   String _getUTF8String(DataRange range) {
-    range = range.mergeExtras();
+    range.mergeExtraRanges();
 
-    if (range != null) {
+    if (!range.isNil) {
       return UTF8.decoder.convert(range.data, range.start, range.end);
     } else {
       return null;
@@ -437,7 +449,7 @@ class Protocol {
 
   int get _payloadLength => _reusablePacketBuffer.payloadLength;
 
-  bool get _isAllRead => _reusablePacketBuffer.payload.isAllRead;
+  bool get _isAllRead => _reusablePacketBuffer.payload.isNotDataLeft;
 
   int get _header => _reusablePacketBuffer.header;
 
@@ -490,7 +502,7 @@ class Protocol {
 
   DataRange _readRestOfPacketDataRange(DataRange reusableRange) =>
       _reusablePacketBuffer.payload.readFixedLengthDataRange(
-          _reusablePacketBuffer.payload.available, reusableRange);
+          _reusablePacketBuffer.payload.leftCount, reusableRange);
 
   DataRange _readLengthEncodedDataRange(DataRange reusableRange) {
     var firstByte = _readByte();
@@ -503,7 +515,7 @@ class Protocol {
         bytesLength = 4;
         break;
       case PREFIX_INT_8:
-        if (_reusablePacketBuffer.payload.available >= 8) {
+        if (_reusablePacketBuffer.payload.leftCount >= 8) {
           bytesLength = 9;
         } else {
           throw new EOFError();

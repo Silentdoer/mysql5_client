@@ -11,8 +11,8 @@ class DataChunk {
   int _start;
   int _length;
 
-  DataChunk(this._data, [this._start = 0, this._length]) {
-    _length ??= _data.length - _start;
+  DataChunk(List<int> data, [int start = 0, int length]) {
+    reuse(data, start, length);
   }
 
   DataChunk.reusable();

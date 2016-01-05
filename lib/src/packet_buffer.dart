@@ -32,5 +32,5 @@ class PacketBuffer {
 
   int get header => _header;
 
-  int get payloadLength => _payload.payloadLength;
+  int get payloadLength => _payload.dataLength;
 }

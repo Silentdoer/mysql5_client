@@ -42,8 +42,8 @@ class DataReader {
     var chunk = _chunks.first;
 
     var reusableChunk = _reusableBuffer.getReusableChunk(reusableChunksCount);
-    var bufferChunk = chunk.extractDataChunk(leftLength, reusableChunk);
     reusableChunksCount++;
+    var bufferChunk = chunk.extractDataChunk(leftLength, reusableChunk);
     leftLength -= bufferChunk.length;
 
     if (chunk.isEmpty) {

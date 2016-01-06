@@ -26,8 +26,8 @@ class QueryCommandTextProtocol extends ProtocolDelegate {
 
   ResultSetRowPacket get reusableRowPacket => _reusableRowPacket;
 
-  void freeReusables() {
-    super.freeReusables();
+  void free() {
+    super.free();
 
     _reusableColumnPacket._free();
     _reusableRowPacket?._free();
@@ -135,7 +135,7 @@ class QueryCommandTextProtocol extends ProtocolDelegate {
   }
 
   ResultSetColumnCountPacket _readResultSetColumnCountPacket() {
-    var packet = new ResultSetColumnCountPacket(_sequenceId, _payloadLength);
+    var packet = new ResultSetColumnCountPacket(_payloadLength, _sequenceId);
 
     // A packet containing a Protocol::LengthEncodedInteger column_count
     packet._columnCount = _readLengthEncodedInteger();
@@ -147,7 +147,7 @@ class QueryCommandTextProtocol extends ProtocolDelegate {
   }
 
   ResultSetColumnDefinitionPacket _skipResultSetColumnDefinitionPacket() {
-    var packet = _reusableColumnPacket.reuse(_sequenceId, _payloadLength);
+    var packet = _reusableColumnPacket.reuse(_payloadLength, _sequenceId);
 
     _skipBytes(_payloadLength);
 
@@ -155,7 +155,7 @@ class QueryCommandTextProtocol extends ProtocolDelegate {
   }
 
   ResultSetColumnDefinitionPacket _readResultSetColumnDefinitionPacket() {
-    var packet = _reusableColumnPacket.reuse(_sequenceId, _payloadLength);
+    var packet = _reusableColumnPacket.reuse(_payloadLength, _sequenceId);
 
     var dataRange;
     var i = 0;
@@ -203,7 +203,7 @@ class QueryCommandTextProtocol extends ProtocolDelegate {
   }
 
   ResultSetRowPacket _skipResultSetRowPacket() {
-    var packet = _reusableRowPacket.reuse(_sequenceId, _payloadLength);
+    var packet = _reusableRowPacket.reuse(_payloadLength, _sequenceId);
 
     _skipBytes(_payloadLength);
 
@@ -211,7 +211,7 @@ class QueryCommandTextProtocol extends ProtocolDelegate {
   }
 
   ResultSetRowPacket _readResultSetRowPacket() {
-    var packet = _reusableRowPacket.reuse(_sequenceId, _payloadLength);
+    var packet = _reusableRowPacket.reuse(_payloadLength, _sequenceId);
 
     var i = 0;
     while (!_isAllRead) {

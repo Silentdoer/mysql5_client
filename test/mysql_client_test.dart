@@ -11,12 +11,33 @@ import "package:stack_trace/stack_trace.dart";
 Future main() async {
   Chain.capture(() async {
     try {
-      await test10();
+      await test11();
     } catch (e, s) {
       print(e);
       print(new Chain.forTrace(s));
     }
   });
+}
+
+Future test11() async {
+  var connection = new Connection();
+
+  try {
+    await connection.connect("localhost", 3306, "root", "mysql", "test");
+
+    var result =
+        await connection.executeQuery("SELECT * FROM people LIMIT 10");
+
+    // rows
+    while (await result.next()) {
+      print(result.getNumValue(0));
+    }
+  } catch (e, s) {
+    print("Error: $e");
+    print(new Chain.forTrace(s).terse);
+  } finally {
+    await connection.close();
+  }
 }
 
 Future test10() async {

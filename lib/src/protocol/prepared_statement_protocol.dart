@@ -25,10 +25,10 @@ class PreparedStatementProtocol extends ProtocolDelegate {
 
   PreparedResultSetRowPacket get reusableRowPacket => _reusableRowPacket;
 
-  void freeReusables() {
-    super.freeReusables();
+  void free() {
+    super.free();
 
-    _protocol.queryCommandTextProtocol.freeReusables();
+    _protocol.queryCommandTextProtocol.free();
 
     _reusableRowPacket?._free();
   }
@@ -225,10 +225,14 @@ class PreparedStatementProtocol extends ProtocolDelegate {
 
   CommandStatementPrepareOkResponsePacket _readCommandStatementPrepareOkResponsePacket() {
     var packet = new CommandStatementPrepareOkResponsePacket(
-        _sequenceId, _payloadLength);
+        _payloadLength, _sequenceId);
+
+    if (_header != 0x00) {
+      throw new StateError("Invalid packet header: $_header != 0x00");
+    }
 
     // status (1) -- [00] OK
-    packet._status = _readByte();
+    packet._status = _header;
     // statement_id (4) -- statement-id
     packet._statementId = _readFixedLengthInteger(4);
     // num_columns (2) -- number of columns
@@ -244,7 +248,7 @@ class PreparedStatementProtocol extends ProtocolDelegate {
   }
 
   ResultSetColumnCountPacket _readResultSetColumnCountPacket() {
-    var packet = new ResultSetColumnCountPacket(_sequenceId, _payloadLength);
+    var packet = new ResultSetColumnCountPacket(_payloadLength, _sequenceId);
 
     // A packet containing a Protocol::LengthEncodedInteger column_count
     packet._columnCount = _readByte();
@@ -256,7 +260,7 @@ class PreparedStatementProtocol extends ProtocolDelegate {
   }
 
   PreparedResultSetRowPacket _skipResultSetRowPacket() {
-    var packet = _reusableRowPacket.reuse(_sequenceId, _payloadLength);
+    var packet = _reusableRowPacket.reuse(_payloadLength, _sequenceId);
 
     _skipBytes(_payloadLength);
 
@@ -264,7 +268,7 @@ class PreparedStatementProtocol extends ProtocolDelegate {
   }
 
   PreparedResultSetRowPacket _readResultSetRowPacket(List<int> columnTypes) {
-    var packet = _reusableRowPacket.reuse(_sequenceId, _payloadLength);
+    var packet = _reusableRowPacket.reuse(_payloadLength, _sequenceId);
 
     // header
     _skipByte();

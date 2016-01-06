@@ -41,8 +41,8 @@ abstract class ProtocolDelegate {
 
   ProtocolDelegate(this._protocol);
 
-  void freeReusables() {
-    _protocol._freeReusables();
+  void free() {
+    _protocol._free();
   }
 
   int get _clientCapabilityFlags => _protocol._clientCapabilityFlags;
@@ -226,7 +226,7 @@ class Protocol {
     return value2 is Future ? value2 : new Future.value(value2);
   }
 
-  void _freeReusables() {
+  void _free() {
     __writerBuffer = null;
     __reusablePacketBuffer.free();
     __reusableDataRange.free();
@@ -261,7 +261,7 @@ class Protocol {
   bool _isErrorPacket() => _header == 0xff;
 
   OkPacket _readOkPacket() => __completeSuccessResponsePacket(
-      new OkPacket(_sequenceId, _payloadLength));
+      new OkPacket(_payloadLength, _sequenceId));
 
   EOFPacket _readEOFPacket() {
     // TODO check CLIENT_DEPRECATE_EOF flag
@@ -271,7 +271,7 @@ class Protocol {
       return __completeSuccessResponsePacket(
           new EOFPacket(_sequenceId, _payloadLength));
     } else {
-      var packet = new EOFPacket(_sequenceId, _payloadLength);
+      var packet = new EOFPacket(_payloadLength, _sequenceId);
       // EOF packet
       // int<1>	header	[00] or [fe] the OK packet header
       packet._header = _readByte();
@@ -287,7 +287,7 @@ class Protocol {
   }
 
   ErrorPacket _readErrorPacket() {
-    var packet = new ErrorPacket(_sequenceId, _payloadLength);
+    var packet = new ErrorPacket(_payloadLength, _sequenceId);
     // int<1>	header	[00] or [fe] the OK packet header
     packet._header = _readByte();
     // int<2>	error_code	error-code

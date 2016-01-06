@@ -105,9 +105,11 @@ class ConnectionProtocol extends ProtocolDelegate {
   }
 
   InitialHandshakePacket _readInitialHandshakePacket() {
-    var packet = new InitialHandshakePacket(_sequenceId, _payloadLength);
+    var packet = new InitialHandshakePacket(_payloadLength, _sequenceId);
 
-    // TODO verifica header
+    if (_header != 0x0a) {
+      throw new StateError("Invalid packet header: $_header != 0x0a");
+    }
 
     // 1              [0a] protocol version
     packet._protocolVersion = _header;

@@ -71,7 +71,7 @@ class Connection {
       _socket = socket;
       _protocol = protocol;
     } finally {
-      protocol.connectionProtocol.freeReusables();
+      protocol.connectionProtocol.free();
     }
   }
 
@@ -115,7 +115,7 @@ class Connection {
 
       return _lastProtocolResult;
     } finally {
-      _protocol.queryCommandTextProtocol.freeReusables();
+      _protocol.queryCommandTextProtocol.free();
     }
   }
 
@@ -170,7 +170,7 @@ class Connection {
 
       return _lastProtocolResult;
     } finally {
-      _protocol.preparedStatementProtocol.freeReusables();
+      _protocol.preparedStatementProtocol.free();
     }
   }
 
@@ -360,7 +360,7 @@ class PreparedStatement implements ProtocolResult {
         return _connection._lastProtocolResult;
       }
     } finally {
-      _connection._protocol.preparedStatementProtocol.freeReusables();
+      _connection._protocol.preparedStatementProtocol.free();
     }
   }
 
@@ -382,7 +382,7 @@ class PreparedStatement implements ProtocolResult {
         _connection._protocol.preparedStatementProtocol
             .writeCommandStatementClosePacket(_statementId);
       } finally {
-        _connection._protocol.preparedStatementProtocol.freeReusables();
+        _connection._protocol.preparedStatementProtocol.free();
       }
     }
   }
@@ -521,7 +521,7 @@ class _QueryColumnIterator implements ProtocolIterator {
       return true;
     } else {
       _isClosed = true;
-      _connection._protocol.queryCommandTextProtocol.freeReusables();
+      _connection._protocol.queryCommandTextProtocol.free();
       return false;
     }
   }
@@ -596,7 +596,7 @@ class _QueryRowIterator implements ProtocolIterator {
       return true;
     } else {
       _isClosed = true;
-      _result._connection._protocol.queryCommandTextProtocol.freeReusables();
+      _result._connection._protocol.queryCommandTextProtocol.free();
       return false;
     }
   }
@@ -683,7 +683,7 @@ class _PreparedQueryRowIterator implements ProtocolIterator {
     } else {
       _isClosed = true;
       _result._statement._connection._protocol.preparedStatementProtocol
-          .freeReusables();
+          .free();
       return false;
     }
   }

@@ -53,6 +53,8 @@ class Connection {
       var response =
           await protocol.connectionProtocol.readInitialHandshakeResponse();
 
+      // TODO verifica sequenceId
+
       if (response is! InitialHandshakePacket) {
         throw new ConnectionError(response.errorMessage);
       }
@@ -164,6 +166,8 @@ class Connection {
       _lastProtocolResult = new PreparedStatement(
           response.statementId, parameters, columns, this);
 
+      // TODO raccogliere gli statement aperti
+
       return _lastProtocolResult;
     } finally {
       _protocol.preparedStatementProtocol.freeReusables();
@@ -175,7 +179,9 @@ class Connection {
       throw new StateError("Connection closed");
     }
 
-    await _lastProtocolResult?.free();
+    await _lastProtocolResult?.close();
+
+    // TODO chiudo tutti gli eventuali statement ancora aperti (senza inviare la richiesta di chiusura del protocollo)
 
     var socket = _socket;
 
@@ -294,6 +300,10 @@ class PreparedStatement implements ProtocolResult {
   bool get isClosed => _isClosed;
 
   void setParameter(int index, value, [int sqlType]) {
+    if (_isClosed) {
+      throw new StateError("Prepared statement closed");
+    }
+
     if (index >= parameterCount) {
       throw new IndexError(index, _parameterValues);
     }
@@ -310,13 +320,13 @@ class PreparedStatement implements ProtocolResult {
   }
 
   Future<PreparedQueryResult> executeQuery() async {
-    // TODO check dello stato
+    if (_isClosed) {
+      throw new StateError("Prepared statement closed");
+    }
 
-    // TODO free del _lastProtocolResult
+    await _connection._lastProtocolResult?.free();
 
-    // await _lastProtocolResult?.free();
-
-    // _lastProtocolResult = null;
+    _connection._lastProtocolResult = null;
 
     try {
       _connection._protocol.preparedStatementProtocol
@@ -342,9 +352,12 @@ class PreparedStatement implements ProtocolResult {
           hasColumn = await columnIterator._skip();
         }
 
-        // TODO memorizzazione del _lastProtocolResult
+        _connection._lastProtocolResult =
+            new PreparedQueryResult.resultSet(this);
 
-        return new PreparedQueryResult.resultSet(this);
+        // TODO raccolgo l'ultimo result abbinato a questo statement
+
+        return _connection._lastProtocolResult;
       }
     } finally {
       _connection._protocol.preparedStatementProtocol.freeReusables();
@@ -352,17 +365,25 @@ class PreparedStatement implements ProtocolResult {
   }
 
   @override
-  Future free() async {}
+  Future free() async {
+    // TODO non posso chiudere lo statement ma posso liberare qualcosa?
+  }
 
   @override
   Future close() async {
-    // TODO implementare PreparedStatement.close
+    if (!_isClosed) {
+      _isClosed = true;
 
-    try {
-      _connection._protocol.preparedStatementProtocol
-          .writeCommandStatementClosePacket(_statementId);
-    } finally {
-      _connection._protocol.preparedStatementProtocol.freeReusables();
+      // TODO chiudo l'eventuale ultimo queryresult attaccato
+
+      // TODO avviso informo il connection della chiusura dello statement
+
+      try {
+        _connection._protocol.preparedStatementProtocol
+            .writeCommandStatementClosePacket(_statementId);
+      } finally {
+        _connection._protocol.preparedStatementProtocol.freeReusables();
+      }
     }
   }
 }
@@ -428,7 +449,7 @@ class _QueryColumnIterator implements ProtocolIterator {
   bool get isClosed => _isClosed;
 
   Future close() async {
-    if (!isClosed) {
+    if (!_isClosed) {
       var hasNext = true;
       while (hasNext) {
         hasNext = _skip();
@@ -445,7 +466,7 @@ class _QueryColumnIterator implements ProtocolIterator {
   }
 
   rawNext() {
-    if (isClosed) {
+    if (_isClosed) {
       throw new StateError("Column iterator closed");
     }
 
@@ -518,7 +539,7 @@ class _QueryRowIterator implements ProtocolIterator {
   bool get isClosed => _isClosed;
 
   Future close() async {
-    if (!isClosed) {
+    if (!_isClosed) {
       var hasNext = true;
       while (hasNext) {
         hasNext = _skip();
@@ -535,7 +556,7 @@ class _QueryRowIterator implements ProtocolIterator {
   }
 
   rawNext() {
-    if (isClosed) {
+    if (_isClosed) {
       throw new StateError("Column iterator closed");
     }
 
@@ -593,7 +614,7 @@ class _PreparedQueryRowIterator implements ProtocolIterator {
   bool get isClosed => _isClosed;
 
   Future close() async {
-    if (!isClosed) {
+    if (!_isClosed) {
       var hasNext = true;
       while (hasNext) {
         hasNext = _skip();
@@ -610,7 +631,7 @@ class _PreparedQueryRowIterator implements ProtocolIterator {
   }
 
   rawNext() {
-    if (isClosed) {
+    if (_isClosed) {
       throw new StateError("Column iterator closed");
     }
 

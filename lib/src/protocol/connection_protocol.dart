@@ -106,6 +106,9 @@ class ConnectionProtocol extends ProtocolDelegate {
 
   InitialHandshakePacket _readInitialHandshakePacket() {
     var packet = new InitialHandshakePacket(_sequenceId, _payloadLength);
+
+    // TODO verifica header
+
     // 1              [0a] protocol version
     packet._protocolVersion = _header;
     // string[NUL]    server version

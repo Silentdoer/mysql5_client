@@ -13,19 +13,6 @@ class _PacketBuffer {
 
   _PacketBuffer.reusable();
 
-  int get header => _header;
-
-  ReaderBuffer get payload => _payload;
-
-  int get payloadLength => _payload.dataLength;
-
-  int get sequenceId => _sequenceId;
-
-  void free() {
-    _payload.free();
-    _sequenceId = null;
-  }
-
   _PacketBuffer reuse(int sequenceId, int header, ReaderBuffer payload) {
     _sequenceId = sequenceId;
     _header = header;
@@ -33,4 +20,17 @@ class _PacketBuffer {
 
     return this;
   }
+
+  void free() {
+    _payload.free();
+    _sequenceId = null;
+  }
+
+  int get sequenceId => _sequenceId;
+
+  ReaderBuffer get payload => _payload;
+
+  int get header => _header;
+
+  int get payloadLength => _payload.dataLength;
 }

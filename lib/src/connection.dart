@@ -5,11 +5,28 @@ import "dart:io";
 
 import "protocol.dart";
 
-class ColumnDefinition {
-  final String name;
-  final int type;
+class ConnectionError extends Error {
+  final String message;
 
-  ColumnDefinition(this.name, this.type);
+  ConnectionError(this.message);
+
+  String toString() => "ConnectionError: $message";
+}
+
+class QueryError extends Error {
+  final String message;
+
+  QueryError(this.message);
+
+  String toString() => "QueryError: $message";
+}
+
+class PreparedStatementError extends Error {
+  final String message;
+
+  PreparedStatementError(this.message);
+
+  String toString() => "PreparedStatementError: $message";
 }
 
 class Connection {
@@ -20,24 +37,6 @@ class Connection {
   ProtocolResult _lastProtocolResult;
 
   bool get isClosed => _protocol == null;
-
-  Future close() async {
-    if (isClosed) {
-      throw new StateError("Connection closed");
-    }
-
-    await _lastProtocolResult?.close();
-
-    // TODO chiudo tutti gli eventuali statement ancora aperti (senza inviare la richiesta di chiusura del protocollo)
-
-    var socket = _socket;
-
-    _socket = null;
-    _protocol = null;
-
-    await socket.close();
-    socket.destroy();
-  }
 
   Future connect(host, int port, String userName, String password,
       [String database]) async {
@@ -174,39 +173,89 @@ class Connection {
       _protocol.preparedStatementProtocol.freeReusables();
     }
   }
+
+  Future close() async {
+    if (isClosed) {
+      throw new StateError("Connection closed");
+    }
+
+    await _lastProtocolResult?.close();
+
+    // TODO chiudo tutti gli eventuali statement ancora aperti (senza inviare la richiesta di chiusura del protocollo)
+
+    var socket = _socket;
+
+    _socket = null;
+    _protocol = null;
+
+    await socket.close();
+    socket.destroy();
+  }
 }
 
-class ConnectionError extends Error {
-  final String message;
+abstract class ProtocolResult {
+  Future free();
 
-  ConnectionError(this.message);
-
-  String toString() => "ConnectionError: $message";
+  Future close();
 }
 
-class PreparedQueryResult implements ProtocolResult {
-  final PreparedStatement _statement;
+abstract class ProtocolIterator {
+  bool get isClosed;
+
+  Future<bool> next();
+
+  // TODO qui si potrebbe utilizzare il FutureWrapper
+  rawNext();
+
+  Future close();
+}
+
+class ColumnDefinition {
+  final String name;
+  final int type;
+
+  ColumnDefinition(this.name, this.type);
+}
+
+class QueryResult implements ProtocolResult, ProtocolIterator {
+  final Connection _connection;
 
   final int affectedRows;
 
   final int lastInsertId;
 
-  _PreparedQueryRowIterator _rowIterator;
+  final List<ColumnDefinition> columns;
 
-  PreparedQueryResult.ok(this.affectedRows, this.lastInsertId)
-      : this._statement = null,
-        this._rowIterator = null;
+  _QueryRowIterator _rowIterator;
 
-  PreparedQueryResult.resultSet(PreparedStatement statement)
-      : this._statement = statement,
-        this.affectedRows = null,
+  QueryResult.resultSet(this.columns, this._connection)
+      : this.affectedRows = null,
         this.lastInsertId = null {
-    this._rowIterator = new _PreparedQueryRowIterator(this);
+    this._rowIterator = new _QueryRowIterator(this);
   }
 
-  int get columnCount => _statement?.columnCount;
+  QueryResult.ok(this.affectedRows, this.lastInsertId, this._connection)
+      : this.columns = null,
+        this._rowIterator = null;
+
+  int get columnCount => columns.length;
 
   bool get isClosed => _rowIterator == null || _rowIterator.isClosed;
+
+  Future<bool> next() => _rowIterator.next();
+
+  rawNext() => _rowIterator.rawNext();
+
+  String getStringValue(int index) => _rowIterator.getStringValue(index);
+
+  num getNumValue(int index) => _rowIterator.getNumValue(index);
+
+  bool getBoolValue(int index) => _rowIterator.getBoolValue(index);
+
+  @override
+  Future free() async {
+    await close();
+  }
 
   @override
   Future close() async {
@@ -214,21 +263,6 @@ class PreparedQueryResult implements ProtocolResult {
       await _rowIterator.close();
     }
   }
-
-  @override
-  Future free() async {
-    await close();
-  }
-
-  bool getBoolValue(int index) => _rowIterator.getBoolValue(index);
-
-  num getNumValue(int index) => _rowIterator.getNumValue(index);
-
-  String getStringValue(int index) => _rowIterator.getStringValue(index);
-
-  Future<bool> next() => _rowIterator.next();
-
-  rawNext() => _rowIterator.rawNext();
 }
 
 class PreparedStatement implements ProtocolResult {
@@ -259,28 +293,30 @@ class PreparedStatement implements ProtocolResult {
         growable: false);
   }
 
+  int get parameterCount => parameters.length;
+
   int get columnCount => columns.length;
 
   bool get isClosed => _isClosed;
 
-  int get parameterCount => parameters.length;
-
-  @override
-  Future close() async {
-    if (!_isClosed) {
-      _isClosed = true;
-
-      // TODO chiudo l'eventuale ultimo queryresult attaccato
-
-      // TODO avviso informo il connection della chiusura dello statement
-
-      try {
-        _connection._protocol.preparedStatementProtocol
-            .writeCommandStatementClosePacket(_statementId);
-      } finally {
-        _connection._protocol.preparedStatementProtocol.freeReusables();
-      }
+  void setParameter(int index, value, [int sqlType]) {
+    if (_isClosed) {
+      throw new StateError("Prepared statement closed");
     }
+
+    if (index >= parameterCount) {
+      throw new IndexError(index, _parameterValues);
+    }
+
+    sqlType ??= _connection._protocol.preparedStatementProtocol
+        .getSqlTypeFromValue(value);
+
+    if (sqlType != null && _parameterTypes[index] != sqlType) {
+      _parameterTypes[index] = sqlType;
+      _isNewParamsBoundFlag = true;
+    }
+
+    _parameterValues[index] = value;
   }
 
   Future<PreparedQueryResult> executeQuery() async {
@@ -333,192 +369,69 @@ class PreparedStatement implements ProtocolResult {
     // TODO non posso chiudere lo statement ma posso liberare qualcosa?
   }
 
-  void setParameter(int index, value, [int sqlType]) {
-    if (_isClosed) {
-      throw new StateError("Prepared statement closed");
+  @override
+  Future close() async {
+    if (!_isClosed) {
+      _isClosed = true;
+
+      // TODO chiudo l'eventuale ultimo queryresult attaccato
+
+      // TODO avviso informo il connection della chiusura dello statement
+
+      try {
+        _connection._protocol.preparedStatementProtocol
+            .writeCommandStatementClosePacket(_statementId);
+      } finally {
+        _connection._protocol.preparedStatementProtocol.freeReusables();
+      }
     }
-
-    if (index >= parameterCount) {
-      throw new IndexError(index, _parameterValues);
-    }
-
-    sqlType ??= _connection._protocol.preparedStatementProtocol
-        .getSqlTypeFromValue(value);
-
-    if (sqlType != null && _parameterTypes[index] != sqlType) {
-      _parameterTypes[index] = sqlType;
-      _isNewParamsBoundFlag = true;
-    }
-
-    _parameterValues[index] = value;
   }
 }
 
-class PreparedStatementError extends Error {
-  final String message;
-
-  PreparedStatementError(this.message);
-
-  String toString() => "PreparedStatementError: $message";
-}
-
-abstract class ProtocolIterator {
-  bool get isClosed;
-
-  Future close();
-
-  // TODO qui si potrebbe utilizzare il FutureWrapper
-  Future<bool> next();
-
-  rawNext();
-}
-
-abstract class ProtocolResult {
-  Future close();
-
-  Future free();
-}
-
-class QueryError extends Error {
-  final String message;
-
-  QueryError(this.message);
-
-  String toString() => "QueryError: $message";
-}
-
-class QueryResult implements ProtocolResult, ProtocolIterator {
-  final Connection _connection;
+class PreparedQueryResult implements ProtocolResult {
+  final PreparedStatement _statement;
 
   final int affectedRows;
 
   final int lastInsertId;
 
-  final List<ColumnDefinition> columns;
+  _PreparedQueryRowIterator _rowIterator;
 
-  _QueryRowIterator _rowIterator;
-
-  QueryResult.ok(this.affectedRows, this.lastInsertId, this._connection)
-      : this.columns = null,
-        this._rowIterator = null;
-
-  QueryResult.resultSet(this.columns, this._connection)
-      : this.affectedRows = null,
+  PreparedQueryResult.resultSet(PreparedStatement statement)
+      : this._statement = statement,
+        this.affectedRows = null,
         this.lastInsertId = null {
-    this._rowIterator = new _QueryRowIterator(this);
+    this._rowIterator = new _PreparedQueryRowIterator(this);
   }
 
-  int get columnCount => columns.length;
+  PreparedQueryResult.ok(this.affectedRows, this.lastInsertId)
+      : this._statement = null,
+        this._rowIterator = null;
+
+  int get columnCount => _statement?.columnCount;
 
   bool get isClosed => _rowIterator == null || _rowIterator.isClosed;
 
-  @override
-  Future close() async {
-    if (_rowIterator != null && !_rowIterator.isClosed) {
-      await _rowIterator.close();
-    }
-  }
+  Future<bool> next() => _rowIterator.next();
+
+  rawNext() => _rowIterator.rawNext();
+
+  String getStringValue(int index) => _rowIterator.getStringValue(index);
+
+  num getNumValue(int index) => _rowIterator.getNumValue(index);
+
+  bool getBoolValue(int index) => _rowIterator.getBoolValue(index);
 
   @override
   Future free() async {
     await close();
   }
 
-  bool getBoolValue(int index) => _rowIterator.getBoolValue(index);
-
-  num getNumValue(int index) => _rowIterator.getNumValue(index);
-
-  String getStringValue(int index) => _rowIterator.getStringValue(index);
-
-  Future<bool> next() => _rowIterator.next();
-
-  rawNext() => _rowIterator.rawNext();
-}
-
-class _PreparedQueryRowIterator implements ProtocolIterator {
-  final PreparedQueryResult _result;
-
-  bool _isClosed;
-
-  _PreparedQueryRowIterator(this._result) {
-    _isClosed = false;
-  }
-
-  bool get isClosed => _isClosed;
-
+  @override
   Future close() async {
-    if (!_isClosed) {
-      var hasNext = true;
-      while (hasNext) {
-        hasNext = _skip();
-        hasNext = hasNext is Future ? await hasNext : hasNext;
-      }
-
-      _isClosed = true;
+    if (_rowIterator != null && !_rowIterator.isClosed) {
+      await _rowIterator.close();
     }
-  }
-
-  bool getBoolValue(int index) {
-    var formatted = getNumValue(index);
-    return formatted != null ? formatted != 0 : null;
-  }
-
-  num getNumValue(int index) {
-    var column = _result._statement.columns[index];
-    switch (column.type) {
-      case MYSQL_TYPE_TINY:
-      case MYSQL_TYPE_LONG:
-      case MYSQL_TYPE_LONGLONG:
-        return _result._statement._connection._protocol
-            .preparedStatementProtocol.reusableRowPacket.getInteger(index);
-      case MYSQL_TYPE_DOUBLE:
-        return _result._statement._connection._protocol
-            .preparedStatementProtocol.reusableRowPacket.getDouble(index);
-      default:
-        throw new UnsupportedError("Sql type not supported ${column.type}");
-    }
-  }
-
-  String getStringValue(int index) => _result._statement._connection._protocol
-      .preparedStatementProtocol.reusableRowPacket.getUTF8String(index);
-
-  Future<bool> next() {
-    var value = rawNext();
-    return value is Future ? value : new Future.value(value);
-  }
-
-  rawNext() {
-    if (_isClosed) {
-      throw new StateError("Column iterator closed");
-    }
-
-    var response = _result
-        ._statement._connection._protocol.preparedStatementProtocol
-        .readResultSetRowResponse(_result._statement._columnTypes);
-
-    return response is Future
-        ? response.then((response) => _checkNext(response))
-        : _checkNext(response);
-  }
-
-  bool _checkNext(Packet response) {
-    if (response is PreparedResultSetRowPacket) {
-      return true;
-    } else {
-      _isClosed = true;
-      _result._statement._connection._protocol.preparedStatementProtocol
-          .freeReusables();
-      return false;
-    }
-  }
-
-  _skip() {
-    var response = _result._statement._connection._protocol
-        .preparedStatementProtocol.skipResultSetRowResponse();
-
-    return response is Future
-        ? response.then((response) => _checkNext(response))
-        : _checkNext(response);
   }
 }
 
@@ -533,35 +446,8 @@ class _QueryColumnIterator implements ProtocolIterator {
     _isClosed = false;
   }
 
-  String get catalog => _connection
-      ._protocol.queryCommandTextProtocol.reusableColumnPacket.catalog;
-
-  int get characterSet => _connection
-      ._protocol.queryCommandTextProtocol.reusableColumnPacket.characterSet;
-
-  int get columnLength => _connection
-      ._protocol.queryCommandTextProtocol.reusableColumnPacket.columnLength;
-
-  int get decimals => _connection
-      ._protocol.queryCommandTextProtocol.reusableColumnPacket.decimals;
-
-  int get fieldsLength => _connection
-      ._protocol.queryCommandTextProtocol.reusableColumnPacket.fieldsLength;
-  int get flags =>
-      _connection._protocol.queryCommandTextProtocol.reusableColumnPacket.flags;
   bool get isClosed => _isClosed;
-  String get name =>
-      _connection._protocol.queryCommandTextProtocol.reusableColumnPacket.name;
-  String get orgName => _connection
-      ._protocol.queryCommandTextProtocol.reusableColumnPacket.orgName;
-  String get orgTable => _connection
-      ._protocol.queryCommandTextProtocol.reusableColumnPacket.orgTable;
-  String get schema => _connection
-      ._protocol.queryCommandTextProtocol.reusableColumnPacket.schema;
-  String get table =>
-      _connection._protocol.queryCommandTextProtocol.reusableColumnPacket.table;
-  int get type =>
-      _connection._protocol.queryCommandTextProtocol.reusableColumnPacket.type;
+
   Future close() async {
     if (!_isClosed) {
       var hasNext = true;
@@ -596,15 +482,30 @@ class _QueryColumnIterator implements ProtocolIterator {
     }
   }
 
-  bool _checkNext(Packet response) {
-    if (response is ResultSetColumnDefinitionPacket) {
-      return true;
-    } else {
-      _isClosed = true;
-      _connection._protocol.queryCommandTextProtocol.freeReusables();
-      return false;
-    }
-  }
+  String get catalog => _connection
+      ._protocol.queryCommandTextProtocol.reusableColumnPacket.catalog;
+  String get schema => _connection
+      ._protocol.queryCommandTextProtocol.reusableColumnPacket.schema;
+  String get table =>
+      _connection._protocol.queryCommandTextProtocol.reusableColumnPacket.table;
+  String get orgTable => _connection
+      ._protocol.queryCommandTextProtocol.reusableColumnPacket.orgTable;
+  String get name =>
+      _connection._protocol.queryCommandTextProtocol.reusableColumnPacket.name;
+  String get orgName => _connection
+      ._protocol.queryCommandTextProtocol.reusableColumnPacket.orgName;
+  int get fieldsLength => _connection
+      ._protocol.queryCommandTextProtocol.reusableColumnPacket.fieldsLength;
+  int get characterSet => _connection
+      ._protocol.queryCommandTextProtocol.reusableColumnPacket.characterSet;
+  int get columnLength => _connection
+      ._protocol.queryCommandTextProtocol.reusableColumnPacket.columnLength;
+  int get type =>
+      _connection._protocol.queryCommandTextProtocol.reusableColumnPacket.type;
+  int get flags =>
+      _connection._protocol.queryCommandTextProtocol.reusableColumnPacket.flags;
+  int get decimals => _connection
+      ._protocol.queryCommandTextProtocol.reusableColumnPacket.decimals;
 
   _skip() {
     var response = _connection._protocol.queryCommandTextProtocol
@@ -613,6 +514,16 @@ class _QueryColumnIterator implements ProtocolIterator {
     return response is Future
         ? response.then((response) => _checkNext(response))
         : _checkNext(response);
+  }
+
+  bool _checkNext(Packet response) {
+    if (response is ResultSetColumnDefinitionPacket) {
+      return true;
+    } else {
+      _isClosed = true;
+      _connection._protocol.queryCommandTextProtocol.freeReusables();
+      return false;
+    }
   }
 }
 
@@ -639,20 +550,6 @@ class _QueryRowIterator implements ProtocolIterator {
     }
   }
 
-  bool getBoolValue(int index) {
-    var formatted = getNumValue(index);
-    return formatted != null ? formatted != 0 : null;
-  }
-
-  num getNumValue(int index) {
-    var formatted = _result._connection._protocol.queryCommandTextProtocol
-        .reusableRowPacket.getString(index);
-    return formatted != null ? num.parse(formatted) : null;
-  }
-
-  String getStringValue(int index) => _result._connection._protocol
-      .queryCommandTextProtocol.reusableRowPacket.getUTF8String(index);
-
   Future<bool> next() {
     var value = rawNext();
     return value is Future ? value : new Future.value(value);
@@ -671,14 +568,18 @@ class _QueryRowIterator implements ProtocolIterator {
         : _checkNext(response);
   }
 
-  bool _checkNext(Packet response) {
-    if (response is ResultSetRowPacket) {
-      return true;
-    } else {
-      _isClosed = true;
-      _result._connection._protocol.queryCommandTextProtocol.freeReusables();
-      return false;
-    }
+  String getStringValue(int index) => _result._connection._protocol
+      .queryCommandTextProtocol.reusableRowPacket.getUTF8String(index);
+
+  num getNumValue(int index) {
+    var formatted = _result._connection._protocol.queryCommandTextProtocol
+        .reusableRowPacket.getString(index);
+    return formatted != null ? num.parse(formatted) : null;
+  }
+
+  bool getBoolValue(int index) {
+    var formatted = getNumValue(index);
+    return formatted != null ? formatted != 0 : null;
   }
 
   _skip() {
@@ -688,5 +589,102 @@ class _QueryRowIterator implements ProtocolIterator {
     return response is Future
         ? response.then((response) => _checkNext(response))
         : _checkNext(response);
+  }
+
+  bool _checkNext(Packet response) {
+    if (response is ResultSetRowPacket) {
+      return true;
+    } else {
+      _isClosed = true;
+      _result._connection._protocol.queryCommandTextProtocol.freeReusables();
+      return false;
+    }
+  }
+}
+
+class _PreparedQueryRowIterator implements ProtocolIterator {
+  final PreparedQueryResult _result;
+
+  bool _isClosed;
+
+  _PreparedQueryRowIterator(this._result) {
+    _isClosed = false;
+  }
+
+  bool get isClosed => _isClosed;
+
+  Future close() async {
+    if (!_isClosed) {
+      var hasNext = true;
+      while (hasNext) {
+        hasNext = _skip();
+        hasNext = hasNext is Future ? await hasNext : hasNext;
+      }
+
+      _isClosed = true;
+    }
+  }
+
+  Future<bool> next() {
+    var value = rawNext();
+    return value is Future ? value : new Future.value(value);
+  }
+
+  rawNext() {
+    if (_isClosed) {
+      throw new StateError("Column iterator closed");
+    }
+
+    var response = _result
+        ._statement._connection._protocol.preparedStatementProtocol
+        .readResultSetRowResponse(_result._statement._columnTypes);
+
+    return response is Future
+        ? response.then((response) => _checkNext(response))
+        : _checkNext(response);
+  }
+
+  String getStringValue(int index) => _result._statement._connection._protocol
+      .preparedStatementProtocol.reusableRowPacket.getUTF8String(index);
+
+  num getNumValue(int index) {
+    var column = _result._statement.columns[index];
+    switch (column.type) {
+      case MYSQL_TYPE_TINY:
+      case MYSQL_TYPE_LONG:
+      case MYSQL_TYPE_LONGLONG:
+        return _result._statement._connection._protocol
+            .preparedStatementProtocol.reusableRowPacket.getInteger(index);
+      case MYSQL_TYPE_DOUBLE:
+        return _result._statement._connection._protocol
+            .preparedStatementProtocol.reusableRowPacket.getDouble(index);
+      default:
+        throw new UnsupportedError("Sql type not supported ${column.type}");
+    }
+  }
+
+  bool getBoolValue(int index) {
+    var formatted = getNumValue(index);
+    return formatted != null ? formatted != 0 : null;
+  }
+
+  _skip() {
+    var response = _result._statement._connection._protocol
+        .preparedStatementProtocol.skipResultSetRowResponse();
+
+    return response is Future
+        ? response.then((response) => _checkNext(response))
+        : _checkNext(response);
+  }
+
+  bool _checkNext(Packet response) {
+    if (response is PreparedResultSetRowPacket) {
+      return true;
+    } else {
+      _isClosed = true;
+      _result._statement._connection._protocol.preparedStatementProtocol
+          .freeReusables();
+      return false;
+    }
   }
 }

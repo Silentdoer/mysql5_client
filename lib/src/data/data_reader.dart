@@ -24,11 +24,6 @@ class DataReader {
 
   readBuffer(int length) => _readBuffer(0, length, length);
 
-  void _onData(List<int> data) {
-    _chunks.add(new DataChunk(data));
-    _dataReadyCompleter?.complete();
-  }
-
   _readBuffer(int reusableChunksCount, int totalLength, int leftLength) {
     if (_chunks.isEmpty) {
       _dataReadyCompleter = new Completer();
@@ -58,5 +53,10 @@ class DataReader {
     return leftLength > 0
         ? _readBuffer(reusableChunksCount, totalLength, leftLength)
         : _reusableBuffer.reuse(reusableChunksCount, totalLength);
+  }
+
+  void _onData(List<int> data) {
+    _chunks.add(new DataChunk(data));
+    _dataReadyCompleter?.complete();
   }
 }

@@ -20,17 +20,12 @@ class ReaderBuffer {
 
   ReaderBuffer.reusable() : this._chunks = new List<DataChunk>();
 
-  int get dataLength => _dataLength;
-
-  bool get isDataLeft => _readCount < _dataLength;
-
-  bool get isNotDataLeft => _readCount == _dataLength;
-
-  int get leftCount => _dataLength - _readCount;
-
-  int get readCount => _readCount;
-
-  int checkByte() => _chunks[_chunkIndex].checkOneByte();
+  ReaderBuffer reuse(int reusableChunks, int dataLength) {
+    _dataLength = dataLength;
+    _chunkIndex = 0;
+    _readCount = 0;
+    return this;
+  }
 
   void free() {
     if (_chunkIndex != null) {
@@ -52,6 +47,18 @@ class ReaderBuffer {
       return chunk;
     }
   }
+
+  int get dataLength => _dataLength;
+
+  int get readCount => _readCount;
+
+  int get leftCount => _dataLength - _readCount;
+
+  bool get isDataLeft => _readCount < _dataLength;
+
+  bool get isNotDataLeft => _readCount == _dataLength;
+
+  int checkByte() => _chunks[_chunkIndex].checkOneByte();
 
   int readByte() {
     var chunk = _chunks[_chunkIndex];
@@ -124,12 +131,5 @@ class ReaderBuffer {
     // skip the terminator
     _readCount++;
     return range;
-  }
-
-  ReaderBuffer reuse(int reusableChunks, int dataLength) {
-    _dataLength = dataLength;
-    _chunkIndex = 0;
-    _readCount = 0;
-    return this;
   }
 }

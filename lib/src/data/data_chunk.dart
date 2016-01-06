@@ -4,7 +4,6 @@
 library mysql_client.data_chunk;
 
 import 'dart:math';
-
 import 'data_range.dart';
 
 class DataChunk {
@@ -18,11 +17,31 @@ class DataChunk {
 
   DataChunk.reusable();
 
-  bool get isEmpty => _length == 0;
+  DataChunk reuse(List<int> data, [int start = 0, int length]) {
+    _data = data;
+    _start = start;
+    _length = length ?? _data.length - _start;
+    return this;
+  }
 
+  void free() {
+    _data = null;
+    _start = null;
+    _length = null;
+  }
+
+  bool get isEmpty => _length == 0;
   int get length => _length;
 
   int checkOneByte() => _data[_start];
+
+  int extractOneByte() {
+    var value = _data[_start];
+    _start++;
+    _length--;
+    return value;
+  }
+
   DataChunk extractDataChunk(int length, DataChunk reusableChunk) {
     length = min(_length, length);
     var chunk = reusableChunk.reuse(_data, _start, length);
@@ -45,13 +64,6 @@ class DataChunk {
     return range;
   }
 
-  int extractOneByte() {
-    var value = _data[_start];
-    _start++;
-    _length--;
-    return value;
-  }
-
   DataRange extractUpToDataRange(int terminator, DataRange reusableRange) {
     DataRange range;
     int i = _data.indexOf(terminator, _start);
@@ -67,18 +79,5 @@ class DataChunk {
       _length -= range.length;
     }
     return range;
-  }
-
-  void free() {
-    _data = null;
-    _start = null;
-    _length = null;
-  }
-
-  DataChunk reuse(List<int> data, [int start = 0, int length]) {
-    _data = data;
-    _start = start;
-    _length = length ?? _data.length - _start;
-    return this;
   }
 }

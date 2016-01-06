@@ -2,13 +2,13 @@ part of mysql_client.protocol;
 
 const int COM_QUERY = 0x03;
 
-const int MYSQL_TYPE_DATETIME = 0x0c;
-const int MYSQL_TYPE_DOUBLE = 0x05;
+const int MYSQL_TYPE_TINY = 0x01;
 const int MYSQL_TYPE_LONG = 0x03;
-const int MYSQL_TYPE_LONGLONG = 0x08;
+const int MYSQL_TYPE_DOUBLE = 0x05;
 const int MYSQL_TYPE_NULL = 0x06;
 const int MYSQL_TYPE_TIMESTAMP = 0x07;
-const int MYSQL_TYPE_TINY = 0x01;
+const int MYSQL_TYPE_LONGLONG = 0x08;
+const int MYSQL_TYPE_DATETIME = 0x0c;
 const int MYSQL_TYPE_VAR_STRING = 0xfd;
 
 class QueryCommandTextProtocol extends ProtocolDelegate {
@@ -33,42 +33,6 @@ class QueryCommandTextProtocol extends ProtocolDelegate {
     _reusableRowPacket?._free();
   }
 
-  Future<Packet> readCommandQueryResponse() {
-    var value = _readPacketBuffer();
-    var value2 = value is Future
-        ? value.then((_) => _readCommandQueryResponsePacket())
-        : _readCommandQueryResponsePacket();
-    return value2 is Future ? value2 : new Future.value(value2);
-  }
-
-  readResultSetColumnDefinitionResponse() {
-    var value = _readPacketBuffer();
-    return value is Future
-        ? value.then((_) => _readResultSetColumnDefinitionResponsePacket())
-        : _readResultSetColumnDefinitionResponsePacket();
-  }
-
-  readResultSetRowResponse() {
-    var value = _readPacketBuffer();
-    return value is Future
-        ? value.then((_) => _readResultSetRowResponsePacket())
-        : _readResultSetRowResponsePacket();
-  }
-
-  skipResultSetColumnDefinitionResponse() {
-    var value = _readPacketBuffer();
-    return value is Future
-        ? value.then((_) => _skipResultSetColumnDefinitionResponsePacket())
-        : _skipResultSetColumnDefinitionResponsePacket();
-  }
-
-  skipResultSetRowResponse() {
-    var value = _readPacketBuffer();
-    return value is Future
-        ? value.then((_) => _skipResultSetRowResponsePacket())
-        : _skipResultSetRowResponsePacket();
-  }
-
   void writeCommandQueryPacket(String query) {
     _createWriterBuffer();
 
@@ -82,7 +46,41 @@ class QueryCommandTextProtocol extends ProtocolDelegate {
     _writePacket(sequenceId);
   }
 
-  bool _isLocalInFilePacket() => _header == 0xfb;
+  Future<Packet> readCommandQueryResponse() {
+    var value = _readPacketBuffer();
+    var value2 = value is Future
+        ? value.then((_) => _readCommandQueryResponsePacket())
+        : _readCommandQueryResponsePacket();
+    return value2 is Future ? value2 : new Future.value(value2);
+  }
+
+  skipResultSetColumnDefinitionResponse() {
+    var value = _readPacketBuffer();
+    return value is Future
+        ? value.then((_) => _skipResultSetColumnDefinitionResponsePacket())
+        : _skipResultSetColumnDefinitionResponsePacket();
+  }
+
+  readResultSetColumnDefinitionResponse() {
+    var value = _readPacketBuffer();
+    return value is Future
+        ? value.then((_) => _readResultSetColumnDefinitionResponsePacket())
+        : _readResultSetColumnDefinitionResponsePacket();
+  }
+
+  skipResultSetRowResponse() {
+    var value = _readPacketBuffer();
+    return value is Future
+        ? value.then((_) => _skipResultSetRowResponsePacket())
+        : _skipResultSetRowResponsePacket();
+  }
+
+  readResultSetRowResponse() {
+    var value = _readPacketBuffer();
+    return value is Future
+        ? value.then((_) => _readResultSetRowResponsePacket())
+        : _readResultSetRowResponsePacket();
+  }
 
   Packet _readCommandQueryResponsePacket() {
     if (_isOkPacket()) {
@@ -96,6 +94,46 @@ class QueryCommandTextProtocol extends ProtocolDelegate {
     }
   }
 
+  Packet _skipResultSetColumnDefinitionResponsePacket() {
+    if (_isErrorPacket()) {
+      return _readErrorPacket();
+    } else if (_isEOFPacket()) {
+      return _readEOFPacket();
+    } else {
+      return _skipResultSetColumnDefinitionPacket();
+    }
+  }
+
+  Packet _readResultSetColumnDefinitionResponsePacket() {
+    if (_isErrorPacket()) {
+      return _readErrorPacket();
+    } else if (_isEOFPacket()) {
+      return _readEOFPacket();
+    } else {
+      return _readResultSetColumnDefinitionPacket();
+    }
+  }
+
+  Packet _skipResultSetRowResponsePacket() {
+    if (_isErrorPacket()) {
+      return _readErrorPacket();
+    } else if (_isEOFPacket()) {
+      return _readEOFPacket();
+    } else {
+      return _skipResultSetRowPacket();
+    }
+  }
+
+  Packet _readResultSetRowResponsePacket() {
+    if (_isErrorPacket()) {
+      return _readErrorPacket();
+    } else if (_isEOFPacket()) {
+      return _readEOFPacket();
+    } else {
+      return _readResultSetRowPacket();
+    }
+  }
+
   ResultSetColumnCountPacket _readResultSetColumnCountPacket() {
     var packet = new ResultSetColumnCountPacket(_sequenceId, _payloadLength);
 
@@ -104,6 +142,14 @@ class QueryCommandTextProtocol extends ProtocolDelegate {
 
     _reusableRowPacket =
         new ResultSetRowPacket.reusable(_protocol, packet._columnCount);
+
+    return packet;
+  }
+
+  ResultSetColumnDefinitionPacket _skipResultSetColumnDefinitionPacket() {
+    var packet = _reusableColumnPacket.reuse(_sequenceId, _payloadLength);
+
+    _skipBytes(_payloadLength);
 
     return packet;
   }
@@ -156,14 +202,12 @@ class QueryCommandTextProtocol extends ProtocolDelegate {
     return packet;
   }
 
-  Packet _readResultSetColumnDefinitionResponsePacket() {
-    if (_isErrorPacket()) {
-      return _readErrorPacket();
-    } else if (_isEOFPacket()) {
-      return _readEOFPacket();
-    } else {
-      return _readResultSetColumnDefinitionPacket();
-    }
+  ResultSetRowPacket _skipResultSetRowPacket() {
+    var packet = _reusableRowPacket.reuse(_sequenceId, _payloadLength);
+
+    _skipBytes(_payloadLength);
+
+    return packet;
   }
 
   ResultSetRowPacket _readResultSetRowPacket() {
@@ -183,51 +227,7 @@ class QueryCommandTextProtocol extends ProtocolDelegate {
     return packet;
   }
 
-  Packet _readResultSetRowResponsePacket() {
-    if (_isErrorPacket()) {
-      return _readErrorPacket();
-    } else if (_isEOFPacket()) {
-      return _readEOFPacket();
-    } else {
-      return _readResultSetRowPacket();
-    }
-  }
-
-  ResultSetColumnDefinitionPacket _skipResultSetColumnDefinitionPacket() {
-    var packet = _reusableColumnPacket.reuse(_sequenceId, _payloadLength);
-
-    _skipBytes(_payloadLength);
-
-    return packet;
-  }
-
-  Packet _skipResultSetColumnDefinitionResponsePacket() {
-    if (_isErrorPacket()) {
-      return _readErrorPacket();
-    } else if (_isEOFPacket()) {
-      return _readEOFPacket();
-    } else {
-      return _skipResultSetColumnDefinitionPacket();
-    }
-  }
-
-  ResultSetRowPacket _skipResultSetRowPacket() {
-    var packet = _reusableRowPacket.reuse(_sequenceId, _payloadLength);
-
-    _skipBytes(_payloadLength);
-
-    return packet;
-  }
-
-  Packet _skipResultSetRowResponsePacket() {
-    if (_isErrorPacket()) {
-      return _readErrorPacket();
-    } else if (_isEOFPacket()) {
-      return _readEOFPacket();
-    } else {
-      return _skipResultSetRowPacket();
-    }
-  }
+  bool _isLocalInFilePacket() => _header == 0xfb;
 }
 
 class ResultSetColumnCountPacket extends Packet {
@@ -243,21 +243,21 @@ class ResultSetColumnDefinitionPacket extends ReusablePacket {
   ResultSetColumnDefinitionPacket.reusable(Protocol protocol)
       : super.reusable(protocol, 13);
 
-  String get catalog => getString(0);
-
-  int get characterSet => getInteger(7);
-  int get columnLength => getInteger(8);
-  int get decimals => getInteger(11);
-  int get fieldsLength => getInteger(6);
-  int get flags => getInteger(10);
-  String get name => getString(4);
-  String get orgName => getString(5);
-  String get orgTable => getString(3);
-  String get schema => getString(1);
-  String get table => getString(2);
-  int get type => getInteger(9);
   ResultSetColumnDefinitionPacket reuse(int payloadLength, int sequenceId) =>
       _reuse(payloadLength, sequenceId);
+
+  String get catalog => getString(0);
+  String get schema => getString(1);
+  String get table => getString(2);
+  String get orgTable => getString(3);
+  String get name => getString(4);
+  String get orgName => getString(5);
+  int get fieldsLength => getInteger(6);
+  int get characterSet => getInteger(7);
+  int get columnLength => getInteger(8);
+  int get type => getInteger(9);
+  int get flags => getInteger(10);
+  int get decimals => getInteger(11);
 }
 
 class ResultSetRowPacket extends ReusablePacket {

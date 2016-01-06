@@ -118,8 +118,7 @@ Future test10() async {
     try {
       // TODO problema nelle catch credo
       await connection.close();
-    } catch (e) {
-    }
+    } catch (e) {}
   }
 }
 
@@ -154,8 +153,7 @@ Future test9() async {
         break;
       }
 
-      print(
-          "${queryResult.getNumValue(0)}: ${queryResult.getStringValue(1)}");
+      print("${queryResult.getNumValue(0)}: ${queryResult.getStringValue(1)}");
     }
 
     await queryResult.close();
@@ -185,8 +183,7 @@ Future test8() async {
         break;
       }
 
-      print(
-          "${queryResult.getNumValue(0)}: ${queryResult.getStringValue(1)}");
+      print("${queryResult.getNumValue(0)}: ${queryResult.getStringValue(1)}");
     }
   } catch (e, s) {
     print("Error: $e");
@@ -237,8 +234,7 @@ Future test7() async {
         break;
       }
 
-      print(
-          "${queryResult.getNumValue(0)}: ${queryResult.getStringValue(1)}");
+      print("${queryResult.getNumValue(0)}: ${queryResult.getStringValue(1)}");
     }
   } finally {
     await connection.close();

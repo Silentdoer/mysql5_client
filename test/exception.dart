@@ -21,7 +21,7 @@ void test1() {
   } finally {
     try {
       throw new ArgumentError("error 2");
-    } catch(e) {
+    } catch (e) {
       print("error 2 catched");
     }
   }
@@ -34,7 +34,7 @@ void test2() {
   } finally {
     try {
       throw new ArgumentError("error 2");
-    } catch(e) {
+    } catch (e) {
       print("error 2 catched");
     }
   }

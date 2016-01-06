@@ -1,11 +1,28 @@
 part of mysql_client.protocol;
 
-const int COM_STMT_PREPARE = 0x16;
-const int COM_STMT_EXECUTE = 0x17;
 const int COM_STMT_CLOSE = 0x19;
+const int COM_STMT_EXECUTE = 0x17;
+const int COM_STMT_PREPARE = 0x16;
 const int COM_STMT_RESET = 0x1a;
 
 const int CURSOR_TYPE_NO_CURSOR = 0x00;
+
+class CommandStatementPrepareOkResponsePacket extends Packet {
+  int _status;
+  int _statementId;
+  int _numColumns;
+  int _numParams;
+  int _warningCount;
+
+  CommandStatementPrepareOkResponsePacket(int payloadLength, int sequenceId)
+      : super(payloadLength, sequenceId);
+
+  int get numColumns => _numColumns;
+  int get numParams => _numParams;
+  int get statementId => _statementId;
+  int get status => _status;
+  int get warningCount => _warningCount;
+}
 
 enum DataType {
   STRING,
@@ -16,6 +33,14 @@ enum DataType {
   DOUBLE,
   FLOAT,
   DATETIME
+}
+
+class PreparedResultSetRowPacket extends ReusablePacket {
+  PreparedResultSetRowPacket.reusable(Protocol protocol, int columnCount)
+      : super.reusable(protocol, columnCount);
+
+  PreparedResultSetRowPacket reuse(int payloadLength, int sequenceId) =>
+      _reuse(payloadLength, sequenceId);
 }
 
 class PreparedStatementProtocol extends ProtocolDelegate {
@@ -52,15 +77,45 @@ class PreparedStatementProtocol extends ProtocolDelegate {
     }
   }
 
-  void writeCommandStatementPreparePacket(String query) {
+  Future<Packet> readCommandStatementExecuteResponse() {
+    var value = _readPacketBuffer();
+    var value2 = value is Future
+        ? value.then((_) => _readCommandStatementExecuteResponsePacket())
+        : _readCommandStatementExecuteResponsePacket();
+    return value2 is Future ? value2 : new Future.value(value2);
+  }
+
+  Future<Packet> readCommandStatementPrepareResponse() {
+    var value = _readPacketBuffer();
+    var value2 = value is Future
+        ? value.then((_) => _readCommandStatementPrepareResponsePacket())
+        : _readCommandStatementPrepareResponsePacket();
+    return value2 is Future ? value2 : new Future.value(value2);
+  }
+
+  readResultSetRowResponse(List<int> columnTypes) {
+    var value = _readPacketBuffer();
+    return value is Future
+        ? value.then((_) => _readResultSetRowResponsePacket(columnTypes))
+        : _readResultSetRowResponsePacket(columnTypes);
+  }
+
+  skipResultSetRowResponse() {
+    var value = _readPacketBuffer();
+    return value is Future
+        ? value.then((_) => _skipResultSetRowResponsePacket())
+        : _skipResultSetRowResponsePacket();
+  }
+
+  void writeCommandStatementClosePacket(int statementId) {
     _createWriterBuffer();
 
     var sequenceId = 0x00;
 
-    // command (1) -- [16] the COM_STMT_PREPARE command
-    _writeFixedLengthInteger(COM_STMT_PREPARE, 1);
-    // query (string.EOF) -- the query to prepare
-    _writeFixedLengthUTF8String(query);
+    // 1              [19] COM_STMT_CLOSE
+    _writeFixedLengthInteger(COM_STMT_CLOSE, 1);
+    // 4              statement-id
+    _writeFixedLengthInteger(statementId, 4);
 
     _writePacket(sequenceId);
   }
@@ -129,6 +184,19 @@ class PreparedStatementProtocol extends ProtocolDelegate {
     _writePacket(sequenceId);
   }
 
+  void writeCommandStatementPreparePacket(String query) {
+    _createWriterBuffer();
+
+    var sequenceId = 0x00;
+
+    // command (1) -- [16] the COM_STMT_PREPARE command
+    _writeFixedLengthInteger(COM_STMT_PREPARE, 1);
+    // query (string.EOF) -- the query to prepare
+    _writeFixedLengthUTF8String(query);
+
+    _writePacket(sequenceId);
+  }
+
   void writeCommandStatementResetPacket(int statementId) {
     _createWriterBuffer();
 
@@ -142,54 +210,53 @@ class PreparedStatementProtocol extends ProtocolDelegate {
     _writePacket(sequenceId);
   }
 
-  void writeCommandStatementClosePacket(int statementId) {
-    _createWriterBuffer();
+  List<int> _encodeNullBitmap(List parameters, [int offset = 0]) {
+    //   n              NULL-bitmap, length: (num-params+7)/8
+    var bitmap = new List.filled((parameters.length + 7 + offset) ~/ 8, 0);
 
-    var sequenceId = 0x00;
+    var l = offset ~/ 8;
+    var i = offset % 8;
+    var mask = 1 << i;
+    for (var parameter in parameters) {
+      if (parameter == null) {
+        bitmap[l] |= mask;
+      }
 
-    // 1              [19] COM_STMT_CLOSE
-    _writeFixedLengthInteger(COM_STMT_CLOSE, 1);
-    // 4              statement-id
-    _writeFixedLengthInteger(statementId, 4);
+      i++;
+      if (i == 8) {
+        i = 0;
+        l++;
+        mask = 1;
+      } else {
+        mask <<= 1;
+      }
+    }
 
-    _writePacket(sequenceId);
+    return bitmap;
   }
 
-  Future<Packet> readCommandStatementPrepareResponse() {
-    var value = _readPacketBuffer();
-    var value2 = value is Future
-        ? value.then((_) => _readCommandStatementPrepareResponsePacket())
-        : _readCommandStatementPrepareResponsePacket();
-    return value2 is Future ? value2 : new Future.value(value2);
-  }
-
-  Future<Packet> readCommandStatementExecuteResponse() {
-    var value = _readPacketBuffer();
-    var value2 = value is Future
-        ? value.then((_) => _readCommandStatementExecuteResponsePacket())
-        : _readCommandStatementExecuteResponsePacket();
-    return value2 is Future ? value2 : new Future.value(value2);
-  }
-
-  skipResultSetRowResponse() {
-    var value = _readPacketBuffer();
-    return value is Future
-        ? value.then((_) => _skipResultSetRowResponsePacket())
-        : _skipResultSetRowResponsePacket();
-  }
-
-  readResultSetRowResponse(List<int> columnTypes) {
-    var value = _readPacketBuffer();
-    return value is Future
-        ? value.then((_) => _readResultSetRowResponsePacket(columnTypes))
-        : _readResultSetRowResponsePacket(columnTypes);
-  }
-
-  Packet _readCommandStatementPrepareResponsePacket() {
-    if (_isErrorPacket()) {
-      return _readErrorPacket();
+  DataType _getDataTypeFromSqlType(int sqlType) {
+    if (sqlType == null) {
+      return null;
     } else {
-      return _readCommandStatementPrepareOkResponsePacket();
+      switch (sqlType) {
+        case MYSQL_TYPE_VAR_STRING:
+          return DataType.STRING;
+        case MYSQL_TYPE_LONG:
+          return DataType.INTEGER_4;
+        case MYSQL_TYPE_LONGLONG:
+          return DataType.INTEGER_8;
+        case MYSQL_TYPE_DOUBLE:
+          return DataType.DOUBLE;
+        case MYSQL_TYPE_TINY:
+          return DataType.INTEGER_1;
+        case MYSQL_TYPE_DATETIME:
+          return DataType.DATETIME;
+        case MYSQL_TYPE_TIMESTAMP:
+          return DataType.DATETIME;
+        default:
+          throw new UnsupportedError("Sql type not supported $sqlType");
+      }
     }
   }
 
@@ -200,26 +267,6 @@ class PreparedStatementProtocol extends ProtocolDelegate {
       return _readErrorPacket();
     } else {
       return _readResultSetColumnCountPacket();
-    }
-  }
-
-  Packet _skipResultSetRowResponsePacket() {
-    if (_isErrorPacket()) {
-      return _readErrorPacket();
-    } else if (_isEOFPacket()) {
-      return _readEOFPacket();
-    } else {
-      return _skipResultSetRowPacket();
-    }
-  }
-
-  Packet _readResultSetRowResponsePacket(List<int> columnTypes) {
-    if (_isErrorPacket()) {
-      return _readErrorPacket();
-    } else if (_isEOFPacket()) {
-      return _readEOFPacket();
-    } else {
-      return _readResultSetRowPacket(columnTypes);
     }
   }
 
@@ -243,6 +290,14 @@ class PreparedStatementProtocol extends ProtocolDelegate {
     return packet;
   }
 
+  Packet _readCommandStatementPrepareResponsePacket() {
+    if (_isErrorPacket()) {
+      return _readErrorPacket();
+    } else {
+      return _readCommandStatementPrepareOkResponsePacket();
+    }
+  }
+
   ResultSetColumnCountPacket _readResultSetColumnCountPacket() {
     var packet = new ResultSetColumnCountPacket(_sequenceId, _payloadLength);
 
@@ -251,14 +306,6 @@ class PreparedStatementProtocol extends ProtocolDelegate {
 
     _reusableRowPacket =
         new PreparedResultSetRowPacket.reusable(_protocol, packet._columnCount);
-
-    return packet;
-  }
-
-  PreparedResultSetRowPacket _skipResultSetRowPacket() {
-    var packet = _reusableRowPacket.reuse(_sequenceId, _payloadLength);
-
-    _skipBytes(_payloadLength);
 
     return packet;
   }
@@ -315,78 +362,31 @@ class PreparedStatementProtocol extends ProtocolDelegate {
     return packet;
   }
 
-  DataType _getDataTypeFromSqlType(int sqlType) {
-    if (sqlType == null) {
-      return null;
+  Packet _readResultSetRowResponsePacket(List<int> columnTypes) {
+    if (_isErrorPacket()) {
+      return _readErrorPacket();
+    } else if (_isEOFPacket()) {
+      return _readEOFPacket();
     } else {
-      switch (sqlType) {
-        case MYSQL_TYPE_VAR_STRING:
-          return DataType.STRING;
-        case MYSQL_TYPE_LONG:
-          return DataType.INTEGER_4;
-        case MYSQL_TYPE_LONGLONG:
-          return DataType.INTEGER_8;
-        case MYSQL_TYPE_DOUBLE:
-          return DataType.DOUBLE;
-        case MYSQL_TYPE_TINY:
-          return DataType.INTEGER_1;
-        case MYSQL_TYPE_DATETIME:
-          return DataType.DATETIME;
-        case MYSQL_TYPE_TIMESTAMP:
-          return DataType.DATETIME;
-        default:
-          throw new UnsupportedError("Sql type not supported $sqlType");
-      }
+      return _readResultSetRowPacket(columnTypes);
     }
   }
 
-  List<int> _encodeNullBitmap(List parameters, [int offset = 0]) {
-    //   n              NULL-bitmap, length: (num-params+7)/8
-    var bitmap = new List.filled((parameters.length + 7 + offset) ~/ 8, 0);
+  PreparedResultSetRowPacket _skipResultSetRowPacket() {
+    var packet = _reusableRowPacket.reuse(_sequenceId, _payloadLength);
 
-    var l = offset ~/ 8;
-    var i = offset % 8;
-    var mask = 1 << i;
-    for (var parameter in parameters) {
-      if (parameter == null) {
-        bitmap[l] |= mask;
-      }
+    _skipBytes(_payloadLength);
 
-      i++;
-      if (i == 8) {
-        i = 0;
-        l++;
-        mask = 1;
-      } else {
-        mask <<= 1;
-      }
-    }
-
-    return bitmap;
+    return packet;
   }
-}
 
-class CommandStatementPrepareOkResponsePacket extends Packet {
-  int _status;
-  int _statementId;
-  int _numColumns;
-  int _numParams;
-  int _warningCount;
-
-  CommandStatementPrepareOkResponsePacket(int payloadLength, int sequenceId)
-      : super(payloadLength, sequenceId);
-
-  int get status => _status;
-  int get statementId => _statementId;
-  int get numColumns => _numColumns;
-  int get numParams => _numParams;
-  int get warningCount => _warningCount;
-}
-
-class PreparedResultSetRowPacket extends ReusablePacket {
-  PreparedResultSetRowPacket.reusable(Protocol protocol, int columnCount)
-      : super.reusable(protocol, columnCount);
-
-  PreparedResultSetRowPacket reuse(int payloadLength, int sequenceId) =>
-      _reuse(payloadLength, sequenceId);
+  Packet _skipResultSetRowResponsePacket() {
+    if (_isErrorPacket()) {
+      return _readErrorPacket();
+    } else if (_isEOFPacket()) {
+      return _readEOFPacket();
+    } else {
+      return _skipResultSetRowPacket();
+    }
+  }
 }

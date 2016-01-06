@@ -6,8 +6,8 @@ library mysql_client.test;
 import "dart:async";
 
 import 'package:mysql_client/mysql_client.dart';
-import "package:sqljocky/sqljocky.dart";
 import "package:sqlconnection/sql_connection_remote.dart";
+import "package:sqljocky/sqljocky.dart";
 
 Future main() async {
   await testRemoteSql();
@@ -64,6 +64,39 @@ Future testMySqlClient() async {
   }
 }
 
+Future testRemoteSql() async {
+  var time;
+
+  var factory = new RemoteSqlConnectionFactory("127.0.0.1", 7777);
+
+  var connection;
+
+  try {
+    time = new DateTime.now().millisecondsSinceEpoch;
+
+    connection = await factory.createConnection("application:primeapp");
+
+    var records = await connection.query("""
+      select * from v_application.node limit 100
+    """);
+
+    print(records.data.length);
+
+    // print(records.data);
+  } finally {
+    if (connection != null) {
+      await connection.close();
+    }
+
+    if (factory != null) {
+      await factory.closeConnections();
+    }
+
+    print(
+        "Closed connection in ${new DateTime.now().millisecondsSinceEpoch - time} ms");
+  }
+}
+
 Future testSqlJocky() async {
   var time;
   var pool;
@@ -97,39 +130,6 @@ Future testSqlJocky() async {
     await connection.release();
 
     pool.closeConnectionsWhenNotInUse();
-
-    print(
-        "Closed connection in ${new DateTime.now().millisecondsSinceEpoch - time} ms");
-  }
-}
-
-Future testRemoteSql() async {
-  var time;
-
-  var factory = new RemoteSqlConnectionFactory("127.0.0.1", 7777);
-
-  var connection;
-
-  try {
-    time = new DateTime.now().millisecondsSinceEpoch;
-
-    connection = await factory.createConnection("application:primeapp");
-
-    var records = await connection.query("""
-      select * from v_application.node limit 100
-    """);
-
-    print(records.data.length);
-
-    // print(records.data);
-  } finally {
-    if (connection != null) {
-      await connection.close();
-    }
-
-    if (factory != null) {
-      await factory.closeConnections();
-    }
 
     print(
         "Closed connection in ${new DateTime.now().millisecondsSinceEpoch - time} ms");

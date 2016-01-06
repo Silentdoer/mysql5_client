@@ -11,6 +11,14 @@ class ConnectionProtocol extends ProtocolDelegate {
   }
 
   // TODO passare clientCapabilityFlags, clientConnectAttributes, characterSet e maxPacketSize come parametri
+  Future<Packet> readInitialHandshakeResponse() {
+    var value = _readPacketBuffer();
+    var value2 = value is Future
+        ? value.then((_) => _readInitialHandshakeResponsePacket())
+        : _readInitialHandshakeResponsePacket();
+    return value2 is Future ? value2 : new Future.value(value2);
+  }
+
   void writeHandshakeResponsePacket(String userName, String password,
       String database, String authPluginData, String authPluginName) {
     _createWriterBuffer();
@@ -88,20 +96,37 @@ class ConnectionProtocol extends ProtocolDelegate {
     _writePacket(sequenceId);
   }
 
-  Future<Packet> readInitialHandshakeResponse() {
-    var value = _readPacketBuffer();
-    var value2 = value is Future
-        ? value.then((_) => _readInitialHandshakeResponsePacket())
-        : _readInitialHandshakeResponsePacket();
-    return value2 is Future ? value2 : new Future.value(value2);
+  List<int> _encodeString(String value, {utf8Encoded: false}) {
+    return !utf8Encoded ? value.codeUnits : UTF8.encode(value);
   }
 
-  Packet _readInitialHandshakeResponsePacket() {
-    if (_isErrorPacket()) {
-      return _readErrorPacket();
+  String _generateAuthResponse(
+      String password, String authPluginData, String authPluginName,
+      {utf8Encoded: false}) {
+    var encodedPassword = _encodeString(password, utf8Encoded: utf8Encoded);
+    var encodedAuthPluginData =
+        _encodeString(authPluginData, utf8Encoded: utf8Encoded);
+
+    var response;
+
+    if (authPluginName == "mysql_native_password") {
+      // SHA1( password ) XOR SHA1( "20-bytes random data from server" <concat> SHA1( SHA1( password ) ) )
+      var passwordSha1 = (new SHA1()..add(encodedPassword)).close();
+      var passwordSha1Sha1 = (new SHA1()..add(passwordSha1)).close();
+      var hash = (new SHA1()..add(encodedAuthPluginData)..add(passwordSha1Sha1))
+          .close();
+
+      var buffer = new StringBuffer();
+      var generatedHash = new List<int>(hash.length);
+      for (var i = 0; i < generatedHash.length; i++) {
+        buffer.writeCharCode(hash[i] ^ passwordSha1[i]);
+      }
+      response = buffer.toString();
     } else {
-      return _readInitialHandshakePacket();
+      throw new UnsupportedError(authPluginName);
     }
+
+    return response;
   }
 
   InitialHandshakePacket _readInitialHandshakePacket() {
@@ -165,37 +190,12 @@ class ConnectionProtocol extends ProtocolDelegate {
     return packet;
   }
 
-  String _generateAuthResponse(
-      String password, String authPluginData, String authPluginName,
-      {utf8Encoded: false}) {
-    var encodedPassword = _encodeString(password, utf8Encoded: utf8Encoded);
-    var encodedAuthPluginData =
-        _encodeString(authPluginData, utf8Encoded: utf8Encoded);
-
-    var response;
-
-    if (authPluginName == "mysql_native_password") {
-      // SHA1( password ) XOR SHA1( "20-bytes random data from server" <concat> SHA1( SHA1( password ) ) )
-      var passwordSha1 = (new SHA1()..add(encodedPassword)).close();
-      var passwordSha1Sha1 = (new SHA1()..add(passwordSha1)).close();
-      var hash = (new SHA1()..add(encodedAuthPluginData)..add(passwordSha1Sha1))
-          .close();
-
-      var buffer = new StringBuffer();
-      var generatedHash = new List<int>(hash.length);
-      for (var i = 0; i < generatedHash.length; i++) {
-        buffer.writeCharCode(hash[i] ^ passwordSha1[i]);
-      }
-      response = buffer.toString();
+  Packet _readInitialHandshakeResponsePacket() {
+    if (_isErrorPacket()) {
+      return _readErrorPacket();
     } else {
-      throw new UnsupportedError(authPluginName);
+      return _readInitialHandshakePacket();
     }
-
-    return response;
-  }
-
-  List<int> _encodeString(String value, {utf8Encoded: false}) {
-    return !utf8Encoded ? value.codeUnits : UTF8.encode(value);
   }
 }
 
@@ -217,17 +217,17 @@ class InitialHandshakePacket extends Packet {
   InitialHandshakePacket(int payloadLength, int sequenceId)
       : super(payloadLength, sequenceId);
 
-  int get protocolVersion => _protocolVersion;
-  String get serverVersion => _serverVersion;
-  int get connectionId => _connectionId;
-  String get authPluginDataPart1 => _authPluginDataPart1;
-  int get capabilityFlags1 => _capabilityFlags1;
-  int get characterSet => _characterSet;
-  int get statusFlags => _statusFlags;
-  int get capabilityFlags2 => _capabilityFlags2;
-  int get serverCapabilityFlags => _serverCapabilityFlags;
-  int get authPluginDataLength => _authPluginDataLength;
-  String get authPluginDataPart2 => _authPluginDataPart2;
   String get authPluginData => _authPluginData;
+  int get authPluginDataLength => _authPluginDataLength;
+  String get authPluginDataPart1 => _authPluginDataPart1;
+  String get authPluginDataPart2 => _authPluginDataPart2;
   String get authPluginName => _authPluginName;
+  int get capabilityFlags1 => _capabilityFlags1;
+  int get capabilityFlags2 => _capabilityFlags2;
+  int get characterSet => _characterSet;
+  int get connectionId => _connectionId;
+  int get protocolVersion => _protocolVersion;
+  int get serverCapabilityFlags => _serverCapabilityFlags;
+  String get serverVersion => _serverVersion;
+  int get statusFlags => _statusFlags;
 }

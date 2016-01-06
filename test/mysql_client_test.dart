@@ -122,77 +122,6 @@ Future test10() async {
   }
 }
 
-Future test9() async {
-  var connection = new Connection();
-
-  try {
-    await connection.connect("localhost", 3306, "root", "mysql", "test");
-
-    var preparedStatement =
-        await connection.prepareQuery("SELECT * FROM people WHERE id = ?");
-
-    print("Parameters: ${preparedStatement.parameterCount}");
-    print("Columns: ${preparedStatement.columnCount}");
-
-    preparedStatement.setParameter(0, 10);
-
-    var queryResult = await preparedStatement.executeQuery();
-
-    // column count
-    var columnCount = queryResult.columnCount;
-    print(columnCount);
-
-    for (var column in preparedStatement.columns) {
-      print("Type: ${column.type}");
-    }
-
-    // rows
-    while (true) {
-      var next = await queryResult.next();
-      if (!next) {
-        break;
-      }
-
-      print("${queryResult.getNumValue(0)}: ${queryResult.getStringValue(1)}");
-    }
-
-    await queryResult.close();
-
-    await preparedStatement.close();
-  } finally {
-    await connection.close();
-  }
-}
-
-Future test8() async {
-  var connection = new Connection();
-
-  try {
-    await connection.connect("localhost", 3306, "root", "mysql", "test");
-
-    var queryResult =
-        await connection.executeQuery("SELECT * FROM people WHERE id = 10");
-
-    print(queryResult.columns);
-    print(queryResult.columnCount);
-
-    // rows
-    while (true) {
-      var next = await queryResult.next();
-      if (!next) {
-        break;
-      }
-
-      print("${queryResult.getNumValue(0)}: ${queryResult.getStringValue(1)}");
-    }
-  } catch (e, s) {
-    print("Error: $e");
-    print(new Chain.forTrace(s).terse);
-  } finally {
-    await connection.close();
-  }
-}
-
 Future test4() async {
   var connection = new Connection();
 
@@ -211,21 +140,18 @@ Future test4() async {
   }
 }
 
-Future test7() async {
+Future test5() async {
   var connection = new Connection();
 
   try {
     await connection.connect("localhost", 3306, "root", "mysql", "test");
 
-    var queryResult;
+    var queryResult =
+        await connection.executeQuery("SELECT * FROM people LIMIT 10");
 
-    queryResult = await connection
-        .executeQuery("INSERT INTO people(name, age) values ('hans', 42)");
-
-    print(queryResult.affectedRows);
-
-    queryResult =
-        await connection.executeQuery("SELECT * FROM people WHERE age = 42");
+    // column count
+    var columnCount = queryResult.columnCount;
+    print(columnCount);
 
     // rows
     while (true) {
@@ -234,8 +160,11 @@ Future test7() async {
         break;
       }
 
-      print("${queryResult.getNumValue(0)}: ${queryResult.getStringValue(1)}");
+      print(queryResult.getNumValue(0));
     }
+  } catch (e, s) {
+    print("Error: $e");
+    print(new Chain.forTrace(s).terse);
   } finally {
     await connection.close();
   }
@@ -290,18 +219,21 @@ Future test6() async {
   }
 }
 
-Future test5() async {
+Future test7() async {
   var connection = new Connection();
 
   try {
     await connection.connect("localhost", 3306, "root", "mysql", "test");
 
-    var queryResult =
-        await connection.executeQuery("SELECT * FROM people LIMIT 10");
+    var queryResult;
 
-    // column count
-    var columnCount = queryResult.columnCount;
-    print(columnCount);
+    queryResult = await connection
+        .executeQuery("INSERT INTO people(name, age) values ('hans', 42)");
+
+    print(queryResult.affectedRows);
+
+    queryResult =
+        await connection.executeQuery("SELECT * FROM people WHERE age = 42");
 
     // rows
     while (true) {
@@ -310,11 +242,79 @@ Future test5() async {
         break;
       }
 
-      print(queryResult.getNumValue(0));
+      print("${queryResult.getNumValue(0)}: ${queryResult.getStringValue(1)}");
+    }
+  } finally {
+    await connection.close();
+  }
+}
+
+Future test8() async {
+  var connection = new Connection();
+
+  try {
+    await connection.connect("localhost", 3306, "root", "mysql", "test");
+
+    var queryResult =
+        await connection.executeQuery("SELECT * FROM people WHERE id = 10");
+
+    print(queryResult.columns);
+    print(queryResult.columnCount);
+
+    // rows
+    while (true) {
+      var next = await queryResult.next();
+      if (!next) {
+        break;
+      }
+
+      print("${queryResult.getNumValue(0)}: ${queryResult.getStringValue(1)}");
     }
   } catch (e, s) {
     print("Error: $e");
     print(new Chain.forTrace(s).terse);
+  } finally {
+    await connection.close();
+  }
+}
+
+Future test9() async {
+  var connection = new Connection();
+
+  try {
+    await connection.connect("localhost", 3306, "root", "mysql", "test");
+
+    var preparedStatement =
+        await connection.prepareQuery("SELECT * FROM people WHERE id = ?");
+
+    print("Parameters: ${preparedStatement.parameterCount}");
+    print("Columns: ${preparedStatement.columnCount}");
+
+    preparedStatement.setParameter(0, 10);
+
+    var queryResult = await preparedStatement.executeQuery();
+
+    // column count
+    var columnCount = queryResult.columnCount;
+    print(columnCount);
+
+    for (var column in preparedStatement.columns) {
+      print("Type: ${column.type}");
+    }
+
+    // rows
+    while (true) {
+      var next = await queryResult.next();
+      if (!next) {
+        break;
+      }
+
+      print("${queryResult.getNumValue(0)}: ${queryResult.getStringValue(1)}");
+    }
+
+    await queryResult.close();
+
+    await preparedStatement.close();
   } finally {
     await connection.close();
   }

@@ -30,7 +30,7 @@ class PreparedStatementError extends Error {
 }
 
 class Connection {
-  Socket _socket;
+  RawSocket _socket;
 
   Protocol _protocol;
 
@@ -44,8 +44,9 @@ class Connection {
       throw new StateError("Connection already connected");
     }
 
-    var socket = await Socket.connect(host, port);
+    var socket = await RawSocket.connect(host, port);
     socket.setOption(SocketOption.TCP_NODELAY, true);
+    socket.writeEventsEnabled = false;
 
     var protocol = new Protocol(socket);
 
@@ -72,6 +73,50 @@ class Connection {
       _protocol = protocol;
     } finally {
       protocol.connectionProtocol.free();
+    }
+  }
+
+  Future<QueryResult> test(String query) async {
+    if (isClosed) {
+      throw new StateError("Connection closed");
+    }
+
+    await _lastProtocolResult?.free();
+
+    _lastProtocolResult = null;
+
+    try {
+      _protocol.queryCommandTextProtocol.writeCommandQueryPacket(query);
+
+      var response =
+          await _protocol.queryCommandTextProtocol.readCommandQueryResponse();
+
+      if (response is OkPacket) {
+        return new QueryResult.ok(
+            response.affectedRows, response.lastInsertId, this);
+      }
+
+      if (response is! ResultSetColumnCountPacket) {
+        throw new QueryError(response.errorMessage);
+      }
+
+      List<ColumnDefinition> columns = new List(response.columnCount);
+      var columnIterator = new _QueryColumnIterator(columns.length, this);
+      var hasColumn = true;
+      var i = 0;
+      while (hasColumn) {
+        hasColumn = await columnIterator.rawNext();
+        if (hasColumn) {
+          columns[i++] =
+              new ColumnDefinition(columnIterator.name, columnIterator.type);
+        }
+      }
+
+      _lastProtocolResult = new QueryResult.resultSet(columns, this);
+
+      return _lastProtocolResult;
+    } finally {
+      _protocol.queryCommandTextProtocol.free();
     }
   }
 
@@ -189,7 +234,6 @@ class Connection {
     _protocol = null;
 
     await socket.close();
-    socket.destroy();
   }
 }
 
@@ -682,8 +726,7 @@ class _PreparedQueryRowIterator implements ProtocolIterator {
       return true;
     } else {
       _isClosed = true;
-      _result._statement._connection._protocol.preparedStatementProtocol
-          .free();
+      _result._statement._connection._protocol.preparedStatementProtocol.free();
       return false;
     }
   }

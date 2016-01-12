@@ -201,7 +201,7 @@ class Protocol {
   QueryCommandTextProtocol __queryCommandTextProtocol;
   PreparedStatementProtocol __preparedStatementProtocol;
 
-  Protocol(Socket socket) {
+  Protocol(RawSocket socket) {
     __reader = new DataReader(socket);
     __writer = new DataWriter(socket);
 

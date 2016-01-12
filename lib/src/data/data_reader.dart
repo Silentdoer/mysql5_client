@@ -5,6 +5,7 @@ library mysql_client.data_reader;
 
 import "dart:async";
 import "dart:collection";
+import "dart:io";
 
 import "data_chunk.dart";
 import "reader_buffer.dart";
@@ -14,24 +15,29 @@ class DataReader {
 
   final Queue<DataChunk> _chunks = new Queue();
 
-  final Stream<List<int>> _stream;
+  final RawSocket _socket;
 
-  Completer _dataReadyCompleter;
+  Completer _dataRequestCompleter;
 
-  DataReader(this._stream) {
-    this._stream.listen(_onData);
+  StreamSubscription<RawSocketEvent> _subscription;
+
+  DataReader(this._socket) {
+    _subscription = this._socket.listen(_onData);
+    _subscription.pause();
   }
 
   readBuffer(int length) => _readBuffer(0, length, length);
 
   _readBuffer(int reusableChunksCount, int totalLength, int leftLength) {
     if (_chunks.isEmpty) {
-      _dataReadyCompleter = new Completer();
+      _dataRequestCompleter = new Completer();
+      _subscription.resume();
 
-      return _dataReadyCompleter.future
-          .then((_) => _dataReadyCompleter = null)
-          .then((_) => _readBufferInternal(
-              reusableChunksCount, totalLength, leftLength));
+      return _dataRequestCompleter.future.then((readLength) {
+        _subscription.pause();
+        _dataRequestCompleter = null;
+      }).then((_) =>
+          _readBufferInternal(reusableChunksCount, totalLength, leftLength));
     } else {
       return _readBufferInternal(reusableChunksCount, totalLength, leftLength);
     }
@@ -55,8 +61,10 @@ class DataReader {
         : _reusableBuffer.reuse(reusableChunksCount, totalLength);
   }
 
-  void _onData(List<int> data) {
-    _chunks.add(new DataChunk(data));
-    _dataReadyCompleter?.complete();
+  void _onData(RawSocketEvent event) {
+    if (event == RawSocketEvent.READ && _dataRequestCompleter != null) {
+      _chunks.add(new DataChunk(_socket.read(_socket.available())));
+      _dataRequestCompleter?.complete();
+    }
   }
 }

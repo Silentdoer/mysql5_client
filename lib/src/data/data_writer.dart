@@ -6,11 +6,11 @@ library mysql_client.data_writer;
 import "dart:io";
 
 class DataWriter {
-  final IOSink _sink;
+  final RawSocket _socket;
 
-  DataWriter(this._sink);
+  DataWriter(this._socket);
 
   void writeBuffer(List<int> buffer) {
-    _sink.add(buffer);
+    _socket.write(buffer);
   }
 }

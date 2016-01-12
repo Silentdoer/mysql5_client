@@ -11,6 +11,9 @@ import "data_chunk.dart";
 import "reader_buffer.dart";
 
 class DataReader {
+
+  final int maxChunkSize;
+
   final ReaderBuffer _reusableBuffer = new ReaderBuffer.reusable();
 
   final Queue<DataChunk> _chunks = new Queue();
@@ -21,7 +24,7 @@ class DataReader {
 
   StreamSubscription<RawSocketEvent> _subscription;
 
-  DataReader(this._socket) {
+  DataReader(this._socket, {this.maxChunkSize}) {
     _subscription = this._socket.listen(_onData);
     _subscription.pause();
   }
@@ -65,7 +68,8 @@ class DataReader {
 
   void _onData(RawSocketEvent event) {
     if (event == RawSocketEvent.READ && _dataRequestCompleter != null) {
-      _chunks.add(new DataChunk(_socket.read(_socket.available())));
+      _chunks.add(new DataChunk(_socket.read(maxChunkSize)));
+
       _dataRequestCompleter.complete();
     }
   }

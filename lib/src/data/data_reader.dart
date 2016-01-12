@@ -36,8 +36,10 @@ class DataReader {
       return _dataRequestCompleter.future.then((readLength) {
         _subscription.pause();
         _dataRequestCompleter = null;
-      }).then((_) =>
-          _readBufferInternal(reusableChunksCount, totalLength, leftLength));
+
+        return _readBufferInternal(
+            reusableChunksCount, totalLength, leftLength);
+      });
     } else {
       return _readBufferInternal(reusableChunksCount, totalLength, leftLength);
     }
@@ -64,7 +66,7 @@ class DataReader {
   void _onData(RawSocketEvent event) {
     if (event == RawSocketEvent.READ && _dataRequestCompleter != null) {
       _chunks.add(new DataChunk(_socket.read(_socket.available())));
-      _dataRequestCompleter?.complete();
+      _dataRequestCompleter.complete();
     }
   }
 }

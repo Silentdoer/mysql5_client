@@ -11,12 +11,45 @@ import "package:stack_trace/stack_trace.dart";
 Future main() async {
   Chain.capture(() async {
     try {
-      await test12();
+      await test7();
     } catch (e, s) {
       print(e);
       print(new Chain.forTrace(s));
     }
   });
+}
+
+Future test7() async {
+  var connection;
+
+  try {
+    connection = await new ConnectionFactory()
+        .connect("localhost", 3306, "root", "mysql", "test");
+
+    var queryResult;
+
+    queryResult = await connection
+        .executeQuery("INSERT INTO people(name, age) values ('hans', 42)");
+
+    print(queryResult.affectedRows);
+
+    queryResult =
+      await connection.executeQuery("SELECT * FROM people WHERE age = 42");
+
+    print(queryResult.columns);
+
+    // rows
+    while (true) {
+      var next = await queryResult.next();
+      if (!next) {
+        break;
+      }
+
+      print("${queryResult.getNumValue(0)}: ${queryResult.getStringValue(1)}");
+    }
+  } finally {
+    await connection.close();
+  }
 }
 
 Future test12() async {
@@ -259,37 +292,6 @@ Future test4() async {
     print("Columns: ${preparedStatement.columnCount}");
 
     await preparedStatement.close();
-  } finally {
-    await connection.close();
-  }
-}
-
-Future test7() async {
-  var connection;
-
-  try {
-    connection = await new ConnectionFactory()
-        .connect("localhost", 3306, "root", "mysql", "test");
-
-    var queryResult;
-
-    queryResult = await connection
-        .executeQuery("INSERT INTO people(name, age) values ('hans', 42)");
-
-    print(queryResult.affectedRows);
-
-    queryResult =
-        await connection.executeQuery("SELECT * FROM people WHERE age = 42");
-
-    // rows
-    while (true) {
-      var next = await queryResult.next();
-      if (!next) {
-        break;
-      }
-
-      print("${queryResult.getNumValue(0)}: ${queryResult.getStringValue(1)}");
-    }
   } finally {
     await connection.close();
   }

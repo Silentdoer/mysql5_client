@@ -135,6 +135,8 @@ class SqlJockySpeedTest extends SpeedTest {
     await super.run();
 
     await pool.closeConnectionsWhenNotInUse();
+
+    pool = null;
   }
 
   Future executeQuery(String sql) {

@@ -78,7 +78,7 @@ class ConnectionImpl implements Connection {
           await _protocol.queryCommandTextProtocol.readCommandQueryResponse();
 
       if (response is OkPacket) {
-        return new QueryResultImpl.ok(
+        return new CommandQueryResultImpl.ok(
             response.affectedRows, response.lastInsertId, this);
       }
 
@@ -98,7 +98,7 @@ class ConnectionImpl implements Connection {
         }
       }
 
-      _lastProtocolResult = new QueryResultImpl.resultSet(columns, this);
+      _lastProtocolResult = new CommandQueryResultImpl.resultSet(columns, this);
 
       return _lastProtocolResult;
     } finally {
@@ -122,7 +122,7 @@ class ConnectionImpl implements Connection {
           await _protocol.queryCommandTextProtocol.readCommandQueryResponse();
 
       if (response is OkPacket) {
-        return new QueryResultImpl.ok(
+        return new CommandQueryResultImpl.ok(
             response.affectedRows, response.lastInsertId, this);
       }
 
@@ -142,7 +142,7 @@ class ConnectionImpl implements Connection {
         }
       }
 
-      _lastProtocolResult = new QueryResultImpl.resultSet(columns, this);
+      _lastProtocolResult = new CommandQueryResultImpl.resultSet(columns, this);
 
       return _lastProtocolResult;
     } finally {
@@ -223,28 +223,27 @@ class ConnectionImpl implements Connection {
   }
 }
 
-class QueryResultImpl implements QueryResult {
-  final ConnectionImpl _connection;
-
+abstract class BaseQueryResultImpl implements QueryResult {
   final int affectedRows;
 
   final int lastInsertId;
 
-  final List<ColumnDefinition> columns;
+  RowIterator _rowIterator;
 
-  QueryRowIterator _rowIterator;
-
-  QueryResultImpl.resultSet(this.columns, this._connection)
+  BaseQueryResultImpl.resultSet()
       : this.affectedRows = null,
         this.lastInsertId = null {
-    this._rowIterator = new QueryRowIterator(this);
+    this._rowIterator = _createRowIterator();
   }
 
-  QueryResultImpl.ok(this.affectedRows, this.lastInsertId, this._connection)
-      : this.columns = null,
-        this._rowIterator = null;
+  BaseQueryResultImpl.ok(this.affectedRows, this.lastInsertId)
+      : this._rowIterator = null;
 
-  int get columnCount => columns.length;
+  RowIterator _createRowIterator();
+
+  List<ColumnDefinition> get columns;
+
+  int get columnCount => columns?.length;
 
   bool get isClosed => _rowIterator == null || _rowIterator.isClosed;
 
@@ -258,6 +257,11 @@ class QueryResultImpl implements QueryResult {
 
   bool getBoolValue(int index) => _rowIterator.getBoolValue(index);
 
+  Future<List<List>> getNextRows() {
+    // TODO implementare getNextRows
+    throw new UnimplementedError();
+  }
+
   @override
   Future free() async {
     await close();
@@ -269,6 +273,28 @@ class QueryResultImpl implements QueryResult {
       await _rowIterator.close();
     }
   }
+}
+
+abstract class RowIterator implements DataIterator {
+  String getStringValue(int index);
+  num getNumValue(int index);
+  bool getBoolValue(int index);
+}
+
+class CommandQueryResultImpl extends BaseQueryResultImpl {
+  final ConnectionImpl _connection;
+
+  final List<ColumnDefinition> columns;
+
+  CommandQueryResultImpl.resultSet(this.columns, this._connection)
+      : super.resultSet();
+
+  CommandQueryResultImpl.ok(
+      int affectedRows, int lastInsertId, this._connection)
+      : this.columns = null,
+        super.ok(affectedRows, lastInsertId);
+
+  RowIterator _createRowIterator() => new CommandQueryRowIteratorImpl(this);
 
   Protocol get _protocol => _connection._protocol;
 }
@@ -396,65 +422,33 @@ class PreparedStatementImpl implements PreparedStatement {
   }
 }
 
-class PreparedQueryResultImpl implements QueryResult {
+class PreparedQueryResultImpl extends BaseQueryResultImpl {
   final PreparedStatement _statement;
-
-  final int affectedRows;
-
-  final int lastInsertId;
-
-  PreparedQueryRowIterator _rowIterator;
 
   PreparedQueryResultImpl.resultSet(PreparedStatement statement)
       : this._statement = statement,
-        this.affectedRows = null,
-        this.lastInsertId = null {
-    this._rowIterator = new PreparedQueryRowIterator(this);
-  }
+        super.resultSet();
 
-  PreparedQueryResultImpl.ok(this.affectedRows, this.lastInsertId)
+  PreparedQueryResultImpl.ok(int affectedRows, int lastInsertId)
       : this._statement = null,
-        this._rowIterator = null;
+        super.ok(affectedRows, lastInsertId);
 
-  int get columnCount => _statement?.columnCount;
+  RowIterator _createRowIterator() => new PreparedQueryRowIterator(this);
 
   List<ColumnDefinition> get columns => _statement?.columns;
-
-  bool get isClosed => _rowIterator == null || _rowIterator.isClosed;
-
-  Future<bool> next() => _rowIterator.next();
-
-  rawNext() => _rowIterator.rawNext();
-
-  String getStringValue(int index) => _rowIterator.getStringValue(index);
-
-  num getNumValue(int index) => _rowIterator.getNumValue(index);
-
-  bool getBoolValue(int index) => _rowIterator.getBoolValue(index);
-
-  @override
-  Future free() async {
-    await close();
-  }
-
-  @override
-  Future close() async {
-    if (_rowIterator != null && !_rowIterator.isClosed) {
-      await _rowIterator.close();
-    }
-  }
 }
 
-class QueryColumnIterator implements DataIterator {
-  final ConnectionImpl _connection;
-
-  final int columnCount;
-
+abstract class BaseDataIteratorImpl implements DataIterator {
   bool _isClosed;
 
-  QueryColumnIterator(this.columnCount, this._connection) {
+  BaseDataIteratorImpl() {
     _isClosed = false;
   }
+
+  bool _isDataPacket(Packet packet);
+  _readDataResponse();
+  _skipDataResponse();
+  _free();
 
   bool get isClosed => _isClosed;
 
@@ -480,17 +474,38 @@ class QueryColumnIterator implements DataIterator {
       throw new StateError("Column iterator closed");
     }
 
-    if (columnCount > 0) {
-      var response = _connection._protocol.queryCommandTextProtocol
-          .readResultSetColumnDefinitionResponse();
+    var response = _readDataResponse();
 
-      return response is Future
-          ? response.then((response) => _checkNext(response))
-          : _checkNext(response);
+    return response is Future
+        ? response.then((response) => _checkNext(response))
+        : _checkNext(response);
+  }
+
+  _skip() {
+    var response = _skipDataResponse();
+
+    return response is Future
+        ? response.then((response) => _checkNext(response))
+        : _checkNext(response);
+  }
+
+  bool _checkNext(Packet packet) {
+    if (_isDataPacket(packet)) {
+      return true;
     } else {
+      _isClosed = true;
+      _free();
       return false;
     }
   }
+}
+
+class QueryColumnIterator extends BaseDataIteratorImpl {
+  final ConnectionImpl _connection;
+
+  final int columnCount;
+
+  QueryColumnIterator(this.columnCount, this._connection);
 
   String get catalog => _connection
       ._protocol.queryCommandTextProtocol.reusableColumnPacket.catalog;
@@ -517,66 +532,27 @@ class QueryColumnIterator implements DataIterator {
   int get decimals => _connection
       ._protocol.queryCommandTextProtocol.reusableColumnPacket.decimals;
 
-  _skip() {
-    var response = _connection._protocol.queryCommandTextProtocol
-        .skipResultSetColumnDefinitionResponse();
+  bool _isDataPacket(Packet packet) =>
+      packet is ResultSetColumnDefinitionPacket;
 
-    return response is Future
-        ? response.then((response) => _checkNext(response))
-        : _checkNext(response);
-  }
+  _readDataResponse() => _connection._protocol.queryCommandTextProtocol
+      .readResultSetColumnDefinitionResponse();
 
-  bool _checkNext(Packet response) {
-    if (response is ResultSetColumnDefinitionPacket) {
-      return true;
-    } else {
-      _isClosed = true;
-      _connection._protocol.queryCommandTextProtocol.free();
-      return false;
-    }
-  }
+  _skipDataResponse() => _connection._protocol.queryCommandTextProtocol
+      .skipResultSetColumnDefinitionResponse();
+
+  _free() => _connection._protocol.queryCommandTextProtocol.free();
 }
 
-class QueryRowIterator implements DataIterator {
-  final QueryResultImpl _result;
+abstract class BaseQueryRowIteratorImpl<T extends QueryResult>
+    extends BaseDataIteratorImpl implements RowIterator {
+  final T _result;
 
-  bool _isClosed;
+  BaseQueryRowIteratorImpl(this._result);
+}
 
-  QueryRowIterator(this._result) {
-    _isClosed = false;
-  }
-
-  bool get isClosed => _isClosed;
-
-  Future close() async {
-    if (!_isClosed) {
-      var hasNext = true;
-      while (hasNext) {
-        hasNext = _skip();
-        hasNext = hasNext is Future ? await hasNext : hasNext;
-      }
-
-      _isClosed = true;
-    }
-  }
-
-  Future<bool> next() {
-    var value = rawNext();
-    return value is Future ? value : new Future.value(value);
-  }
-
-  rawNext() {
-    if (_isClosed) {
-      throw new StateError("Column iterator closed");
-    }
-
-    var response =
-        _result._protocol.queryCommandTextProtocol.readResultSetRowResponse();
-
-    return response is Future
-        ? response.then((response) => _checkNext(response))
-        : _checkNext(response);
-  }
+class CommandQueryRowIteratorImpl extends BaseQueryRowIteratorImpl {
+  CommandQueryRowIteratorImpl(CommandQueryResultImpl result) : super(result);
 
   String getStringValue(int index) => _result._connection._protocol
       .queryCommandTextProtocol.reusableRowPacket.getUTF8String(index);
@@ -592,67 +568,19 @@ class QueryRowIterator implements DataIterator {
     return formatted != null ? formatted != 0 : null;
   }
 
-  _skip() {
-    var response = _result._connection._protocol.queryCommandTextProtocol
-        .skipResultSetRowResponse();
+  bool _isDataPacket(Packet response) => response is ResultSetRowPacket;
 
-    return response is Future
-        ? response.then((response) => _checkNext(response))
-        : _checkNext(response);
-  }
+  _readDataResponse() =>
+      _result._protocol.queryCommandTextProtocol.readResultSetRowResponse();
 
-  bool _checkNext(Packet response) {
-    if (response is ResultSetRowPacket) {
-      return true;
-    } else {
-      _isClosed = true;
-      _result._connection._protocol.queryCommandTextProtocol.free();
-      return false;
-    }
-  }
+  _skipDataResponse() =>
+      _result._protocol.queryCommandTextProtocol.skipResultSetRowResponse();
+
+  _free() => _result._connection._protocol.queryCommandTextProtocol.free();
 }
 
-class PreparedQueryRowIterator implements DataIterator {
-  final _result;
-
-  bool _isClosed;
-
-  PreparedQueryRowIterator(this._result) {
-    _isClosed = false;
-  }
-
-  bool get isClosed => _isClosed;
-
-  Future close() async {
-    if (!_isClosed) {
-      var hasNext = true;
-      while (hasNext) {
-        hasNext = _skip();
-        hasNext = hasNext is Future ? await hasNext : hasNext;
-      }
-
-      _isClosed = true;
-    }
-  }
-
-  Future<bool> next() {
-    var value = rawNext();
-    return value is Future ? value : new Future.value(value);
-  }
-
-  rawNext() {
-    if (_isClosed) {
-      throw new StateError("Column iterator closed");
-    }
-
-    var response = _result
-        ._statement._connection._protocol.preparedStatementProtocol
-        .readResultSetRowResponse(_result._statement._columnTypes);
-
-    return response is Future
-        ? response.then((response) => _checkNext(response))
-        : _checkNext(response);
-  }
+class PreparedQueryRowIterator extends BaseQueryRowIteratorImpl {
+  PreparedQueryRowIterator(PreparedQueryResultImpl result) : super(result);
 
   String getStringValue(int index) => _result._statement._connection._protocol
       .preparedStatementProtocol.reusableRowPacket.getUTF8String(index);
@@ -696,4 +624,15 @@ class PreparedQueryRowIterator implements DataIterator {
       return false;
     }
   }
+
+  bool _isDataPacket(Packet response) => response is PreparedResultSetRowPacket;
+
+  _readDataResponse() =>
+      _result._statement._connection._protocol.preparedStatementProtocol
+          .readResultSetRowResponse(_result._statement._columnTypes);
+
+  _skipDataResponse() =>
+      _result._protocol.preparedStatementProtocol.skipResultSetRowResponse();
+
+  _free() => _result._connection._protocol.preparedStatementProtocol.free();
 }

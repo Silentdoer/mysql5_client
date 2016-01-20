@@ -68,6 +68,10 @@ abstract class QueryResult implements CommandResult, DataIterator {
   num getNumValue(int index);
 
   bool getBoolValue(int index);
+
+  // TODO aggiungere skip e limit
+  // TODO aggiungere hint tipo sql per il recupero
+  Future<List<List>> getNextRows();
 }
 
 abstract class PreparedStatement implements CommandResult {

@@ -20,16 +20,14 @@ Future main() async {
 }
 
 Future test12() async {
-  var connection = new Connection();
-
+  var connection;
   try {
     print("CONNECTION");
-    await connection.connect("localhost", 3306, "root", "mysql", "test");
-
+    connection = await new ConnectionFactory()
+        .connect("localhost", 3306, "root", "mysql", "test");
 
     print("TEST");
-    var result =
-      await connection.test("SELECT * FROM people");
+    var result = await connection.test("SELECT * FROM people");
 
     // rows
     print("NEXT");
@@ -46,16 +44,15 @@ Future test12() async {
 }
 
 Future test11() async {
-  var connection = new Connection();
+  var connection;
 
   try {
     print("CONNECTION");
-    await connection.connect("localhost", 3306, "root", "mysql", "test");
-
+    connection = await new ConnectionFactory()
+        .connect("localhost", 3306, "root", "mysql", "test");
 
     print("TEST");
-    var result =
-        await connection.test("SELECT * FROM people LIMIT 1");
+    var result = await connection.test("SELECT * FROM people LIMIT 1");
 
     // rows
     // print("NEXT");
@@ -72,10 +69,11 @@ Future test11() async {
 }
 
 Future test10() async {
-  var connection = new Connection();
+  var connection;
 
   try {
-    await connection.connect("localhost", 3306, "root", "mysql", "test");
+    connection = await new ConnectionFactory()
+        .connect("localhost", 3306, "root", "mysql", "test");
 
     // TODO verificare datetime e timestamp
     await connection.executeQuery("""
@@ -175,10 +173,11 @@ Future test10() async {
 }
 
 Future test9() async {
-  var connection = new Connection();
+  var connection;
 
   try {
-    await connection.connect("localhost", 3306, "root", "mysql", "test");
+    connection = await new ConnectionFactory()
+        .connect("localhost", 3306, "root", "mysql", "test");
 
     var preparedStatement =
         await connection.prepareQuery("SELECT * FROM people WHERE id = ?");
@@ -217,10 +216,11 @@ Future test9() async {
 }
 
 Future test8() async {
-  var connection = new Connection();
+  var connection;
 
   try {
-    await connection.connect("localhost", 3306, "root", "mysql", "test");
+    connection = await new ConnectionFactory()
+        .connect("localhost", 3306, "root", "mysql", "test");
 
     var queryResult =
         await connection.executeQuery("SELECT * FROM people WHERE id = 10");
@@ -246,10 +246,11 @@ Future test8() async {
 }
 
 Future test4() async {
-  var connection = new Connection();
+  var connection;
 
   try {
-    await connection.connect("localhost", 3306, "root", "mysql", "test");
+    connection = await new ConnectionFactory()
+        .connect("localhost", 3306, "root", "mysql", "test");
 
     var preparedStatement =
         await connection.prepareQuery("SELECT * FROM people WHERE id = ?");
@@ -264,10 +265,11 @@ Future test4() async {
 }
 
 Future test7() async {
-  var connection = new Connection();
+  var connection;
 
   try {
-    await connection.connect("localhost", 3306, "root", "mysql", "test");
+    connection = await new ConnectionFactory()
+        .connect("localhost", 3306, "root", "mysql", "test");
 
     var queryResult;
 
@@ -294,10 +296,11 @@ Future test7() async {
 }
 
 Future test6() async {
-  var connection = new Connection();
+  var connection;
 
   try {
-    await connection.connect("localhost", 3306, "root", "mysql", "test");
+    connection = await new ConnectionFactory()
+        .connect("localhost", 3306, "root", "mysql", "test");
 
     var queryResult;
 
@@ -343,10 +346,11 @@ Future test6() async {
 }
 
 Future test5() async {
-  var connection = new Connection();
+  var connection;
 
   try {
-    await connection.connect("localhost", 3306, "root", "mysql", "test");
+    connection = await new ConnectionFactory()
+        .connect("localhost", 3306, "root", "mysql", "test");
 
     var queryResult =
         await connection.executeQuery("SELECT * FROM people LIMIT 10");

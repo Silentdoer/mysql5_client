@@ -79,9 +79,9 @@ class MySqlClientSpeedTest extends SpeedTest {
   Connection connection;
 
   Future run() async {
-    connection = new Connection();
+    var factory = new ConnectionFactory();
 
-    await connection.connect("localhost", 3306, "root", "mysql", "test");
+    connection = await factory.connect("localhost", 3306, "root", "mysql", "test");
 
     await super.run();
 
@@ -89,6 +89,6 @@ class MySqlClientSpeedTest extends SpeedTest {
   }
 
   Future executeQuery(String sql) {
-    return connection.test(sql);
+    return connection.executeQuery(sql);
   }
 }

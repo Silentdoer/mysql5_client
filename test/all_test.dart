@@ -22,9 +22,9 @@ Future testMySqlClient() async {
   var connection;
 
   try {
-    connection = new Connection();
+    var factory = new ConnectionFactory();
 
-    await connection.connect("104.155.81.67", 3306, "sysadmin_vpd", "oracle");
+    connection = await factory.connect("104.155.81.67", 3306, "sysadmin_vpd", "oracle");
 
     time = new DateTime.now().millisecondsSinceEpoch;
 

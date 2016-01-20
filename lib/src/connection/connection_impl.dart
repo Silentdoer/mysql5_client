@@ -1,4 +1,10 @@
-part of mysql_client.connection;
+library mysql_client.connection.impl;
+
+import 'dart:async';
+import 'dart:io';
+
+import '../protocol.dart';
+import '../connection.dart';
 
 class ConnectionFactoryImpl implements ConnectionFactory {
   Future<Connection> connect(host, int port, String userName, String password,

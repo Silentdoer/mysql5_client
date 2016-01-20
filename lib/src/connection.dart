@@ -104,3 +104,11 @@ abstract class DataIterator {
 
   Future close();
 }
+
+abstract class RowIterator implements DataIterator {
+  String getStringValue(int index);
+
+  num getNumValue(int index);
+
+  bool getBoolValue(int index);
+}

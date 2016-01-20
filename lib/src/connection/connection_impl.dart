@@ -87,7 +87,7 @@ class ConnectionImpl implements Connection {
       }
 
       List<ColumnDefinition> columns = new List(response.columnCount);
-      var columnIterator = new QueryColumnIterator(columns.length, this);
+      var columnIterator = new QueryColumnIteratorImpl(columns.length, this);
       var hasColumn = true;
       var i = 0;
       while (hasColumn) {
@@ -131,7 +131,7 @@ class ConnectionImpl implements Connection {
       }
 
       List<ColumnDefinition> columns = new List(response.columnCount);
-      var columnIterator = new QueryColumnIterator(columns.length, this);
+      var columnIterator = new QueryColumnIteratorImpl(columns.length, this);
       var hasColumn = true;
       var i = 0;
       while (hasColumn) {
@@ -171,7 +171,7 @@ class ConnectionImpl implements Connection {
       }
 
       List<ColumnDefinition> parameters = new List(response.numParams);
-      var parameterIterator = new QueryColumnIterator(parameters.length, this);
+      var parameterIterator = new QueryColumnIteratorImpl(parameters.length, this);
       var hasParameter = true;
       var i = 0;
       while (hasParameter) {
@@ -183,7 +183,7 @@ class ConnectionImpl implements Connection {
       }
 
       List<ColumnDefinition> columns = new List(response.numColumns);
-      var columnIterator = new QueryColumnIterator(columns.length, this);
+      var columnIterator = new QueryColumnIteratorImpl(columns.length, this);
       var hasColumn = true;
       var l = 0;
       while (hasColumn) {
@@ -273,12 +273,6 @@ abstract class BaseQueryResultImpl implements QueryResult {
       await _rowIterator.close();
     }
   }
-}
-
-abstract class RowIterator implements DataIterator {
-  String getStringValue(int index);
-  num getNumValue(int index);
-  bool getBoolValue(int index);
 }
 
 class CommandQueryResultImpl extends BaseQueryResultImpl {
@@ -380,7 +374,7 @@ class PreparedStatementImpl implements PreparedStatement {
         return new PreparedQueryResultImpl.ok(
             response.affectedRows, response.lastInsertId);
       } else {
-        var columnIterator = new QueryColumnIterator(columnCount, _connection);
+        var columnIterator = new QueryColumnIteratorImpl(columnCount, _connection);
         var hasColumn = true;
         while (hasColumn) {
           hasColumn = await columnIterator._skip();
@@ -433,7 +427,7 @@ class PreparedQueryResultImpl extends BaseQueryResultImpl {
       : this._statement = null,
         super.ok(affectedRows, lastInsertId);
 
-  RowIterator _createRowIterator() => new PreparedQueryRowIterator(this);
+  RowIterator _createRowIterator() => new PreparedQueryRowIteratorImpl(this);
 
   List<ColumnDefinition> get columns => _statement?.columns;
 }
@@ -500,12 +494,12 @@ abstract class BaseDataIteratorImpl implements DataIterator {
   }
 }
 
-class QueryColumnIterator extends BaseDataIteratorImpl {
+class QueryColumnIteratorImpl extends BaseDataIteratorImpl {
   final ConnectionImpl _connection;
 
   final int columnCount;
 
-  QueryColumnIterator(this.columnCount, this._connection);
+  QueryColumnIteratorImpl(this.columnCount, this._connection);
 
   String get catalog => _connection
       ._protocol.queryCommandTextProtocol.reusableColumnPacket.catalog;
@@ -579,8 +573,8 @@ class CommandQueryRowIteratorImpl extends BaseQueryRowIteratorImpl {
   _free() => _result._connection._protocol.queryCommandTextProtocol.free();
 }
 
-class PreparedQueryRowIterator extends BaseQueryRowIteratorImpl {
-  PreparedQueryRowIterator(PreparedQueryResultImpl result) : super(result);
+class PreparedQueryRowIteratorImpl extends BaseQueryRowIteratorImpl {
+  PreparedQueryRowIteratorImpl(PreparedQueryResultImpl result) : super(result);
 
   String getStringValue(int index) => _result._statement._connection._protocol
       .preparedStatementProtocol.reusableRowPacket.getUTF8String(index);

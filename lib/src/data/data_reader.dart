@@ -1,14 +1,7 @@
 // Copyright (c) 2015, <your name>. All rights reserved. Use of this source code
 // is governed by a BSD-style license that can be found in the LICENSE file.
 
-library mysql_client.data_reader;
-
-import "dart:async";
-import "dart:collection";
-import "dart:io";
-
-import "data_chunk.dart";
-import "reader_buffer.dart";
+part of mysql_client.data;
 
 class DataReader {
 

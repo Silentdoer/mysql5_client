@@ -8,10 +8,7 @@ import 'dart:typed_data';
 
 import "package:crypto/crypto.dart";
 
-import 'data/data_range.dart';
-import "data/reader_buffer.dart";
-import 'data/data_reader.dart';
-import 'data/data_writer.dart';
+import "data.dart";
 
 part "protocol/packet_buffer.dart";
 part "protocol/protocol.dart";

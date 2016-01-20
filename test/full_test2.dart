@@ -58,14 +58,11 @@ abstract class SpeedTest {
     print("selecting simple data");
     var sw = new Stopwatch()..start();
     for (var i = 0; i < SIMPLE_SELECTS; i++) {
-      var queryResult = await executeQuery("select * from prova");
+      var queryResult = await executeQuery("select * from prova LIMIT 10");
 
       // rows
-      var hasRow = true;
-      while (hasRow) {
-        // var hasRow = await queryResult.next();
-        hasRow = queryResult.rawNext();
-        hasRow = hasRow is Future ? await hasRow : hasRow;
+      while (await queryResult.next()) {
+        await new Future.delayed(new Duration(milliseconds: 100));
       }
     }
     logTime("simple selects", sw);

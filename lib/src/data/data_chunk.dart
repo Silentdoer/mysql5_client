@@ -30,6 +30,14 @@ class DataChunk {
   bool get isEmpty => _length == 0;
   int get length => _length;
 
+  DataChunk extractDataChunk(int length, DataChunk reusableChunk) {
+    length = min(_length, length);
+    var chunk = reusableChunk.reuse(_data, _start, length);
+    _start += length;
+    _length -= length;
+    return chunk;
+  }
+
   int checkOneByte() => _data[_start];
 
   int extractOneByte() {
@@ -37,14 +45,6 @@ class DataChunk {
     _start++;
     _length--;
     return value;
-  }
-
-  DataChunk extractDataChunk(int length, DataChunk reusableChunk) {
-    length = min(_length, length);
-    var chunk = reusableChunk.reuse(_data, _start, length);
-    _start += length;
-    _length -= length;
-    return chunk;
   }
 
   DataRange extractFixedLengthDataRange(int length, DataRange reusableRange) {

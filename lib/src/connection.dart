@@ -35,6 +35,31 @@ class ColumnDefinition {
   ColumnDefinition(this.name, this.type);
 }
 
+abstract class ConnectionPool {
+  factory ConnectionPool(
+          {host,
+          int port,
+          String userName,
+          String password,
+          String database,
+          int maxConnections,
+          Duration connectionTimeout}) =>
+      new ConnectionPoolImpl(
+          host: host,
+          port: port,
+          userName: userName,
+          password: password,
+          database: database,
+          maxConnections: maxConnections,
+          connectionTimeout: connectionTimeout);
+
+  bool get isClosed;
+
+  Future<Connection> request();
+
+  Future close();
+}
+
 abstract class ConnectionFactory {
   factory ConnectionFactory() {
     return new ConnectionFactoryImpl();
@@ -54,7 +79,7 @@ abstract class Connection {
   Future close();
 }
 
-abstract class QueryResult implements CommandResult, DataIterator {
+abstract class QueryResult implements CommandResult, RowIterator {
   int get affectedRows;
 
   int get lastInsertId;
@@ -62,12 +87,6 @@ abstract class QueryResult implements CommandResult, DataIterator {
   int get columnCount;
 
   List<ColumnDefinition> get columns;
-
-  String getStringValue(int index);
-
-  num getNumValue(int index);
-
-  bool getBoolValue(int index);
 
   // TODO aggiungere skip e limit
   // TODO aggiungere hint tipo sql per il recupero
@@ -79,10 +98,13 @@ abstract class PreparedStatement implements CommandResult {
 
   int get columnCount;
 
+  List<ColumnDefinition> get parameters;
+
   List<ColumnDefinition> get columns;
 
   bool get isClosed;
 
+  // TODO utilizzare le enumerazioni per il sqlType
   void setParameter(int index, value, [int sqlType]);
 
   Future<QueryResult> executeQuery();

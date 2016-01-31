@@ -5,16 +5,11 @@ version: 0.0.1
 #homepage: https://www.example.com
 
 environment:
-  sdk: '>=1.0.0 <2.0.0'
+  sdk: '>=1.13.0 <2.0.0'
 
 dependencies:
-  crypto: ^0.9.1
-  sqljocky: any
-  stack_trace: any
-  sqlconnection:
-    hosted:
-      name: sqlconnection
-      url: http://pub.primeapp.it:9091
-    version: any
+  crypto: "^0.9.1"
+  pool: "^1.2.1"
+  stack_trace: "^1.6.0"
 dev_dependencies:
   test: '>=0.12.0 <0.13.0'

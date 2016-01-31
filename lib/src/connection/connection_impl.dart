@@ -3,33 +3,55 @@ library mysql_client.connection.impl;
 import 'dart:async';
 import 'dart:io';
 
+import 'package:pool/pool.dart';
+
 import '../protocol.dart';
 import '../connection.dart';
+
+class ConnectionPoolImpl implements ConnectionPool {
+  final ConnectionFactory _factory;
+  final Pool _pool;
+  final _host;
+  final int _port;
+  final String _userName;
+  final String _password;
+  final String _database;
+
+  ConnectionPoolImpl(
+      {host,
+      int port,
+      String userName,
+      String password,
+      String database,
+      int maxConnections,
+      Duration connectionTimeout})
+      : this._host = host,
+        this._port = port,
+        this._userName = userName,
+        this._password = password,
+        this._database = database,
+        this._factory = new ConnectionFactory(),
+        this._pool = new Pool(maxConnections, timeout: connectionTimeout);
+
+  bool get isClosed => _pool.isClosed;
+
+  Future<Connection> request() {
+    if (isClosed) {
+      throw new StateError("Connection pool closed");
+    }
+
+    // TODO pool support
+    return this._factory.connect(_host, _port, _userName, _password, _database);
+  }
+
+  Future close() {
+    return _pool.close();
+  }
+}
 
 class ConnectionFactoryImpl implements ConnectionFactory {
   Future<Connection> connect(host, int port, String userName, String password,
       [String database]) async {
-    var connection = new ConnectionImpl();
-    await connection.connect(host, port, userName, password, database);
-    return connection;
-  }
-}
-
-class ConnectionImpl implements Connection {
-  RawSocket _socket;
-
-  Protocol _protocol;
-
-  CommandResult _lastProtocolResult;
-
-  bool get isClosed => _protocol == null;
-
-  Future connect(host, int port, String userName, String password,
-      [String database]) async {
-    if (!isClosed) {
-      throw new StateError("Connection already connected");
-    }
-
     var socket = await RawSocket.connect(host, port);
     socket.setOption(SocketOption.TCP_NODELAY, true);
     socket.writeEventsEnabled = false;
@@ -55,56 +77,23 @@ class ConnectionImpl implements Connection {
         throw new ConnectionError(response.errorMessage);
       }
 
-      _socket = socket;
-      _protocol = protocol;
+      return new ConnectionImpl(socket, protocol);
     } finally {
       protocol.connectionProtocol.free();
     }
   }
+}
 
-  Future<QueryResult> test(String query) async {
-    if (isClosed) {
-      throw new StateError("Connection closed");
-    }
+class ConnectionImpl implements Connection {
+  RawSocket _socket;
 
-    await _lastProtocolResult?.free();
+  Protocol _protocol;
 
-    _lastProtocolResult = null;
+  CommandResult _lastProtocolResult;
 
-    try {
-      _protocol.queryCommandTextProtocol.writeCommandQueryPacket(query);
+  ConnectionImpl(this._socket, this._protocol);
 
-      var response =
-          await _protocol.queryCommandTextProtocol.readCommandQueryResponse();
-
-      if (response is OkPacket) {
-        return new CommandQueryResultImpl.ok(
-            response.affectedRows, response.lastInsertId, this);
-      }
-
-      if (response is! ResultSetColumnCountPacket) {
-        throw new QueryError(response.errorMessage);
-      }
-
-      List<ColumnDefinition> columns = new List(response.columnCount);
-      var columnIterator = new QueryColumnIteratorImpl(columns.length, this);
-      var hasColumn = true;
-      var i = 0;
-      while (hasColumn) {
-        hasColumn = await columnIterator.rawNext();
-        if (hasColumn) {
-          columns[i++] =
-              new ColumnDefinition(columnIterator.name, columnIterator.type);
-        }
-      }
-
-      _lastProtocolResult = new CommandQueryResultImpl.resultSet(columns, this);
-
-      return _lastProtocolResult;
-    } finally {
-      _protocol.queryCommandTextProtocol.free();
-    }
-  }
+  bool get isClosed => _protocol == null;
 
   Future<QueryResult> executeQuery(String query) async {
     if (isClosed) {
@@ -171,7 +160,8 @@ class ConnectionImpl implements Connection {
       }
 
       List<ColumnDefinition> parameters = new List(response.numParams);
-      var parameterIterator = new QueryColumnIteratorImpl(parameters.length, this);
+      var parameterIterator =
+          new QueryColumnIteratorImpl(parameters.length, this);
       var hasParameter = true;
       var i = 0;
       while (hasParameter) {
@@ -241,8 +231,6 @@ abstract class BaseQueryResultImpl implements QueryResult {
 
   RowIterator _createRowIterator();
 
-  List<ColumnDefinition> get columns;
-
   int get columnCount => columns?.length;
 
   bool get isClosed => _rowIterator == null || _rowIterator.isClosed;
@@ -262,12 +250,10 @@ abstract class BaseQueryResultImpl implements QueryResult {
     throw new UnimplementedError();
   }
 
-  @override
   Future free() async {
     await close();
   }
 
-  @override
   Future close() async {
     if (_rowIterator != null && !_rowIterator.isClosed) {
       await _rowIterator.close();
@@ -299,6 +285,7 @@ class PreparedStatementImpl implements PreparedStatement {
   final int _statementId;
 
   final List<ColumnDefinition> parameters;
+
   final List<ColumnDefinition> columns;
 
   final List<int> _parameterTypes;
@@ -374,7 +361,8 @@ class PreparedStatementImpl implements PreparedStatement {
         return new PreparedQueryResultImpl.ok(
             response.affectedRows, response.lastInsertId);
       } else {
-        var columnIterator = new QueryColumnIteratorImpl(columnCount, _connection);
+        var columnIterator =
+            new QueryColumnIteratorImpl(columnCount, _connection);
         var hasColumn = true;
         while (hasColumn) {
           hasColumn = await columnIterator._skip();
@@ -392,12 +380,10 @@ class PreparedStatementImpl implements PreparedStatement {
     }
   }
 
-  @override
   Future free() async {
     // TODO non posso chiudere lo statement ma posso liberare qualcosa?
   }
 
-  @override
   Future close() async {
     if (!_isClosed) {
       _isClosed = true;

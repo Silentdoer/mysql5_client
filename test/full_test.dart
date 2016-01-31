@@ -5,8 +5,6 @@ library mysql_client.test;
 
 import "dart:async";
 
-import "package:sqljocky/sqljocky.dart";
-
 import 'package:mysql_client/mysql_client.dart';
 
 const SIMPLE_INSERTS = 1000;
@@ -117,31 +115,5 @@ class MySqlClientSpeedTest extends SpeedTest {
 
   Future executeQuery(String sql) {
     return connection.executeQuery(sql);
-  }
-}
-
-class SqlJockySpeedTest extends SpeedTest {
-  ConnectionPool pool;
-
-  Future run() async {
-    pool = new ConnectionPool(
-        host: 'localhost',
-        port: 3306,
-        user: 'root',
-        password: 'mysql',
-        db: 'test',
-        max: 1);
-
-    await super.run();
-
-    await pool.closeConnectionsWhenNotInUse();
-
-    pool = null;
-  }
-
-  Future executeQuery(String sql) {
-    return pool.query(sql).then((results) {
-      return results.toList();
-    });
   }
 }

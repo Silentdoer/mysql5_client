@@ -8,6 +8,27 @@ import 'package:pool/pool.dart';
 import '../protocol.dart';
 import '../connection.dart';
 
+int _getSqlType(SqlType sqlType) {
+  switch (sqlType) {
+    case SqlType.DATETIME:
+      return MYSQL_TYPE_DATETIME;
+    case SqlType.DOUBLE:
+      return MYSQL_TYPE_DOUBLE;
+    case SqlType.LONG:
+      return MYSQL_TYPE_LONG;
+    case SqlType.LONGLONG:
+      return MYSQL_TYPE_LONGLONG;
+    case SqlType.NULL:
+      return MYSQL_TYPE_NULL;
+    case SqlType.TIMESTAMP:
+      return MYSQL_TYPE_TIMESTAMP;
+    case SqlType.TINY:
+      return MYSQL_TYPE_TINY;
+    case SqlType.VAR_STRING:
+      return MYSQL_TYPE_VAR_STRING;
+  }
+}
+
 class ConnectionPoolImpl implements ConnectionPool {
   final ConnectionFactory _factory;
   final Pool _pool;
@@ -314,7 +335,7 @@ class PreparedStatementImpl implements PreparedStatement {
 
   bool get isClosed => _isClosed;
 
-  void setParameter(int index, value, [int sqlType]) {
+  void setParameter(int index, value, [SqlType sqlType]) {
     if (_isClosed) {
       throw new StateError("Prepared statement closed");
     }
@@ -323,11 +344,13 @@ class PreparedStatementImpl implements PreparedStatement {
       throw new IndexError(index, _parameterValues);
     }
 
-    sqlType ??= _connection._protocol.preparedStatementProtocol
+    var type = _getSqlType(sqlType);
+
+    type ??= _connection._protocol.preparedStatementProtocol
         .getSqlTypeFromValue(value);
 
-    if (sqlType != null && _parameterTypes[index] != sqlType) {
-      _parameterTypes[index] = sqlType;
+    if (type != null && _parameterTypes[index] != type) {
+      _parameterTypes[index] = type;
       _isNewParamsBoundFlag = true;
     }
 

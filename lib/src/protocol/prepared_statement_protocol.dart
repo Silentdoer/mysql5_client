@@ -8,14 +8,14 @@ const int COM_STMT_RESET = 0x1a;
 const int CURSOR_TYPE_NO_CURSOR = 0x00;
 
 enum DataType {
-  STRING,
-  INTEGER_8,
-  INTEGER_4,
-  INTEGER_2,
-  INTEGER_1,
-  DOUBLE,
-  FLOAT,
-  DATETIME
+  string,
+  integer8,
+  integer4,
+  integer2,
+  integer1,
+  double,
+  float,
+  dateTime
 }
 
 class PreparedStatementProtocol extends ProtocolDelegate {
@@ -101,21 +101,21 @@ class PreparedStatementProtocol extends ProtocolDelegate {
         if (value != null) {
           var dataType = _getDataTypeFromSqlType(parameterTypes[i]);
           switch (dataType) {
-            case DataType.INTEGER_1:
+            case DataType.integer1:
               // value (1) -- integer
               _writeFixedLengthInteger(value ? 1 : 0, 1);
               break;
-            case DataType.DOUBLE:
+            case DataType.double:
               // value (string.fix_len) -- (len=8) double
               _writeDouble(value);
               break;
-            case DataType.INTEGER_8:
+            case DataType.integer8:
               // value (8) -- integer
               _writeFixedLengthInteger(value, 8);
               break;
-            case DataType.DATETIME:
+            case DataType.dateTime:
               throw new UnsupportedError("DateTime not supported yet");
-            case DataType.STRING:
+            case DataType.string:
               // value (lenenc_str) -- string
               _writeLengthEncodedUTF8String(value);
               break;
@@ -286,17 +286,17 @@ class PreparedStatementProtocol extends ProtocolDelegate {
       if ((nullBitmap[l] & mask) == 0) {
         var dataType = _getDataTypeFromSqlType(columnTypes[i]);
         switch (dataType) {
-          case DataType.STRING:
+          case DataType.string:
             _readFixedLengthDataRange(
                 _readLengthEncodedInteger(), reusableRange);
             break;
-          case DataType.DOUBLE:
+          case DataType.double:
             _readFixedLengthDataRange(8, reusableRange);
             break;
-          case DataType.INTEGER_4:
+          case DataType.integer4:
             _readFixedLengthDataRange(4, reusableRange);
             break;
-          case DataType.INTEGER_1:
+          case DataType.integer1:
             _readFixedLengthDataRange(1, reusableRange);
             break;
           default:
@@ -325,19 +325,19 @@ class PreparedStatementProtocol extends ProtocolDelegate {
     } else {
       switch (sqlType) {
         case MYSQL_TYPE_VAR_STRING:
-          return DataType.STRING;
+          return DataType.string;
         case MYSQL_TYPE_LONG:
-          return DataType.INTEGER_4;
+          return DataType.integer4;
         case MYSQL_TYPE_LONGLONG:
-          return DataType.INTEGER_8;
+          return DataType.integer8;
         case MYSQL_TYPE_DOUBLE:
-          return DataType.DOUBLE;
+          return DataType.double;
         case MYSQL_TYPE_TINY:
-          return DataType.INTEGER_1;
+          return DataType.integer1;
         case MYSQL_TYPE_DATETIME:
-          return DataType.DATETIME;
+          return DataType.dateTime;
         case MYSQL_TYPE_TIMESTAMP:
-          return DataType.DATETIME;
+          return DataType.dateTime;
         default:
           throw new UnsupportedError("Sql type not supported $sqlType");
       }

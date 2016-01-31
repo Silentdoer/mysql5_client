@@ -4,6 +4,17 @@ import 'dart:async';
 
 import "connection/connection_impl.dart";
 
+enum SqlType {
+  TINY,
+  LONG,
+  DOUBLE,
+  NULL,
+  TIMESTAMP,
+  LONGLONG,
+  DATETIME,
+  VAR_STRING
+}
+
 class ConnectionError extends Error {
   final String message;
 
@@ -104,8 +115,7 @@ abstract class PreparedStatement implements CommandResult {
 
   bool get isClosed;
 
-  // TODO utilizzare le enumerazioni per il sqlType
-  void setParameter(int index, value, [int sqlType]);
+  void setParameter(int index, value, [SqlType sqlType]);
 
   Future<QueryResult> executeQuery();
 }

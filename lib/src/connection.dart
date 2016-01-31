@@ -20,6 +20,7 @@ class ConnectionError extends Error {
 
   ConnectionError(this.message);
 
+  @override
   String toString() => "ConnectionError: $message";
 }
 
@@ -28,6 +29,7 @@ class QueryError extends Error {
 
   QueryError(this.message);
 
+  @override
   String toString() => "QueryError: $message";
 }
 
@@ -36,6 +38,7 @@ class PreparedStatementError extends Error {
 
   PreparedStatementError(this.message);
 
+  @override
   String toString() => "PreparedStatementError: $message";
 }
 

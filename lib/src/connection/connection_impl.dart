@@ -2,6 +2,7 @@ library mysql_client.connection.impl;
 
 import 'dart:async';
 import 'dart:io';
+import 'dart:collection';
 
 import 'package:pool/pool.dart';
 
@@ -38,6 +39,10 @@ class ConnectionPoolImpl implements ConnectionPool {
   final String _password;
   final String _database;
 
+  final Queue<Connection> _releasedConnections = new Queue();
+  final Map<PooledConnectionImpl, PoolResource> _assignedResources = new Map();
+  final Map<PooledConnectionImpl, Connection> _assignedConnections = new Map();
+
   ConnectionPoolImpl(
       {host,
       int port,
@@ -54,23 +59,58 @@ class ConnectionPoolImpl implements ConnectionPool {
         this._factory = new ConnectionFactory(),
         this._pool = new Pool(maxConnections, timeout: connectionTimeout);
 
+  @override
   bool get isClosed => _pool.isClosed;
 
-  Future<Connection> request() {
+  @override
+  Future<Connection> request() async {
     if (isClosed) {
       throw new StateError("Connection pool closed");
     }
 
-    // TODO pool support
-    return this._factory.connect(_host, _port, _userName, _password, _database);
+    var resource = await _pool.request();
+
+    var connection = _releasedConnections.isNotEmpty ? _releasedConnections.removeLast() : null;
+
+    if (connection == null) {
+      connection =
+          await _factory.connect(_host, _port, _userName, _password, _database);
+    }
+
+    var pooledConnection = new PooledConnectionImpl(connection, this);
+
+    _assignedConnections[pooledConnection] = connection;
+    _assignedResources[pooledConnection] = resource;
+
+    return pooledConnection;
   }
 
-  Future close() {
-    return _pool.close();
+  @override
+  Future close() async {
+    await Future.wait(_assignedConnections.keys
+        .map((pooledConnection) => _release(pooledConnection)));
+
+    await _pool.close();
+
+    await Future
+        .wait(_releasedConnections.map((connection) => connection.close()));
+
+    _releasedConnections.clear();
+  }
+
+  Future _release(PooledConnectionImpl pooledConnection) async {
+    var connection = _assignedConnections.remove(pooledConnection);
+    var resource = _assignedResources.remove(pooledConnection);
+
+    await connection.free();
+    _releasedConnections.add(connection);
+
+    resource.release();
   }
 }
 
 class ConnectionFactoryImpl implements ConnectionFactory {
+  @override
   Future<Connection> connect(host, int port, String userName, String password,
       [String database]) async {
     var socket = await RawSocket.connect(host, port);
@@ -105,6 +145,50 @@ class ConnectionFactoryImpl implements ConnectionFactory {
   }
 }
 
+class PooledConnectionImpl implements Connection {
+  ConnectionPoolImpl _connectionPool;
+
+  ConnectionImpl _connection;
+
+  PooledConnectionImpl(this._connection, this._connectionPool);
+
+  @override
+  bool get isClosed => _connection == null;
+
+  @override
+  Future<QueryResult> executeQuery(String query) {
+    if (isClosed) {
+      throw new StateError("Connection released");
+    }
+
+    return _connection.executeQuery(query);
+  }
+
+  @override
+  Future<PreparedStatement> prepareQuery(String query) {
+    if (isClosed) {
+      throw new StateError("Connection released");
+    }
+
+    return _connection.prepareQuery(query);
+  }
+
+  @override
+  Future close() async {
+    if (isClosed) {
+      throw new StateError("Connection released");
+    }
+
+    _connection = null;
+
+    var connectionPool = _connectionPool;
+
+    _connectionPool = null;
+
+    await connectionPool._release(this);
+  }
+}
+
 class ConnectionImpl implements Connection {
   RawSocket _socket;
 
@@ -114,16 +198,12 @@ class ConnectionImpl implements Connection {
 
   ConnectionImpl(this._socket, this._protocol);
 
+  @override
   bool get isClosed => _protocol == null;
 
+  @override
   Future<QueryResult> executeQuery(String query) async {
-    if (isClosed) {
-      throw new StateError("Connection closed");
-    }
-
-    await _lastProtocolResult?.free();
-
-    _lastProtocolResult = null;
+    await free();
 
     try {
       _protocol.queryCommandTextProtocol.writeCommandQueryPacket(query);
@@ -160,14 +240,9 @@ class ConnectionImpl implements Connection {
     }
   }
 
+  @override
   Future<PreparedStatement> prepareQuery(String query) async {
-    if (isClosed) {
-      throw new StateError("Connection closed");
-    }
-
-    await _lastProtocolResult?.free();
-
-    _lastProtocolResult = null;
+    await free();
 
     try {
       _protocol.preparedStatementProtocol
@@ -216,12 +291,17 @@ class ConnectionImpl implements Connection {
     }
   }
 
+  @override
   Future close() async {
     if (isClosed) {
       throw new StateError("Connection closed");
     }
 
-    await _lastProtocolResult?.close();
+    var lastProtocolResult = _lastProtocolResult;
+
+    _lastProtocolResult = null;
+
+    await lastProtocolResult?.close();
 
     // TODO chiudo tutti gli eventuali statement ancora aperti (senza inviare la richiesta di chiusura del protocollo)
 
@@ -232,11 +312,27 @@ class ConnectionImpl implements Connection {
 
     await socket.close();
   }
+
+  Future free() async {
+    // TODO cosa vuol dire liberare la connessione?
+
+    if (isClosed) {
+      throw new StateError("Connection closed");
+    }
+
+    var lastProtocolResult = _lastProtocolResult;
+
+    _lastProtocolResult = null;
+
+    await lastProtocolResult?.free();
+  }
 }
 
 abstract class BaseQueryResultImpl implements QueryResult {
+  @override
   final int affectedRows;
 
+  @override
   final int lastInsertId;
 
   RowIterator _rowIterator;
@@ -252,29 +348,39 @@ abstract class BaseQueryResultImpl implements QueryResult {
 
   RowIterator _createRowIterator();
 
+  @override
   int get columnCount => columns?.length;
 
+  @override
   bool get isClosed => _rowIterator == null || _rowIterator.isClosed;
 
+  @override
   Future<bool> next() => _rowIterator.next();
 
+  @override
   rawNext() => _rowIterator.rawNext();
 
+  @override
   String getStringValue(int index) => _rowIterator.getStringValue(index);
 
+  @override
   num getNumValue(int index) => _rowIterator.getNumValue(index);
 
+  @override
   bool getBoolValue(int index) => _rowIterator.getBoolValue(index);
 
+  @override
   Future<List<List>> getNextRows() {
     // TODO implementare getNextRows
     throw new UnimplementedError();
   }
 
+  @override
   Future free() async {
     await close();
   }
 
+  @override
   Future close() async {
     if (_rowIterator != null && !_rowIterator.isClosed) {
       await _rowIterator.close();
@@ -285,6 +391,7 @@ abstract class BaseQueryResultImpl implements QueryResult {
 class CommandQueryResultImpl extends BaseQueryResultImpl {
   final ConnectionImpl _connection;
 
+  @override
   final List<ColumnDefinition> columns;
 
   CommandQueryResultImpl.resultSet(this.columns, this._connection)
@@ -295,6 +402,7 @@ class CommandQueryResultImpl extends BaseQueryResultImpl {
       : this.columns = null,
         super.ok(affectedRows, lastInsertId);
 
+  @override
   RowIterator _createRowIterator() => new CommandQueryRowIteratorImpl(this);
 
   Protocol get _protocol => _connection._protocol;
@@ -305,8 +413,10 @@ class PreparedStatementImpl implements PreparedStatement {
 
   final int _statementId;
 
+  @override
   final List<ColumnDefinition> parameters;
 
+  @override
   final List<ColumnDefinition> columns;
 
   final List<int> _parameterTypes;
@@ -329,12 +439,16 @@ class PreparedStatementImpl implements PreparedStatement {
         growable: false);
   }
 
+  @override
   int get parameterCount => parameters.length;
 
+  @override
   int get columnCount => columns.length;
 
+  @override
   bool get isClosed => _isClosed;
 
+  @override
   void setParameter(int index, value, [SqlType sqlType]) {
     if (_isClosed) {
       throw new StateError("Prepared statement closed");
@@ -357,6 +471,7 @@ class PreparedStatementImpl implements PreparedStatement {
     _parameterValues[index] = value;
   }
 
+  @override
   Future<QueryResult> executeQuery() async {
     if (_isClosed) {
       throw new StateError("Prepared statement closed");
@@ -403,10 +518,12 @@ class PreparedStatementImpl implements PreparedStatement {
     }
   }
 
+  @override
   Future free() async {
     // TODO non posso chiudere lo statement ma posso liberare qualcosa?
   }
 
+  @override
   Future close() async {
     if (!_isClosed) {
       _isClosed = true;
@@ -436,8 +553,10 @@ class PreparedQueryResultImpl extends BaseQueryResultImpl {
       : this._statement = null,
         super.ok(affectedRows, lastInsertId);
 
+  @override
   RowIterator _createRowIterator() => new PreparedQueryRowIteratorImpl(this);
 
+  @override
   List<ColumnDefinition> get columns => _statement?.columns;
 }
 
@@ -453,8 +572,10 @@ abstract class BaseDataIteratorImpl implements DataIterator {
   _skipDataResponse();
   _free();
 
+  @override
   bool get isClosed => _isClosed;
 
+  @override
   Future close() async {
     if (!_isClosed) {
       var hasNext = true;
@@ -467,11 +588,13 @@ abstract class BaseDataIteratorImpl implements DataIterator {
     }
   }
 
+  @override
   Future<bool> next() {
     var value = rawNext();
     return value is Future ? value : new Future.value(value);
   }
 
+  @override
   rawNext() {
     if (_isClosed) {
       throw new StateError("Column iterator closed");
@@ -535,15 +658,19 @@ class QueryColumnIteratorImpl extends BaseDataIteratorImpl {
   int get decimals => _connection
       ._protocol.queryCommandTextProtocol.reusableColumnPacket.decimals;
 
+  @override
   bool _isDataPacket(Packet packet) =>
       packet is ResultSetColumnDefinitionPacket;
 
+  @override
   _readDataResponse() => _connection._protocol.queryCommandTextProtocol
       .readResultSetColumnDefinitionResponse();
 
+  @override
   _skipDataResponse() => _connection._protocol.queryCommandTextProtocol
       .skipResultSetColumnDefinitionResponse();
 
+  @override
   _free() => _connection._protocol.queryCommandTextProtocol.free();
 }
 
@@ -557,37 +684,46 @@ abstract class BaseQueryRowIteratorImpl<T extends QueryResult>
 class CommandQueryRowIteratorImpl extends BaseQueryRowIteratorImpl {
   CommandQueryRowIteratorImpl(CommandQueryResultImpl result) : super(result);
 
+  @override
   String getStringValue(int index) => _result._connection._protocol
       .queryCommandTextProtocol.reusableRowPacket.getUTF8String(index);
 
+  @override
   num getNumValue(int index) {
     var formatted = _result._connection._protocol.queryCommandTextProtocol
         .reusableRowPacket.getString(index);
     return formatted != null ? num.parse(formatted) : null;
   }
 
+  @override
   bool getBoolValue(int index) {
     var formatted = getNumValue(index);
     return formatted != null ? formatted != 0 : null;
   }
 
+  @override
   bool _isDataPacket(Packet response) => response is ResultSetRowPacket;
 
+  @override
   _readDataResponse() =>
       _result._protocol.queryCommandTextProtocol.readResultSetRowResponse();
 
+  @override
   _skipDataResponse() =>
       _result._protocol.queryCommandTextProtocol.skipResultSetRowResponse();
 
+  @override
   _free() => _result._connection._protocol.queryCommandTextProtocol.free();
 }
 
 class PreparedQueryRowIteratorImpl extends BaseQueryRowIteratorImpl {
   PreparedQueryRowIteratorImpl(PreparedQueryResultImpl result) : super(result);
 
+  @override
   String getStringValue(int index) => _result._statement._connection._protocol
       .preparedStatementProtocol.reusableRowPacket.getUTF8String(index);
 
+  @override
   num getNumValue(int index) {
     var column = _result._statement.columns[index];
     switch (column.type) {
@@ -604,11 +740,13 @@ class PreparedQueryRowIteratorImpl extends BaseQueryRowIteratorImpl {
     }
   }
 
+  @override
   bool getBoolValue(int index) {
     var formatted = getNumValue(index);
     return formatted != null ? formatted != 0 : null;
   }
 
+  @override
   _skip() {
     var response = _result._statement._connection._protocol
         .preparedStatementProtocol.skipResultSetRowResponse();
@@ -618,6 +756,7 @@ class PreparedQueryRowIteratorImpl extends BaseQueryRowIteratorImpl {
         : _checkNext(response);
   }
 
+  @override
   bool _checkNext(Packet response) {
     if (response is PreparedResultSetRowPacket) {
       return true;
@@ -628,14 +767,18 @@ class PreparedQueryRowIteratorImpl extends BaseQueryRowIteratorImpl {
     }
   }
 
+  @override
   bool _isDataPacket(Packet response) => response is PreparedResultSetRowPacket;
 
+  @override
   _readDataResponse() =>
       _result._statement._connection._protocol.preparedStatementProtocol
           .readResultSetRowResponse(_result._statement._columnTypes);
 
+  @override
   _skipDataResponse() =>
       _result._protocol.preparedStatementProtocol.skipResultSetRowResponse();
 
+  @override
   _free() => _result._connection._protocol.preparedStatementProtocol.free();
 }

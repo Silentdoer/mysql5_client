@@ -11,31 +11,7 @@ Future main() async {
 }
 
 Future capturedMain() async {
-  await test1();
-}
-
-Future test1() async {
-  var connection;
-
-  try {
-    connection = await new ConnectionFactory()
-        .connect("localhost", 3306, "root", "mysql", "test");
-
-    var queryResult =
-        await connection.executeQuery("SELECT count(*) FROM people");
-
-    // rows
-    while (true) {
-      var next = await queryResult.next();
-      if (!next) {
-        break;
-      }
-
-      print("${queryResult.getNumValue(0)}");
-    }
-  } finally {
-    await connection.close();
-  }
+  await test2();
 }
 
 Future test2() async {
@@ -51,27 +27,39 @@ Future test2() async {
         maxConnections: 10,
         connectionTimeout: new Duration(seconds: 30));
 
-    var connection;
+    await testConnection(pool);
 
-    try {
-      connection = await pool.request();
+    await testConnection(pool);
 
-      var queryResult =
-          await connection.executeQuery("SELECT count(*) FROM people");
+    await testConnection(pool);
 
-      // rows
-      while (true) {
-        var next = await queryResult.next();
-        if (!next) {
-          break;
-        }
+    await testConnection(pool);
 
-        print("${queryResult.getNumValue(0)}");
-      }
-    } finally {
-      await connection.close();
-    }
+    await testConnection(pool);
   } finally {
     await pool.close();
+  }
+}
+
+Future testConnection(ConnectionPool pool) async {
+  var connection;
+
+  try {
+    connection = await pool.request();
+
+    var queryResult =
+        await connection.executeQuery("SELECT count(*) FROM people");
+
+    // rows
+    while (true) {
+      var next = await queryResult.next();
+      if (!next) {
+        break;
+      }
+
+      print("${queryResult.getNumValue(0)}");
+    }
+  } finally {
+    await connection?.close();
   }
 }

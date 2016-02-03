@@ -112,6 +112,7 @@ class ConnectionProtocol extends ProtocolDelegate {
     }
 
     // 1              [0a] protocol version
+    _skipByte();
     packet._protocolVersion = _header;
     // string[NUL]    server version
     packet._serverVersion = _readNulTerminatedString();

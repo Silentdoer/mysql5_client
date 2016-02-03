@@ -11,12 +11,92 @@ import "package:stack_trace/stack_trace.dart";
 Future main() async {
   Chain.capture(() async {
     try {
-      await test7();
+      await test21();
     } catch (e, s) {
       print(e);
-      print(new Chain.forTrace(s));
+      print(Trace.format(s));
     }
   });
+}
+
+Future test21() async {
+  var connection;
+
+  try {
+    connection = await new ConnectionFactory()
+        .connect("localhost", 3306, "root", "mysql", "test");
+
+    var queryResult;
+    var statement;
+
+    statement =
+        await connection.prepareQuery("UPDATE people SET age = ? WHERE id = 9");
+
+    statement.setParameter(0, 92);
+
+    queryResult = await statement.executeQuery();
+
+    print(queryResult.affectedRows);
+
+    statement.setParameter(0, 93);
+
+    queryResult = await statement.executeQuery();
+
+    print(queryResult.affectedRows);
+
+    queryResult =
+        await connection.executeQuery("SELECT * FROM people WHERE id = 9");
+
+    // rows
+    while (true) {
+      var next = await queryResult.next();
+      if (!next) {
+        break;
+      }
+
+      print(
+          "${queryResult.getNumValue(0)}: ${queryResult.getStringValue(1)}, ${queryResult.getStringValue(2)}");
+    }
+  } finally {
+    await connection.close();
+  }
+}
+
+Future test20() async {
+  var connection;
+
+  try {
+    connection = await new ConnectionFactory()
+        .connect("localhost", 3306, "root", "mysql", "test");
+
+    var queryResult;
+
+    queryResult = await connection
+        .executeQuery("UPDATE people SET age = 92 WHERE id = 9");
+
+    print(queryResult.affectedRows);
+
+    queryResult = await connection
+        .executeQuery("UPDATE people SET age = 93 WHERE id = 9");
+
+    print(queryResult.affectedRows);
+
+    queryResult =
+        await connection.executeQuery("SELECT * FROM people WHERE id = 9");
+
+    // rows
+    while (true) {
+      var next = await queryResult.next();
+      if (!next) {
+        break;
+      }
+
+      print(
+          "${queryResult.getNumValue(0)}: ${queryResult.getStringValue(1)}, ${queryResult.getStringValue(2)}");
+    }
+  } finally {
+    await connection.close();
+  }
 }
 
 Future test7() async {
@@ -34,7 +114,7 @@ Future test7() async {
     print(queryResult.affectedRows);
 
     queryResult =
-      await connection.executeQuery("SELECT * FROM people WHERE age = 42");
+        await connection.executeQuery("SELECT * FROM people WHERE age = 42");
 
     print(queryResult.columns);
 
@@ -47,55 +127,6 @@ Future test7() async {
 
       print("${queryResult.getNumValue(0)}: ${queryResult.getStringValue(1)}");
     }
-  } finally {
-    await connection.close();
-  }
-}
-
-Future test12() async {
-  var connection;
-  try {
-    print("CONNECTION");
-    connection = await new ConnectionFactory()
-        .connect("localhost", 3306, "root", "mysql", "test");
-
-    print("TEST");
-    var result = await connection.test("SELECT * FROM people");
-
-    // rows
-    print("NEXT");
-    while (await result.next()) {}
-
-    print("CLOSE");
-    await result.close();
-  } catch (e, s) {
-    print("Error: $e");
-    print(new Chain.forTrace(s).terse);
-  } finally {
-    await connection.close();
-  }
-}
-
-Future test11() async {
-  var connection;
-
-  try {
-    print("CONNECTION");
-    connection = await new ConnectionFactory()
-        .connect("localhost", 3306, "root", "mysql", "test");
-
-    print("TEST");
-    var result = await connection.test("SELECT * FROM people LIMIT 1");
-
-    // rows
-    // print("NEXT");
-    // while (await result.next()) {}
-
-    print("CLOSE");
-    await result.close();
-  } catch (e, s) {
-    print("Error: $e");
-    print(new Chain.forTrace(s).terse);
   } finally {
     await connection.close();
   }
@@ -268,7 +299,8 @@ Future test8() async {
         break;
       }
 
-      print("${queryResult.getNumValue(0)}: ${queryResult.getStringValue(1)}");
+      print(
+          "${queryResult.getNumValue(0)}: ${queryResult.getStringValue(1)}, ${queryResult.getNumValue(2)}");
     }
   } catch (e, s) {
     print("Error: $e");

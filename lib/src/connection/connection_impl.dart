@@ -222,7 +222,7 @@ class ConnectionImpl implements Connection {
 
       List<ColumnDefinition> columns = new List(response.columnCount);
       var columnIterator = new QueryColumnIteratorImpl(columns.length, this);
-      var hasColumn = true;
+      var hasColumn = columns.length > 0;
       var i = 0;
       while (hasColumn) {
         hasColumn = await columnIterator.rawNext();
@@ -258,7 +258,7 @@ class ConnectionImpl implements Connection {
       List<ColumnDefinition> parameters = new List(response.numParams);
       var parameterIterator =
           new QueryColumnIteratorImpl(parameters.length, this);
-      var hasParameter = true;
+      var hasParameter = parameters.length > 0;
       var i = 0;
       while (hasParameter) {
         hasParameter = await parameterIterator.rawNext();
@@ -270,7 +270,7 @@ class ConnectionImpl implements Connection {
 
       List<ColumnDefinition> columns = new List(response.numColumns);
       var columnIterator = new QueryColumnIteratorImpl(columns.length, this);
-      var hasColumn = true;
+      var hasColumn = columns.length > 0;
       var l = 0;
       while (hasColumn) {
         hasColumn = await columnIterator.rawNext();

@@ -232,6 +232,7 @@ class PreparedStatementProtocol extends ProtocolDelegate {
     }
 
     // status (1) -- [00] OK
+    _skipByte();
     packet._status = _header;
     // statement_id (4) -- statement-id
     packet._statementId = _readFixedLengthInteger(4);

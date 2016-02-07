@@ -53,23 +53,21 @@ class PreparedStatementProtocol extends ProtocolDelegate {
   }
 
   void writeCommandStatementPreparePacket(String query) {
-    _createWriterBuffer();
-
-    var sequenceId = 0x00;
+    _resetSequenceId();
 
     // command (1) -- [16] the COM_STMT_PREPARE command
     _writeFixedLengthInteger(COM_STMT_PREPARE, 1);
     // query (string.EOF) -- the query to prepare
     _writeFixedLengthUTF8String(query);
 
-    _writePacket(sequenceId);
+    _writePacket();
   }
 
   void writeCommandStatementExecutePacket(int statementId, List parameterValues,
       bool isNewParamsBoundFlag, List<int> parameterTypes) {
-    _createWriterBuffer();
+    _resetSequenceId();
 
-    var sequenceId = 0x00;
+    _createWriterBuffer();
 
     // 1              [17] COM_STMT_EXECUTE
     _writeFixedLengthInteger(COM_STMT_EXECUTE, 1);
@@ -126,33 +124,33 @@ class PreparedStatementProtocol extends ProtocolDelegate {
       }
     }
 
-    _writePacket(sequenceId);
+    _writePacket();
   }
 
   void writeCommandStatementResetPacket(int statementId) {
-    _createWriterBuffer();
+    _resetSequenceId();
 
-    var sequenceId = 0x00;
+    _createWriterBuffer();
 
     // 1              [1a] COM_STMT_RESET
     _writeFixedLengthInteger(COM_STMT_RESET, 1);
     // 4              statement-id
     _writeFixedLengthInteger(statementId, 4);
 
-    _writePacket(sequenceId);
+    _writePacket();
   }
 
   void writeCommandStatementClosePacket(int statementId) {
-    _createWriterBuffer();
+    _resetSequenceId();
 
-    var sequenceId = 0x00;
+    _createWriterBuffer();
 
     // 1              [19] COM_STMT_CLOSE
     _writeFixedLengthInteger(COM_STMT_CLOSE, 1);
     // 4              statement-id
     _writeFixedLengthInteger(statementId, 4);
 
-    _writePacket(sequenceId);
+    _writePacket();
   }
 
   Future<Packet> readCommandStatementPrepareResponse() {

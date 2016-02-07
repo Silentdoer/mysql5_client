@@ -70,7 +70,9 @@ class ConnectionPoolImpl implements ConnectionPool {
 
     var resource = await _pool.request();
 
-    var connection = _releasedConnections.isNotEmpty ? _releasedConnections.removeLast() : null;
+    var connection = _releasedConnections.isNotEmpty
+        ? _releasedConnections.removeLast()
+        : null;
 
     if (connection == null) {
       connection =
@@ -122,8 +124,6 @@ class ConnectionFactoryImpl implements ConnectionFactory {
     try {
       var response =
           await protocol.connectionProtocol.readInitialHandshakeResponse();
-
-      // TODO verifica sequenceId
 
       if (response is! InitialHandshakePacket) {
         throw new ConnectionError(response.errorMessage);

@@ -230,7 +230,6 @@ Future test10() async {
     }
   } finally {
     try {
-      // TODO problema nelle catch credo
       await connection.close();
     } catch (e) {}
   }

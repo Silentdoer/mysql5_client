@@ -115,12 +115,16 @@ abstract class ProtocolDelegate {
   DataRange _readLengthEncodedDataRange(DataRange reusable) =>
       _protocol._readLengthEncodedDataRange(reusable);
 
+  void _resetSequenceId() {
+    _protocol._resetSequenceId();
+  }
+
   void _createWriterBuffer() {
     _protocol._createWriterBuffer();
   }
 
-  void _writePacket(int sequenceId) {
-    _protocol._writePacket(sequenceId);
+  void _writePacket() {
+    _protocol._writePacket();
   }
 
   void _writeByte(int value) {
@@ -194,6 +198,7 @@ class Protocol {
   final DataRange __reusableDataRange = new DataRange.reusable();
   List<int> __writerBuffer;
 
+  int __lastSequenceId;
   DataWriter __writer;
   DataReader __reader;
 
@@ -208,6 +213,8 @@ class Protocol {
     __connectionProtocol = new ConnectionProtocol(this);
     __queryCommandTextProtocol = new QueryCommandTextProtocol(this);
     __preparedStatementProtocol = new PreparedStatementProtocol(this);
+
+    _resetSequenceId();
   }
 
   ConnectionProtocol get connectionProtocol => __connectionProtocol;
@@ -478,11 +485,26 @@ class Protocol {
         .readFixedLengthDataRange(bytesLength - 1, reusableRange);
   }
 
+  void _resetSequenceId() {
+    __lastSequenceId = -1;
+  }
+
+  int _nextSequenceId() {
+    if (__lastSequenceId == 255) {
+      __lastSequenceId = 0;
+    } else {
+      __lastSequenceId++;
+    }
+    return __lastSequenceId;
+  }
+
   void _createWriterBuffer() {
     __writerBuffer = new List<int>();
   }
 
-  void _writePacket(int sequenceId) {
+  void _writePacket() {
+    int sequenceId = _nextSequenceId();
+
     var payloadBuffer = __writerBuffer;
 
     _createWriterBuffer();
@@ -588,7 +610,13 @@ class Protocol {
   __readPacketBufferPayload(ReaderBuffer headerReaderBuffer) {
     var payloadLength = _getInteger(
         headerReaderBuffer.readFixedLengthDataRange(3, __reusableDataRange));
+    _nextSequenceId();
+
     var sequenceId = headerReaderBuffer.readByte();
+    if (sequenceId != __lastSequenceId) {
+      throw new StateError(
+          "Packet sequence id: $sequenceId != $__lastSequenceId");
+    }
 
     var value = __reader.readBuffer(payloadLength);
     if (value is Future) {

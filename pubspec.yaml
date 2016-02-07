@@ -10,6 +10,6 @@ environment:
 dependencies:
   crypto: "^0.9.1"
   pool: "^1.2.1"
-  stack_trace: "^1.6.0"
 dev_dependencies:
+  stack_trace: "^1.6.0"
   test: '>=0.12.0 <0.13.0'

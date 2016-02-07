@@ -6,16 +6,20 @@ library mysql_client.test;
 import "dart:async";
 
 import 'package:mysql_client/mysql_client.dart';
+import 'package:stack_trace/stack_trace.dart';
 
 const SIMPLE_INSERTS = 1000;
 const SIMPLE_SELECTS = 1000;
 
 // sudo ngrep -x -q -d lo0 '' 'port 3306'
 
-Future main() async {
-  await new MySqlClientSpeedTest().run();
-
-  // await new SqlJockySpeedTest().run();
+Future main() {
+  return Chain.capture(() {
+    return new MySqlClientSpeedTest().run();
+  }, onError: (e, s) {
+    print("Error: $e");
+    print(Trace.format(s));
+  });
 }
 
 abstract class SpeedTest {

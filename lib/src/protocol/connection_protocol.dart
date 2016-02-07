@@ -24,9 +24,6 @@ class ConnectionProtocol extends ProtocolDelegate {
       _clientCapabilityFlags ^= CLIENT_CONNECT_WITH_DB;
     }
 
-    var sequenceId =
-        0x01; // penso dipenda dalla sequenza a cui era arrivato il server
-
     // 4              capability flags, CLIENT_PROTOCOL_41 always set
     _writeFixedLengthInteger(_clientCapabilityFlags, 4);
     // 4              max-packet size
@@ -85,7 +82,7 @@ class ConnectionProtocol extends ProtocolDelegate {
       _writeBytes(valuesBuffer);
     }
 
-    _writePacket(sequenceId);
+    _writePacket();
   }
 
   Future<Packet> readInitialHandshakeResponse() {

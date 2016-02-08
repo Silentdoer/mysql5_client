@@ -75,8 +75,14 @@ class ConnectionPoolImpl implements ConnectionPool {
         : null;
 
     if (connection == null) {
-      connection =
-          await _factory.connect(_host, _port, _userName, _password, _database);
+      try {
+        connection = await _factory.connect(
+            _host, _port, _userName, _password, _database);
+      } catch (e) {
+        resource.release();
+
+        rethrow;
+      }
     }
 
     var pooledConnection = new PooledConnectionImpl(connection, this);
@@ -685,13 +691,15 @@ class CommandQueryRowIteratorImpl extends BaseQueryRowIteratorImpl {
   CommandQueryRowIteratorImpl(CommandQueryResultImpl result) : super(result);
 
   @override
-  String getStringValue(int index) => _result._connection._protocol
-      .queryCommandTextProtocol.reusableRowPacket.getUTF8String(index);
+  String getStringValue(int index) =>
+      _result._connection._protocol.queryCommandTextProtocol.reusableRowPacket
+          .getUTF8String(index);
 
   @override
   num getNumValue(int index) {
-    var formatted = _result._connection._protocol.queryCommandTextProtocol
-        .reusableRowPacket.getString(index);
+    var formatted = _result
+        ._connection._protocol.queryCommandTextProtocol.reusableRowPacket
+        .getString(index);
     return formatted != null ? num.parse(formatted) : null;
   }
 
@@ -721,7 +729,8 @@ class PreparedQueryRowIteratorImpl extends BaseQueryRowIteratorImpl {
 
   @override
   String getStringValue(int index) => _result._statement._connection._protocol
-      .preparedStatementProtocol.reusableRowPacket.getUTF8String(index);
+      .preparedStatementProtocol.reusableRowPacket
+      .getUTF8String(index);
 
   @override
   num getNumValue(int index) {
@@ -731,10 +740,12 @@ class PreparedQueryRowIteratorImpl extends BaseQueryRowIteratorImpl {
       case MYSQL_TYPE_LONG:
       case MYSQL_TYPE_LONGLONG:
         return _result._statement._connection._protocol
-            .preparedStatementProtocol.reusableRowPacket.getInteger(index);
+            .preparedStatementProtocol.reusableRowPacket
+            .getInteger(index);
       case MYSQL_TYPE_DOUBLE:
         return _result._statement._connection._protocol
-            .preparedStatementProtocol.reusableRowPacket.getDouble(index);
+            .preparedStatementProtocol.reusableRowPacket
+            .getDouble(index);
       default:
         throw new UnsupportedError("Sql type not supported ${column.type}");
     }
@@ -748,8 +759,9 @@ class PreparedQueryRowIteratorImpl extends BaseQueryRowIteratorImpl {
 
   @override
   _skip() {
-    var response = _result._statement._connection._protocol
-        .preparedStatementProtocol.skipResultSetRowResponse();
+    var response = _result
+        ._statement._connection._protocol.preparedStatementProtocol
+        .skipResultSetRowResponse();
 
     return response is Future
         ? response.then((response) => _checkNext(response))

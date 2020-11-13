@@ -27,6 +27,8 @@ int _getSqlType(SqlType sqlType) {
       return MYSQL_TYPE_TINY;
     case SqlType.VAR_STRING:
       return MYSQL_TYPE_VAR_STRING;
+    default:
+      return MYSQL_TYPE_UNKNOWN;
   }
 }
 
@@ -41,7 +43,8 @@ class ConnectionPoolImpl implements ConnectionPool {
 
   final Queue<Connection> _releasedConnections = new Queue();
   final Map<PooledConnectionImpl, PoolResource> _assignedResources = new Map();
-  final Map<PooledConnectionImpl, Connection> _assignedConnections = new Map();
+  final Map<PooledConnectionImpl, ConnectionImpl> _assignedConnections =
+      new Map();
 
   ConnectionPoolImpl(
       {host,
@@ -100,8 +103,8 @@ class ConnectionPoolImpl implements ConnectionPool {
 
     await _pool.close();
 
-    await Future
-        .wait(_releasedConnections.map((connection) => connection.close()));
+    await Future.wait(
+        _releasedConnections.map((connection) => connection.close()));
 
     _releasedConnections.clear();
   }
@@ -122,7 +125,7 @@ class ConnectionFactoryImpl implements ConnectionFactory {
   Future<Connection> connect(host, int port, String userName, String password,
       [String database]) async {
     var socket = await RawSocket.connect(host, port);
-    socket.setOption(SocketOption.TCP_NODELAY, true);
+    socket.setOption(SocketOption.tcpNoDelay, true);
     socket.writeEventsEnabled = false;
 
     var protocol = new Protocol(socket);
@@ -132,11 +135,15 @@ class ConnectionFactoryImpl implements ConnectionFactory {
           await protocol.connectionProtocol.readInitialHandshakeResponse();
 
       if (response is! InitialHandshakePacket) {
-        throw new ConnectionError(response.errorMessage);
+        if (response is ErrorPacket) {
+          throw new QueryError(response.errorMessage);
+        } else {
+          throw new QueryError("response is! InitialHandshakePacket");
+        }
       }
 
       protocol.connectionProtocol.writeHandshakeResponsePacket(userName,
-          password, database, response.authPluginData, response.authPluginName);
+          password, database, (response as InitialHandshakePacket).authPluginData, (response as InitialHandshakePacket).authPluginName);
 
       response = await protocol.readCommandResponse();
 
@@ -223,10 +230,14 @@ class ConnectionImpl implements Connection {
       }
 
       if (response is! ResultSetColumnCountPacket) {
-        throw new QueryError(response.errorMessage);
+        if (response is ErrorPacket) {
+          throw new QueryError(response.errorMessage);
+        } else {
+          throw new QueryError("response is! ResultSetColumnCountPacket");
+        }
       }
 
-      List<ColumnDefinition> columns = new List(response.columnCount);
+      List<ColumnDefinition> columns = new List((response as ResultSetColumnCountPacket).columnCount);
       var columnIterator = new QueryColumnIteratorImpl(columns.length, this);
       var hasColumn = columns.length > 0;
       var i = 0;
@@ -258,10 +269,14 @@ class ConnectionImpl implements Connection {
           .readCommandStatementPrepareResponse();
 
       if (response is! CommandStatementPrepareOkResponsePacket) {
-        throw new PreparedStatementError(response.errorMessage);
+        if (response is ErrorPacket) {
+          throw new QueryError(response.errorMessage);
+        } else {
+          throw new QueryError("response is! CommandStatementPrepareOkResponsePacket");
+        }
       }
 
-      List<ColumnDefinition> parameters = new List(response.numParams);
+      List<ColumnDefinition> parameters = new List((response as CommandStatementPrepareOkResponsePacket).numParams);
       var parameterIterator =
           new QueryColumnIteratorImpl(parameters.length, this);
       var hasParameter = parameters.length > 0;
@@ -274,7 +289,7 @@ class ConnectionImpl implements Connection {
         }
       }
 
-      List<ColumnDefinition> columns = new List(response.numColumns);
+      List<ColumnDefinition> columns = new List((response as CommandStatementPrepareOkResponsePacket).numColumns);
       var columnIterator = new QueryColumnIteratorImpl(columns.length, this);
       var hasColumn = columns.length > 0;
       var l = 0;
@@ -287,7 +302,7 @@ class ConnectionImpl implements Connection {
       }
 
       _lastProtocolResult = new PreparedStatementImpl(
-          response.statementId, parameters, columns, this);
+          (response as CommandStatementPrepareOkResponsePacket).statementId, parameters, columns, this);
 
       // TODO raccogliere gli statement aperti
 
@@ -446,6 +461,9 @@ class PreparedStatementImpl implements PreparedStatement {
   }
 
   @override
+  List<int> get columnTypes => _columnTypes;
+
+  @override
   int get parameterCount => parameters.length;
 
   @override
@@ -453,6 +471,9 @@ class PreparedStatementImpl implements PreparedStatement {
 
   @override
   bool get isClosed => _isClosed;
+
+  @override
+  ConnectionImpl get connection => _connection;
 
   @override
   void setParameter(int index, value, [SqlType sqlType]) {
@@ -574,8 +595,11 @@ abstract class BaseDataIteratorImpl implements DataIterator {
   }
 
   bool _isDataPacket(Packet packet);
+
   _readDataResponse();
+
   _skipDataResponse();
+
   _free();
 
   @override
@@ -641,26 +665,37 @@ class QueryColumnIteratorImpl extends BaseDataIteratorImpl {
 
   String get catalog => _connection
       ._protocol.queryCommandTextProtocol.reusableColumnPacket.catalog;
+
   String get schema => _connection
       ._protocol.queryCommandTextProtocol.reusableColumnPacket.schema;
+
   String get table =>
       _connection._protocol.queryCommandTextProtocol.reusableColumnPacket.table;
+
   String get orgTable => _connection
       ._protocol.queryCommandTextProtocol.reusableColumnPacket.orgTable;
+
   String get name =>
       _connection._protocol.queryCommandTextProtocol.reusableColumnPacket.name;
+
   String get orgName => _connection
       ._protocol.queryCommandTextProtocol.reusableColumnPacket.orgName;
+
   int get fieldsLength => _connection
       ._protocol.queryCommandTextProtocol.reusableColumnPacket.fieldsLength;
+
   int get characterSet => _connection
       ._protocol.queryCommandTextProtocol.reusableColumnPacket.characterSet;
+
   int get columnLength => _connection
       ._protocol.queryCommandTextProtocol.reusableColumnPacket.columnLength;
+
   int get type =>
       _connection._protocol.queryCommandTextProtocol.reusableColumnPacket.type;
+
   int get flags =>
       _connection._protocol.queryCommandTextProtocol.reusableColumnPacket.flags;
+
   int get decimals => _connection
       ._protocol.queryCommandTextProtocol.reusableColumnPacket.decimals;
 
@@ -691,14 +726,20 @@ class CommandQueryRowIteratorImpl extends BaseQueryRowIteratorImpl {
   CommandQueryRowIteratorImpl(CommandQueryResultImpl result) : super(result);
 
   @override
-  String getStringValue(int index) =>
-      _result._connection._protocol.queryCommandTextProtocol.reusableRowPacket
-          .getUTF8String(index);
+  String getStringValue(int index) => (_result as CommandQueryResultImpl)
+      ._connection
+      ._protocol
+      .queryCommandTextProtocol
+      .reusableRowPacket
+      .getUTF8String(index);
 
   @override
   num getNumValue(int index) {
-    var formatted = _result
-        ._connection._protocol.queryCommandTextProtocol.reusableRowPacket
+    var formatted = (_result as CommandQueryResultImpl)
+        ._connection
+        ._protocol
+        .queryCommandTextProtocol
+        .reusableRowPacket
         .getString(index);
     return formatted != null ? num.parse(formatted) : null;
   }
@@ -713,38 +754,58 @@ class CommandQueryRowIteratorImpl extends BaseQueryRowIteratorImpl {
   bool _isDataPacket(Packet response) => response is ResultSetRowPacket;
 
   @override
-  _readDataResponse() =>
-      _result._protocol.queryCommandTextProtocol.readResultSetRowResponse();
+  _readDataResponse() => (_result as CommandQueryResultImpl)
+      ._protocol
+      .queryCommandTextProtocol
+      .readResultSetRowResponse();
 
   @override
-  _skipDataResponse() =>
-      _result._protocol.queryCommandTextProtocol.skipResultSetRowResponse();
+  _skipDataResponse() => (_result as CommandQueryResultImpl)
+      ._protocol
+      .queryCommandTextProtocol
+      .skipResultSetRowResponse();
 
   @override
-  _free() => _result._connection._protocol.queryCommandTextProtocol.free();
+  _free() => (_result as CommandQueryResultImpl)
+      ._connection
+      ._protocol
+      .queryCommandTextProtocol
+      .free();
 }
 
 class PreparedQueryRowIteratorImpl extends BaseQueryRowIteratorImpl {
   PreparedQueryRowIteratorImpl(PreparedQueryResultImpl result) : super(result);
 
   @override
-  String getStringValue(int index) => _result._statement._connection._protocol
-      .preparedStatementProtocol.reusableRowPacket
+  String getStringValue(int index) => (_result as PreparedQueryResultImpl)
+      ._statement
+      .connection
+      ._protocol
+      .preparedStatementProtocol
+      .reusableRowPacket
       .getUTF8String(index);
 
   @override
   num getNumValue(int index) {
-    var column = _result._statement.columns[index];
+    var column = (_result as PreparedQueryResultImpl)._statement.columns[index];
     switch (column.type) {
       case MYSQL_TYPE_TINY:
       case MYSQL_TYPE_LONG:
       case MYSQL_TYPE_LONGLONG:
-        return _result._statement._connection._protocol
-            .preparedStatementProtocol.reusableRowPacket
+        return (_result as PreparedQueryResultImpl)
+            ._statement
+            .connection
+            ._protocol
+            .preparedStatementProtocol
+            .reusableRowPacket
             .getInteger(index);
       case MYSQL_TYPE_DOUBLE:
-        return _result._statement._connection._protocol
-            .preparedStatementProtocol.reusableRowPacket
+        return (_result as PreparedQueryResultImpl)
+            ._statement
+            .connection
+            ._protocol
+            .preparedStatementProtocol
+            .reusableRowPacket
             .getDouble(index);
       default:
         throw new UnsupportedError("Sql type not supported ${column.type}");
@@ -759,8 +820,11 @@ class PreparedQueryRowIteratorImpl extends BaseQueryRowIteratorImpl {
 
   @override
   _skip() {
-    var response = _result
-        ._statement._connection._protocol.preparedStatementProtocol
+    var response = (_result as PreparedQueryResultImpl)
+        ._statement
+        .connection
+        ._protocol
+        .preparedStatementProtocol
         .skipResultSetRowResponse();
 
     return response is Future
@@ -774,7 +838,12 @@ class PreparedQueryRowIteratorImpl extends BaseQueryRowIteratorImpl {
       return true;
     } else {
       _isClosed = true;
-      _result._statement._connection._protocol.preparedStatementProtocol.free();
+      (_result as PreparedQueryResultImpl)
+          ._statement
+          .connection
+          ._protocol
+          .preparedStatementProtocol
+          .free();
       return false;
     }
   }
@@ -783,14 +852,27 @@ class PreparedQueryRowIteratorImpl extends BaseQueryRowIteratorImpl {
   bool _isDataPacket(Packet response) => response is PreparedResultSetRowPacket;
 
   @override
-  _readDataResponse() =>
-      _result._statement._connection._protocol.preparedStatementProtocol
-          .readResultSetRowResponse(_result._statement._columnTypes);
+  _readDataResponse() => (_result as PreparedQueryResultImpl)
+      ._statement
+      .connection
+      ._protocol
+      .preparedStatementProtocol
+      .readResultSetRowResponse(
+          (_result as PreparedQueryResultImpl)._statement.columnTypes);
 
   @override
-  _skipDataResponse() =>
-      _result._protocol.preparedStatementProtocol.skipResultSetRowResponse();
+  _skipDataResponse() => (_result as PreparedQueryResultImpl)
+      ._statement
+      .connection
+      ._protocol
+      .preparedStatementProtocol
+      .skipResultSetRowResponse();
 
   @override
-  _free() => _result._connection._protocol.preparedStatementProtocol.free();
+  _free() => (_result as PreparedQueryResultImpl)
+      ._statement
+      .connection
+      ._protocol
+      .preparedStatementProtocol
+      .free();
 }

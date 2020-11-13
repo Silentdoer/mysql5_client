@@ -118,6 +118,10 @@ abstract class PreparedStatement implements CommandResult {
 
   bool get isClosed;
 
+  ConnectionImpl get connection;
+
+  List<int> get columnTypes;
+
   void setParameter(int index, value, [SqlType sqlType]);
 
   Future<QueryResult> executeQuery();

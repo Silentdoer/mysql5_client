@@ -400,7 +400,7 @@ class Protocol {
     range.mergeExtraRanges();
 
     if (!range.isNil) {
-      return UTF8.decoder.convert(range.data, range.start, range.end);
+      return utf8.decoder.convert(range.data, range.start, range.end);
     } else {
       return null;
     }
@@ -566,7 +566,7 @@ class Protocol {
   void _writeFixedLengthUTF8String(String value, [int length]) {
     int start = __writerBuffer.length;
 
-    __writerBuffer.addAll(UTF8.encoder.convert(value));
+    __writerBuffer.addAll(utf8.encoder.convert(value));
 
     if (length != null && __writerBuffer.length - start != length) {
       throw new ArgumentError("${__writerBuffer.length - start} != $length");
@@ -584,7 +584,7 @@ class Protocol {
   }
 
   void _writeLengthEncodedUTF8String(String value) {
-    var encoded = UTF8.encoder.convert(value);
+    var encoded = utf8.encoder.convert(value);
 
     _writeLengthEncodedInteger(encoded.length);
 
@@ -598,7 +598,7 @@ class Protocol {
   }
 
   void _writeNulTerminatedUTF8String(String value) {
-    __writerBuffer.addAll(UTF8.encoder.convert(value));
+    __writerBuffer.addAll(utf8.encoder.convert(value));
 
     __writerBuffer.add(NULL_TERMINATOR);
   }

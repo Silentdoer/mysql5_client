@@ -113,7 +113,7 @@ class MySqlClientSpeedTest extends SpeedTest {
     connection = null;
   }
 
-  Future executeQuery(String sql) {
+  Future<QueryResult> executeQuery(String sql) {
     return connection.executeQuery(sql);
   }
 }

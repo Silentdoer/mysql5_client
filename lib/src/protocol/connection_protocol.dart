@@ -1,13 +1,15 @@
 part of mysql_client.protocol;
 
 class ConnectionProtocol extends ProtocolDelegate {
-  var _characterSet = 0x21; // corrisponde a utf8_general_ci
+  // corrisponde a utf8_general_ci
+  var _characterSet = 0x21;
   var _maxPacketSize = (2 << (24 - 1)) - 1;
   var _clientConnectAttributes = {"prova": "ciao"};
 
   ConnectionProtocol(Protocol protocol) : super(protocol) {
     _clientCapabilityFlags =
-        _protocol._decodeInteger([0x0d, 0xa2, 0x00, 0x00]); // TODO sistemare
+        // TODO sistemare
+        _protocol._decodeInteger([0x0d, 0xa2, 0x00, 0x00]);
   }
 
   // TODO passare clientCapabilityFlags, clientConnectAttributes, characterSet e maxPacketSize come parametri
@@ -176,10 +178,19 @@ class ConnectionProtocol extends ProtocolDelegate {
 
     if (authPluginName == "mysql_native_password") {
       // SHA1( password ) XOR SHA1( "20-bytes random data from server" <concat> SHA1( SHA1( password ) ) )
-      var passwordSha1 = (new SHA1()..add(encodedPassword)).close();
-      var passwordSha1Sha1 = (new SHA1()..add(passwordSha1)).close();
-      var hash = (new SHA1()..add(encodedAuthPluginData)..add(passwordSha1Sha1))
-          .close();
+
+      // new SHA1()..add(encodedPassword)).close();
+      var passwordSha1 = sha1.convert(encodedPassword).bytes;
+      // (new SHA1()..add(passwordSha1)).close();
+      var passwordSha1Sha1 = sha1.convert(passwordSha1).bytes;
+
+      // var hash = (new SHA1()..add(encodedAuthPluginData)..add(passwordSha1Sha1)).close();
+      var output = new AccumulatorSink<Digest>();
+      var input = sha1.startChunkedConversion(output);
+      input.add(encodedAuthPluginData);
+      input.add(passwordSha1Sha1);
+      input.close();
+      var hash = output.events.single.bytes;
 
       var buffer = new StringBuffer();
       var generatedHash = new List<int>(hash.length);
@@ -195,7 +206,7 @@ class ConnectionProtocol extends ProtocolDelegate {
   }
 
   List<int> _encodeString(String value, {utf8Encoded: false}) {
-    return !utf8Encoded ? value.codeUnits : UTF8.encode(value);
+    return !utf8Encoded ? value.codeUnits : utf8.encode(value);
   }
 }
 
@@ -218,16 +229,30 @@ class InitialHandshakePacket extends Packet {
       : super(payloadLength, sequenceId);
 
   int get protocolVersion => _protocolVersion;
+
   String get serverVersion => _serverVersion;
+
   int get connectionId => _connectionId;
+
   String get authPluginDataPart1 => _authPluginDataPart1;
+
   int get capabilityFlags1 => _capabilityFlags1;
+
   int get characterSet => _characterSet;
+
   int get statusFlags => _statusFlags;
+
   int get capabilityFlags2 => _capabilityFlags2;
+
   int get serverCapabilityFlags => _serverCapabilityFlags;
+
   int get authPluginDataLength => _authPluginDataLength;
+
   String get authPluginDataPart2 => _authPluginDataPart2;
+
+  void set authPluginDataPart2(dataPart2) => _authPluginDataPart2 = dataPart2;
+
   String get authPluginData => _authPluginData;
+
   String get authPluginName => _authPluginName;
 }

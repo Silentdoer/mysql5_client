@@ -196,7 +196,7 @@ class Protocol {
 
   final _PacketBuffer __reusablePacketBuffer = new _PacketBuffer.reusable();
   final DataRange __reusableDataRange = new DataRange.reusable();
-  List<int> __writerBuffer;
+  List<int> _writerBuffer;
 
   int __lastSequenceId;
   DataWriter __writer;
@@ -209,6 +209,7 @@ class Protocol {
   Protocol(RawSocket socket) {
     __reader = new DataReader(socket);
     __writer = new DataWriter(socket);
+    _writerBuffer = List();
 
     __connectionProtocol = new ConnectionProtocol(this);
     __queryCommandTextProtocol = new QueryCommandTextProtocol(this);
@@ -234,7 +235,7 @@ class Protocol {
   }
 
   void _free() {
-    __writerBuffer = null;
+    _writerBuffer.clear();
     __reusablePacketBuffer.free();
     __reusableDataRange.free();
   }
@@ -246,12 +247,6 @@ class Protocol {
   bool get _isAllRead => __reusablePacketBuffer.payload.isNotDataLeft;
 
   int get _header => __reusablePacketBuffer.header;
-
-  List<int> get _writerBuffer => __writerBuffer;
-
-  void set _writerBuffer(List<int> writerBuffer) {
-    __writerBuffer = writerBuffer;
-  }
 
   _readPacketBuffer() {
     var value = __reader.readBuffer(4);
@@ -499,52 +494,52 @@ class Protocol {
   }
 
   void _createWriterBuffer() {
-    __writerBuffer = new List<int>();
+    _writerBuffer = new List<int>();
   }
 
   void _writePacket() {
     int sequenceId = _nextSequenceId();
 
-    var payloadBuffer = __writerBuffer;
+    var payloadBuffer = _writerBuffer;
 
     _createWriterBuffer();
     _writeFixedLengthInteger(payloadBuffer.length, 3);
     _writeByte(sequenceId);
 
-    __writer.writeBuffer(__writerBuffer);
+    __writer.writeBuffer(_writerBuffer);
     __writer.writeBuffer(payloadBuffer);
   }
 
   void _writeByte(int value) {
-    __writerBuffer.add(value);
+    _writerBuffer.add(value);
   }
 
   void _writeBytes(List<int> value) {
-    __writerBuffer.addAll(value);
+    _writerBuffer.addAll(value);
   }
 
   void _writeFixedLengthInteger(int value, int length) {
     for (var i = 0, rotation = 0, mask = 0xff;
         i < length;
         i++, rotation += 8, mask <<= 8) {
-      __writerBuffer.add((value & mask) >> rotation);
+      _writerBuffer.add((value & mask) >> rotation);
     }
   }
 
   void _writeLengthEncodedInteger(int value) {
     if (value < MAX_INT_1) {
-      __writerBuffer.add(value);
+      _writerBuffer.add(value);
     } else {
       var bytesLength;
       if (value < MAX_INT_2) {
         bytesLength = 2;
-        __writerBuffer.add(PREFIX_INT_2);
+        _writerBuffer.add(PREFIX_INT_2);
       } else if (value < MAX_INT_3) {
         bytesLength = 3;
-        __writerBuffer.add(PREFIX_INT_3);
+        _writerBuffer.add(PREFIX_INT_3);
       } else if (value < MAX_INT_8) {
         bytesLength = 8;
-        __writerBuffer.add(PREFIX_INT_8);
+        _writerBuffer.add(PREFIX_INT_8);
       } else {
         throw new UnsupportedError("Undefined value");
       }
@@ -554,33 +549,33 @@ class Protocol {
   }
 
   void _writeFixedLengthString(String value, [int length]) {
-    int start = __writerBuffer.length;
+    int start = _writerBuffer.length;
 
-    __writerBuffer.addAll(value.codeUnits);
+    _writerBuffer.addAll(value.codeUnits);
 
-    if (length != null && __writerBuffer.length - start != length) {
-      throw new ArgumentError("${__writerBuffer.length - start} != $length");
+    if (length != null && _writerBuffer.length - start != length) {
+      throw new ArgumentError("${_writerBuffer.length - start} != $length");
     }
   }
 
   void _writeFixedLengthUTF8String(String value, [int length]) {
-    int start = __writerBuffer.length;
+    int start = _writerBuffer.length;
 
-    __writerBuffer.addAll(utf8.encoder.convert(value));
+    _writerBuffer.addAll(utf8.encoder.convert(value));
 
-    if (length != null && __writerBuffer.length - start != length) {
-      throw new ArgumentError("${__writerBuffer.length - start} != $length");
+    if (length != null && _writerBuffer.length - start != length) {
+      throw new ArgumentError("${_writerBuffer.length - start} != $length");
     }
   }
 
   void _writeFixedFilledLengthString(int fillValue, int length) {
-    __writerBuffer.addAll(new List.filled(length, fillValue));
+    _writerBuffer.addAll(new List.filled(length, fillValue));
   }
 
   void _writeLengthEncodedString(String value) {
     _writeLengthEncodedInteger(value.length);
 
-    __writerBuffer.addAll(value.codeUnits);
+    _writerBuffer.addAll(value.codeUnits);
   }
 
   void _writeLengthEncodedUTF8String(String value) {
@@ -588,23 +583,23 @@ class Protocol {
 
     _writeLengthEncodedInteger(encoded.length);
 
-    __writerBuffer.addAll(encoded);
+    _writerBuffer.addAll(encoded);
   }
 
   void _writeNulTerminatedString(String value) {
-    __writerBuffer.addAll(value.codeUnits);
+    _writerBuffer.addAll(value.codeUnits);
 
-    __writerBuffer.add(NULL_TERMINATOR);
+    _writerBuffer.add(NULL_TERMINATOR);
   }
 
   void _writeNulTerminatedUTF8String(String value) {
-    __writerBuffer.addAll(utf8.encoder.convert(value));
+    _writerBuffer.addAll(utf8.encoder.convert(value));
 
-    __writerBuffer.add(NULL_TERMINATOR);
+    _writerBuffer.add(NULL_TERMINATOR);
   }
 
   void _writeDouble(num value) {
-    __writerBuffer.addAll(_encodeDouble(value));
+    _writerBuffer.addAll(_encodeDouble(value));
   }
 
   __readPacketBufferPayload(ReaderBuffer headerReaderBuffer) {

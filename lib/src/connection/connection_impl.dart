@@ -1,13 +1,13 @@
 library mysql_client.connection.impl;
 
 import 'dart:async';
-import 'dart:io';
 import 'dart:collection';
+import 'dart:io';
 
 import 'package:pool/pool.dart';
 
-import '../protocol.dart';
 import '../connection.dart';
+import '../protocol.dart';
 
 int _getSqlType(SqlType sqlType) {
   switch (sqlType) {
@@ -26,9 +26,9 @@ int _getSqlType(SqlType sqlType) {
     case SqlType.TINY:
       return MYSQL_TYPE_TINY;
     case SqlType.VAR_STRING:
-      return MYSQL_TYPE_VAR_STRING;
+    // TODO 有新类型来了这里需要修改
     default:
-      return MYSQL_TYPE_UNKNOWN;
+      return MYSQL_TYPE_VAR_STRING;
   }
 }
 
@@ -142,8 +142,12 @@ class ConnectionFactoryImpl implements ConnectionFactory {
         }
       }
 
-      protocol.connectionProtocol.writeHandshakeResponsePacket(userName,
-          password, database, (response as InitialHandshakePacket).authPluginData, (response as InitialHandshakePacket).authPluginName);
+      protocol.connectionProtocol.writeHandshakeResponsePacket(
+          userName,
+          password,
+          database,
+          (response as InitialHandshakePacket).authPluginData,
+          (response as InitialHandshakePacket).authPluginName);
 
       response = await protocol.readCommandResponse();
 
@@ -237,7 +241,8 @@ class ConnectionImpl implements Connection {
         }
       }
 
-      List<ColumnDefinition> columns = new List((response as ResultSetColumnCountPacket).columnCount);
+      List<ColumnDefinition> columns =
+          new List((response as ResultSetColumnCountPacket).columnCount);
       var columnIterator = new QueryColumnIteratorImpl(columns.length, this);
       var hasColumn = columns.length > 0;
       var i = 0;
@@ -272,11 +277,13 @@ class ConnectionImpl implements Connection {
         if (response is ErrorPacket) {
           throw new QueryError(response.errorMessage);
         } else {
-          throw new QueryError("response is! CommandStatementPrepareOkResponsePacket");
+          throw new QueryError(
+              "response is! CommandStatementPrepareOkResponsePacket");
         }
       }
 
-      List<ColumnDefinition> parameters = new List((response as CommandStatementPrepareOkResponsePacket).numParams);
+      List<ColumnDefinition> parameters = new List(
+          (response as CommandStatementPrepareOkResponsePacket).numParams);
       var parameterIterator =
           new QueryColumnIteratorImpl(parameters.length, this);
       var hasParameter = parameters.length > 0;
@@ -289,7 +296,8 @@ class ConnectionImpl implements Connection {
         }
       }
 
-      List<ColumnDefinition> columns = new List((response as CommandStatementPrepareOkResponsePacket).numColumns);
+      List<ColumnDefinition> columns = new List(
+          (response as CommandStatementPrepareOkResponsePacket).numColumns);
       var columnIterator = new QueryColumnIteratorImpl(columns.length, this);
       var hasColumn = columns.length > 0;
       var l = 0;
@@ -302,7 +310,10 @@ class ConnectionImpl implements Connection {
       }
 
       _lastProtocolResult = new PreparedStatementImpl(
-          (response as CommandStatementPrepareOkResponsePacket).statementId, parameters, columns, this);
+          (response as CommandStatementPrepareOkResponsePacket).statementId,
+          parameters,
+          columns,
+          this);
 
       // TODO raccogliere gli statement aperti
 

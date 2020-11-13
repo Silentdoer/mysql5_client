@@ -10,7 +10,6 @@ const int MYSQL_TYPE_TIMESTAMP = 0x07;
 const int MYSQL_TYPE_LONGLONG = 0x08;
 const int MYSQL_TYPE_DATETIME = 0x0c;
 const int MYSQL_TYPE_VAR_STRING = 0xfd;
-const int MYSQL_TYPE_UNKNOWN = -1;
 
 class QueryCommandTextProtocol extends ProtocolDelegate {
   final ResultSetColumnDefinitionPacket _reusableColumnPacket;

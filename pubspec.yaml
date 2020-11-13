@@ -1,7 +1,9 @@
 name: mysql5_client
 description: mysql5.x driver
 version: 0.1.0
-author: ["Roberto Tassi", "silentdoer"]
+authors:
+  - Roberto Tassi
+  - WangLiQi <1010993610@qq.com>
 repository: "https://github.com/Silentdoer/mysql5_client.git"
 
 environment:

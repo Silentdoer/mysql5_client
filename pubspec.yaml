@@ -1,5 +1,5 @@
 name: mysql5_client
-description: A starting point for Dart libraries or applications.
+description: mysql5.x driver
 version: 0.1.0
 author: ["Roberto Tassi", "silentdoer"]
 

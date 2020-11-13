@@ -185,8 +185,7 @@ class ConnectionProtocol extends ProtocolDelegate {
       var passwordSha1Sha1 = sha1.convert(passwordSha1).bytes;
 
       // var hash = (new SHA1()..add(encodedAuthPluginData)..add(passwordSha1Sha1)).close();
-      // TODO 看下怎么去掉这个类，convert包只用到了这个，还不如自己写个
-      var output = new AccumulatorSink<Digest>();
+      var output = DigestAccumulatorSink();
       var input = sha1.startChunkedConversion(output);
       input.add(encodedAuthPluginData);
       input.add(passwordSha1Sha1);

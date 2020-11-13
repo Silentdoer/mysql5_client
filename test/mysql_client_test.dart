@@ -5,7 +5,7 @@ library mysql_client.test;
 
 import "dart:async";
 
-import 'package:mysql_client/mysql_client.dart';
+import '../lib/mysql5_client.dart';
 import "package:stack_trace/stack_trace.dart";
 
 Future main() async {

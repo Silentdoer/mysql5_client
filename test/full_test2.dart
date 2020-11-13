@@ -5,7 +5,7 @@ library mysql_client.test;
 
 import "dart:async";
 
-import 'package:mysql_client/mysql_client.dart';
+import '../lib/mysql5_client.dart';
 
 const SIMPLE_INSERTS = 1000;
 const SIMPLE_SELECTS = 1;

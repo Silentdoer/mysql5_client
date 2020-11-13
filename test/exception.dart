@@ -17,7 +17,6 @@ void main() {
 void test1() {
   try {
     throw new ArgumentError("error");
-    print("OK 2"); // should never go here
   } finally {
     try {
       throw new ArgumentError("error 2");

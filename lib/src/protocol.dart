@@ -6,10 +6,10 @@ import 'dart:io';
 import 'dart:convert';
 import 'dart:typed_data';
 
-import 'package:convert/convert.dart';
 import "package:crypto/crypto.dart";
 
 import "data.dart";
+import 'type/digest_accumulator_sink.dart';
 
 part "protocol/packet_buffer.dart";
 part "protocol/protocol.dart";

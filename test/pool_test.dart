@@ -2,7 +2,7 @@ import "dart:async";
 
 import "package:stack_trace/stack_trace.dart";
 
-import "package:mysql_client/mysql_client.dart";
+import "../lib/mysql5_client.dart";
 
 Future main() async {
   await Chain.capture(() async {

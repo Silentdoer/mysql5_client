@@ -22,8 +22,8 @@ Future test2() async {
         host: "localhost",
         port: 3306,
         userName: "root",
-        password: "mysql",
-        database: "test",
+        password: "wyzpass",
+        database: "db_test",
         maxConnections: 10,
         connectionTimeout: new Duration(seconds: 30));
 

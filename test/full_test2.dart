@@ -20,9 +20,9 @@ abstract class SpeedTest {
   Future<QueryResult> executeQuery(String sql);
 
   Future run() async {
-    //await dropTables();
-    //await createTables();
-    //await insertSimpleData();
+    await dropTables();
+    await createTables();
+    await insertSimpleData();
     await selectSimpleData();
   }
 
@@ -81,7 +81,7 @@ class MySqlClientSpeedTest extends SpeedTest {
   Future run() async {
     var factory = new ConnectionFactory();
 
-    connection = await factory.connect("localhost", 3306, "root", "mysql", "test");
+    connection = await factory.connect("localhost", 3306, "root", "wyzpass", "db_test");
 
     await super.run();
 

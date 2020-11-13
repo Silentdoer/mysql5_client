@@ -24,7 +24,7 @@ Future test21() async {
 
   try {
     connection = await new ConnectionFactory()
-        .connect("localhost", 3306, "root", "mysql", "test");
+        .connect("localhost", 3306, "root", "wyzpass", "db_test");
 
     var queryResult;
     var statement;
@@ -67,7 +67,7 @@ Future test20() async {
 
   try {
     connection = await new ConnectionFactory()
-        .connect("localhost", 3306, "root", "mysql", "test");
+        .connect("localhost", 3306, "root", "wyzpass", "db_test");
 
     var queryResult;
 
@@ -104,7 +104,7 @@ Future test7() async {
 
   try {
     connection = await new ConnectionFactory()
-        .connect("localhost", 3306, "root", "mysql", "test");
+        .connect("localhost", 3306, "root", "wyzpass", "db_test");
 
     var queryResult;
 
@@ -137,7 +137,7 @@ Future test10() async {
 
   try {
     connection = await new ConnectionFactory()
-        .connect("localhost", 3306, "root", "mysql", "test");
+        .connect("localhost", 3306, "root", "wyzpass", "db_test");
 
     // TODO verificare datetime e timestamp
     await connection.executeQuery("""
@@ -240,7 +240,7 @@ Future test9() async {
 
   try {
     connection = await new ConnectionFactory()
-        .connect("localhost", 3306, "root", "mysql", "test");
+        .connect("localhost", 3306, "root", "wyzpass", "db_test");
 
     var preparedStatement =
         await connection.prepareQuery("SELECT * FROM people WHERE id = ?");
@@ -283,7 +283,7 @@ Future test8() async {
 
   try {
     connection = await new ConnectionFactory()
-        .connect("localhost", 3306, "root", "mysql", "test");
+        .connect("localhost", 3306, "root", "wyzpass", "db_test");
 
     var queryResult =
         await connection.executeQuery("SELECT * FROM people WHERE id = 10");
@@ -314,7 +314,7 @@ Future test4() async {
 
   try {
     connection = await new ConnectionFactory()
-        .connect("localhost", 3306, "root", "mysql", "test");
+        .connect("localhost", 3306, "root", "wyzpass", "db_test");
 
     var preparedStatement =
         await connection.prepareQuery("SELECT * FROM people WHERE id = ?");
@@ -333,7 +333,7 @@ Future test6() async {
 
   try {
     connection = await new ConnectionFactory()
-        .connect("localhost", 3306, "root", "mysql", "test");
+        .connect("localhost", 3306, "root", "wyzpass", "db_test");
 
     var queryResult;
 
@@ -383,7 +383,7 @@ Future test5() async {
 
   try {
     connection = await new ConnectionFactory()
-        .connect("localhost", 3306, "root", "mysql", "test");
+        .connect("localhost", 3306, "root", "wyzpass", "db_test");
 
     var queryResult =
         await connection.executeQuery("SELECT * FROM people LIMIT 10");

@@ -14,17 +14,15 @@ const SIMPLE_SELECTS = 1000;
 
 Future main() async {
   await new MySqlClientSpeedTest().run();
-
-  // await new SqlJockySpeedTest().run();
 }
 
 abstract class SpeedTest {
   Future<QueryResult> executeQuery(String sql);
 
   Future run() async {
-    // await dropTables();
-    // await createTables();
-    // await insertSimpleData();
+    await dropTables();
+    await createTables();
+    await insertSimpleData();
     await selectSimpleData();
   }
 
@@ -43,7 +41,7 @@ abstract class SpeedTest {
     print("creating tables");
 
     await executeQuery("""
-    create table people (id integer not null auto_increment,
+    create table people (id int not null auto_increment,
         name varchar(255),
         age integer,
         name2 varchar(255),
@@ -83,9 +81,9 @@ abstract class SpeedTest {
       // rows
       var hasRow = true;
       while (hasRow) {
-        // var hasRow = await queryResult.next();
-        hasRow = queryResult.rawNext();
-        hasRow = hasRow is Future ? await hasRow : hasRow;
+        hasRow = await queryResult.next();
+//        hasRow = queryResult.rawNext();
+//        hasRow = hasRow is Future ? await hasRow : hasRow;
       }
     }
     logTime("simple selects", sw);
@@ -104,7 +102,7 @@ class MySqlClientSpeedTest extends SpeedTest {
   Connection connection;
 
   Future run() async {
-    connection = await factory.connect("localhost", 3306, "root", "mysql", "test");
+    connection = await factory.connect("localhost", 3306, "root", "wyzpass", "db_test");
 
     await super.run();
 

@@ -28,7 +28,7 @@ int _getSqlType(SqlType sqlType) {
     case SqlType.VAR_STRING:
     // TODO 有新类型来了这里需要修改
     default:
-      return MYSQL_TYPE_VAR_STRING;
+      return null;
   }
 }
 
@@ -452,7 +452,7 @@ class PreparedStatementImpl implements PreparedStatement {
   final List<ColumnDefinition> columns;
 
   final List<int> _parameterTypes;
-  final List _parameterValues;
+  final List<dynamic> _parameterValues;
   List<int> _columnTypes;
 
   bool _isClosed;
@@ -487,7 +487,7 @@ class PreparedStatementImpl implements PreparedStatement {
   ConnectionImpl get connection => _connection;
 
   @override
-  void setParameter(int index, value, [SqlType sqlType]) {
+  void setParameter(int index, dynamic value, [SqlType sqlType]) {
     if (_isClosed) {
       throw new StateError("Prepared statement closed");
     }

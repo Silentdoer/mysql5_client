@@ -1,6 +1,6 @@
 name: mysql5_client
 description: mysql5.x driver
-version: 0.1.0
+version: 0.2.0
 authors:
   - Roberto Tassi
   - WangLiQi <1010993610@qq.com>

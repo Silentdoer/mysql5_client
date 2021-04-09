@@ -97,12 +97,12 @@ abstract class SpeedTest {
 }
 
 class MySqlClientSpeedTest extends SpeedTest {
-  final ConnectionFactory factory = new ConnectionFactory();
+  final ConnectionFactory factory2 = new ConnectionFactory();
 
   Connection connection;
 
   Future run() async {
-    connection = await factory.connect("localhost", 3306, "root", "wyzpass", "db_test");
+    connection = await factory2.connect("localhost", 3306, "root", "wyzpass", "db_test");
 
     await super.run();
 

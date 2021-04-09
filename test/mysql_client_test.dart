@@ -9,22 +9,26 @@ import '../lib/mysql5_client.dart';
 import "package:stack_trace/stack_trace.dart";
 
 Future main() async {
-  Chain.capture(() async {
-    try {
-      await test21();
-    } catch (e, s) {
-      print(e);
-      print(Trace.format(s));
-    }
-  });
+  await test21();
+  // Chain.capture(() async {
+  //   try {
+  //     print('1111');
+  //     await test21();
+  //   } catch (e, s) {
+  //     print('nnnn');
+  //     print(e);
+  //     print(Trace.format(s));
+  //   }
+  // });
 }
 
-Future test21() async {
+Future test21() 
+async {
   var connection;
 
   try {
-    connection = await new ConnectionFactory()
-        .connect("localhost", 3306, "root", "wyzpass", "db_test");
+
+    connection = await new ConnectionFactory().connect("localhost", 3306, "root", "wyzpass", "db_test");
 
     var queryResult;
     var statement;
@@ -35,7 +39,7 @@ Future test21() async {
     statement.setParameter(0, 92);
 
     queryResult = await statement.executeQuery();
-
+    
     print(queryResult.affectedRows);
 
     statement.setParameter(0, 93);

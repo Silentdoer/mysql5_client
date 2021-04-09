@@ -5,17 +5,17 @@ part of mysql_client.data;
 
 class ReaderBuffer {
   List<DataChunk> _chunks;
-  int _dataLength;
+  int? _dataLength;
 
-  int _chunkIndex;
-  int _readCount;
+  int? _chunkIndex;
+  int? _readCount;
 
   ReaderBuffer(int reusableChunks, int dataLength)
-      : this._chunks = new List<DataChunk>() {
+      : this._chunks = List.empty(growable: true) {
     reuse(reusableChunks, dataLength);
   }
 
-  ReaderBuffer.reusable() : this._chunks = new List<DataChunk>();
+  ReaderBuffer.reusable() : this._chunks =  List.empty(growable: true);
 
   ReaderBuffer reuse(int reusableChunks, int dataLength) {
     _dataLength = dataLength;
@@ -26,7 +26,7 @@ class ReaderBuffer {
 
   void free() {
     if (_chunkIndex != null) {
-      for (int i = _chunkIndex; i < _chunks.length; i++) {
+      for (int i = _chunkIndex!; i < _chunks.length; i++) {
         _chunks[i].free();
       }
       _dataLength = null;
@@ -45,54 +45,54 @@ class ReaderBuffer {
     }
   }
 
-  int get dataLength => _dataLength;
+  int? get dataLength => _dataLength;
 
-  int get readCount => _readCount;
+  int? get readCount => _readCount;
 
-  int get leftCount => _dataLength - _readCount;
+  int get leftCount => _dataLength! - _readCount!;
 
-  bool get isDataLeft => _readCount < _dataLength;
+  bool get isDataLeft => _readCount! < _dataLength!;
 
   bool get isNotDataLeft => _readCount == _dataLength;
 
-  int checkByte() => _chunks[_chunkIndex].checkOneByte();
+  int checkByte() => _chunks[_chunkIndex!].checkOneByte();
 
   int readByte() {
-    var chunk = _chunks[_chunkIndex];
+    var chunk = _chunks[_chunkIndex!];
     var byte = chunk.extractOneByte();
     if (chunk.isEmpty) {
       chunk.free();
-      _chunkIndex++;
+      _chunkIndex = _chunkIndex! + 1;
     }
-    _readCount++;
+    _readCount = _readCount! + 1;
     return byte;
   }
 
   DataRange readFixedLengthDataRange(int length, DataRange reusableRange) {
     if (length > 0) {
-      var chunk = _chunks[_chunkIndex];
+      var chunk = _chunks[_chunkIndex!];
       var range = chunk.extractFixedLengthDataRange(length, reusableRange);
-      _readCount += range.length;
+      _readCount = _readCount! + range.length!;
       if (chunk.isEmpty) {
         chunk.free();
-        _chunkIndex++;
+        _chunkIndex = _chunkIndex! + 1;
       }
 
-      if (range.isPending) {
-        var leftLength = length - range.length;
+      if (range.isPending!) {
+        var leftLength = length - range.length!;
         DataRange range2;
         do {
-          chunk = _chunks[_chunkIndex];
+          chunk = _chunks[_chunkIndex!];
           range2 = chunk.extractFixedLengthDataRange(
               leftLength, new DataRange.reusable());
-          _readCount += range2.length;
+          _readCount = _readCount! + range2.length!;
           if (chunk.isEmpty) {
             chunk.free();
-            _chunkIndex++;
+            _chunkIndex = _chunkIndex! + 1;
           }
-          leftLength -= range2.length;
+          leftLength -= range2.length!;
           range.addExtraRange(range2);
-        } while (range2.isPending);
+        } while (range2.isPending!);
       }
 
       return range;
@@ -102,31 +102,31 @@ class ReaderBuffer {
   }
 
   DataRange readUpToDataRange(int terminator, DataRange reusableRange) {
-    var chunk = _chunks[_chunkIndex];
+    var chunk = _chunks[_chunkIndex!];
     var range = chunk.extractUpToDataRange(terminator, reusableRange);
-    _readCount += range.length;
+    _readCount = _readCount! + range.length!;
     if (chunk.isEmpty) {
       chunk.free();
-      _chunkIndex++;
+      _chunkIndex = _chunkIndex! + 1;
     }
 
-    if (range.isPending) {
+    if (range.isPending!) {
       DataRange range2;
       do {
-        chunk = _chunks[_chunkIndex];
+        chunk = _chunks[_chunkIndex!];
         range2 =
             chunk.extractUpToDataRange(terminator, new DataRange.reusable());
-        _readCount += range2.length;
+        _readCount = _readCount! + range2.length!;
         if (chunk.isEmpty) {
           chunk.free();
-          _chunkIndex++;
+          _chunkIndex = _chunkIndex! + 1;
         }
         range.addExtraRange(range2);
-      } while (range2.isPending);
+      } while (range2.isPending!);
     }
 
     // skip the terminator
-    _readCount++;
+    _readCount = _readCount! + 1;
     return range;
   }
 }

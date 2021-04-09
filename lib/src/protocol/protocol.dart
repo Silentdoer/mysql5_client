@@ -57,7 +57,7 @@ abstract class ProtocolDelegate {
     _protocol._serverCapabilityFlags = serverCapabilityFlags;
   }
 
-  int get _sequenceId => _protocol._sequenceId;
+  int? get _sequenceId => _protocol._sequenceId;
 
   int get _payloadLength => _protocol._payloadLength;
 
@@ -88,25 +88,25 @@ abstract class ProtocolDelegate {
 
   int _readLengthEncodedInteger() => _protocol._readLengthEncodedInteger();
 
-  String _readFixedLengthString(int length) =>
+  String? _readFixedLengthString(int length) =>
       _protocol._readFixedLengthString(length);
 
-  String _readFixedLengthUTF8String(int length) =>
+  String? _readFixedLengthUTF8String(int length) =>
       _protocol._readFixedLengthUTF8String(length);
 
-  String _readLengthEncodedString() => _protocol._readLengthEncodedString();
+  String? _readLengthEncodedString() => _protocol._readLengthEncodedString();
 
-  String _readLengthEncodedUTF8String() =>
+  String? _readLengthEncodedUTF8String() =>
       _protocol._readLengthEncodedUTF8String();
 
-  String _readNulTerminatedString() => _protocol._readNulTerminatedString();
+  String? _readNulTerminatedString() => _protocol._readNulTerminatedString();
 
-  String _readNulTerminatedUTF8String() =>
+  String? _readNulTerminatedUTF8String() =>
       _protocol._readNulTerminatedUTF8String();
 
-  String _readRestOfPacketString() => _protocol._readRestOfPacketString();
+  String? _readRestOfPacketString() => _protocol._readRestOfPacketString();
 
-  String _readRestOfPacketUTF8String() =>
+  String? _readRestOfPacketUTF8String() =>
       _protocol._readRestOfPacketUTF8String();
 
   DataRange _readFixedLengthDataRange(int length, DataRange reusable) =>
@@ -143,11 +143,11 @@ abstract class ProtocolDelegate {
     _protocol._writeLengthEncodedInteger(value);
   }
 
-  void _writeFixedLengthString(String value, [int length]) {
+  void _writeFixedLengthString(String value, [int? length]) {
     _protocol._writeFixedLengthString(value, length);
   }
 
-  void _writeFixedLengthUTF8String(String value, [int length]) {
+  void _writeFixedLengthUTF8String(String value, [int? length]) {
     _protocol._writeFixedLengthUTF8String(value, length);
   }
 
@@ -191,25 +191,27 @@ abstract class ProtocolDelegate {
 }
 
 class Protocol {
-  int _serverCapabilityFlags;
-  int _clientCapabilityFlags;
+  // FIXME
+  late int _serverCapabilityFlags;
+  late int _clientCapabilityFlags;
 
   final _PacketBuffer __reusablePacketBuffer = new _PacketBuffer.reusable();
   final DataRange __reusableDataRange = new DataRange.reusable();
-  List<int> _writerBuffer;
+  late List<int> _writerBuffer;
 
-  int __lastSequenceId;
-  DataWriter __writer;
-  DataReader __reader;
+  // FIXME
+  late int __lastSequenceId;
+  late DataWriter __writer;
+  late DataReader __reader;
 
-  ConnectionProtocol __connectionProtocol;
-  QueryCommandTextProtocol __queryCommandTextProtocol;
-  PreparedStatementProtocol __preparedStatementProtocol;
+  late ConnectionProtocol __connectionProtocol;
+  late QueryCommandTextProtocol __queryCommandTextProtocol;
+  late PreparedStatementProtocol __preparedStatementProtocol;
 
   Protocol(RawSocket socket) {
     __reader = new DataReader(socket);
     __writer = new DataWriter(socket);
-    _writerBuffer = List();
+    _writerBuffer = List.empty(growable: true);
 
     __connectionProtocol = new ConnectionProtocol(this);
     __queryCommandTextProtocol = new QueryCommandTextProtocol(this);
@@ -231,7 +233,7 @@ class Protocol {
     var value2 = value is Future
         ? value.then((_) => __readCommandResponsePacket())
         : __readCommandResponsePacket();
-    return value2 is Future ? value2 : new Future.value(value2);
+    return value2 is Future<Packet>? value2 : new Future.value(value2 as Packet);
   }
 
   void _free() {
@@ -240,7 +242,7 @@ class Protocol {
     __reusableDataRange.free();
   }
 
-  int get _sequenceId => __reusablePacketBuffer.sequenceId;
+  int? get _sequenceId => __reusablePacketBuffer.sequenceId;
 
   int get _payloadLength => __reusablePacketBuffer.payloadLength;
 
@@ -263,7 +265,7 @@ class Protocol {
   bool _isErrorPacket() => _header == 0xff;
 
   OkPacket _readOkPacket() => __completeSuccessResponsePacket(
-      new OkPacket(_payloadLength, _sequenceId));
+      new OkPacket(_payloadLength, _sequenceId)) as OkPacket;
 
   EOFPacket _readEOFPacket() {
     // TODO check CLIENT_DEPRECATE_EOF flag
@@ -271,7 +273,7 @@ class Protocol {
 
     if (isEOFDeprecated) {
       return __completeSuccessResponsePacket(
-          new EOFPacket(_sequenceId, _payloadLength));
+          new EOFPacket(_sequenceId, _payloadLength)) as EOFPacket;
     } else {
       var packet = new EOFPacket(_payloadLength, _sequenceId);
       // EOF packet
@@ -297,27 +299,27 @@ class Protocol {
     // if capabilities & CLIENT_PROTOCOL_41 {
     if (_serverCapabilityFlags & CLIENT_PROTOCOL_41 != 0) {
       // string[1]	sql_state_marker	# marker of the SQL State
-      packet._sqlStateMarker = _readFixedLengthString(1);
+      packet._sqlStateMarker = _readFixedLengthString(1)!;
       // string[5]	sql_state	SQL State
-      packet._sqlState = _readFixedLengthString(5);
+      packet._sqlState = _readFixedLengthString(5)!;
     }
     // string<EOF>	error_message	human readable error message
-    packet._errorMessage = _readRestOfPacketString();
+    packet._errorMessage = _readRestOfPacketString()!;
 
     return packet;
   }
 
   int _getInteger(DataRange range) {
     if (range.isByte) {
-      return range.byteValue;
+      return range.byteValue!;
     }
 
     range.mergeExtraRanges();
 
-    return _decodeInteger(range.data, range.start, range.length);
+    return _decodeInteger(range.data!, range.start!, range.length!);
   }
 
-  int _decodeInteger(List<int> data, [int start = 0, int length]) {
+  int _decodeInteger(List<int> data, [int start = 0, int? length]) {
     var i = start;
     length ??= data.length;
     switch (length) {
@@ -364,12 +366,12 @@ class Protocol {
     throw new UnsupportedError("${length} length");
   }
 
-  double _getDouble(DataRange range) {
+  double? _getDouble(DataRange range) {
     range.mergeExtraRanges();
 
     if (!range.isNil) {
       // TODO verificare se esistono conversioni più snelle del double
-      return new Uint8List.fromList(range.data.sublist(range.start, range.end))
+      return new Uint8List.fromList(range.data!.sublist(range.start!, range.end))
           .buffer
           .asFloat64List()[0];
     } else {
@@ -381,21 +383,21 @@ class Protocol {
   List<int> _encodeDouble(num value) =>
       new Float64List.fromList([value.toDouble()]).buffer.asUint8List();
 
-  String _getString(DataRange range) {
+  String? _getString(DataRange range) {
     range.mergeExtraRanges();
 
     if (!range.isNil) {
-      return new String.fromCharCodes(range.data, range.start, range.end);
+      return new String.fromCharCodes(range.data!, range.start!, range.end);
     } else {
       return null;
     }
   }
 
-  String _getUTF8String(DataRange range) {
+  String? _getUTF8String(DataRange range) {
     range.mergeExtraRanges();
 
     if (!range.isNil) {
-      return utf8.decoder.convert(range.data, range.start, range.end);
+      return utf8.decoder.convert(range.data!, range.start!, range.end);
     } else {
       return null;
     }
@@ -420,29 +422,29 @@ class Protocol {
   int _readLengthEncodedInteger() =>
       _getInteger(_readLengthEncodedDataRange(__reusableDataRange));
 
-  String _readFixedLengthString(int length) => _getString(__reusablePacketBuffer
+  String? _readFixedLengthString(int length) => _getString(__reusablePacketBuffer
       .payload.readFixedLengthDataRange(length, __reusableDataRange));
 
-  String _readFixedLengthUTF8String(int length) =>
+  String? _readFixedLengthUTF8String(int length) =>
       _getUTF8String(__reusablePacketBuffer.payload
           .readFixedLengthDataRange(length, __reusableDataRange));
 
-  String _readLengthEncodedString() =>
+  String? _readLengthEncodedString() =>
       _getString(_readLengthEncodedDataRange(__reusableDataRange));
 
-  String _readLengthEncodedUTF8String() =>
+  String? _readLengthEncodedUTF8String() =>
       _getUTF8String(_readLengthEncodedDataRange(__reusableDataRange));
 
-  String _readNulTerminatedString() => _getString(__reusablePacketBuffer.payload
+  String? _readNulTerminatedString() => _getString(__reusablePacketBuffer.payload
       .readUpToDataRange(NULL_TERMINATOR, __reusableDataRange));
 
-  String _readNulTerminatedUTF8String() => _getUTF8String(__reusablePacketBuffer
+  String? _readNulTerminatedUTF8String() => _getUTF8String(__reusablePacketBuffer
       .payload.readUpToDataRange(NULL_TERMINATOR, __reusableDataRange));
 
-  String _readRestOfPacketString() =>
+  String? _readRestOfPacketString() =>
       _getString(_readRestOfPacketDataRange(__reusableDataRange));
 
-  String _readRestOfPacketUTF8String() =>
+  String? _readRestOfPacketUTF8String() =>
       _getUTF8String(_readRestOfPacketDataRange(__reusableDataRange));
 
   DataRange _readFixedLengthDataRange(int length, DataRange reusable) =>
@@ -494,7 +496,7 @@ class Protocol {
   }
 
   void _createWriterBuffer() {
-    _writerBuffer = new List<int>();
+    _writerBuffer = List.empty(growable: true);
   }
 
   void _writePacket() {
@@ -548,7 +550,7 @@ class Protocol {
     }
   }
 
-  void _writeFixedLengthString(String value, [int length]) {
+  void _writeFixedLengthString(String value, [int? length]) {
     int start = _writerBuffer.length;
 
     _writerBuffer.addAll(value.codeUnits);
@@ -558,7 +560,7 @@ class Protocol {
     }
   }
 
-  void _writeFixedLengthUTF8String(String value, [int length]) {
+  void _writeFixedLengthUTF8String(String value, [int? length]) {
     int start = _writerBuffer.length;
 
     _writerBuffer.addAll(utf8.encoder.convert(value));
@@ -667,16 +669,16 @@ class Protocol {
       }
 
       // if status_flags & SERVER_SESSION_STATE_CHANGED {
-      if (packet.statusFlags & SERVER_SESSION_STATE_CHANGED != 0) {
+      if (packet.statusFlags! & SERVER_SESSION_STATE_CHANGED != 0) {
         // string<lenenc>	session_state_changes	session state info
         if (!_isAllRead) {
-          packet._sessionStateChanges = _readLengthEncodedString();
+          packet._sessionStateChanges = _readLengthEncodedString()!;
         }
       }
       // } else {
     } else {
       // string<EOF>	info	human readable status information
-      packet._info = _readRestOfPacketString();
+      packet._info = _readRestOfPacketString()!;
     }
 
     return packet;
@@ -684,14 +686,14 @@ class Protocol {
 }
 
 abstract class Packet {
-  int _payloadLength;
-  int _sequenceId;
+  int? _payloadLength;
+  int? _sequenceId;
 
   Packet(this._payloadLength, this._sequenceId);
 
-  int get payloadLength => _payloadLength;
+  int? get payloadLength => _payloadLength;
 
-  int get sequenceId => _sequenceId;
+  int? get sequenceId => _sequenceId;
 }
 
 class ReusablePacket extends Packet {
@@ -705,7 +707,7 @@ class ReusablePacket extends Packet {
             growable: false),
         super(null, null);
 
-  ReusablePacket _reuse(int payloadLength, int sequenceId) {
+  ReusablePacket _reuse(int? payloadLength, int? sequenceId) {
     _payloadLength = payloadLength;
     _sequenceId = sequenceId;
     return this;
@@ -719,65 +721,65 @@ class ReusablePacket extends Packet {
     }
   }
 
-  double getDouble(int index) => _protocol._getDouble(_dataRanges[index]);
+  double? getDouble(int index) => _protocol._getDouble(_dataRanges[index]);
 
   int getInteger(int index) => _protocol._getInteger(_dataRanges[index]);
 
-  String getString(int index) => _protocol._getString(_dataRanges[index]);
+  String? getString(int index) => _protocol._getString(_dataRanges[index]);
 
-  String getUTF8String(int index) =>
+  String? getUTF8String(int index) =>
       _protocol._getUTF8String(_dataRanges[index]);
 }
 
 abstract class GenericResponsePacket extends Packet {
-  int _header;
-  String _info;
-  String _sessionStateChanges;
+  int? _header;
+  String? _info;
+  String? _sessionStateChanges;
 
-  GenericResponsePacket(int payloadLength, int sequenceId)
+  GenericResponsePacket(int? payloadLength, int? sequenceId)
       : super(payloadLength, sequenceId);
 
-  int get header => _header;
-  String get info => _info;
-  String get sessionStateChanges => _sessionStateChanges;
+  int? get header => _header;
+  String? get info => _info;
+  String? get sessionStateChanges => _sessionStateChanges;
 }
 
 abstract class SuccessResponsePacket extends GenericResponsePacket {
-  int _affectedRows;
-  int _lastInsertId;
-  int _statusFlags;
-  int _warnings;
+  int? _affectedRows;
+  int? _lastInsertId;
+  int? _statusFlags;
+  int? _warnings;
 
-  SuccessResponsePacket(int payloadLength, int sequenceId)
+  SuccessResponsePacket(int? payloadLength, int? sequenceId)
       : super(payloadLength, sequenceId);
 
-  int get affectedRows => _affectedRows;
-  int get lastInsertId => _lastInsertId;
-  int get statusFlags => _statusFlags;
-  int get warnings => _warnings;
+  int? get affectedRows => _affectedRows;
+  int? get lastInsertId => _lastInsertId;
+  int? get statusFlags => _statusFlags;
+  int? get warnings => _warnings;
 }
 
 class OkPacket extends SuccessResponsePacket {
-  OkPacket(int payloadLength, int sequenceId)
+  OkPacket(int? payloadLength, int? sequenceId)
       : super(payloadLength, sequenceId);
 }
 
 class EOFPacket extends SuccessResponsePacket {
-  EOFPacket(int payloadLength, int sequenceId)
+  EOFPacket(int? payloadLength, int? sequenceId)
       : super(payloadLength, sequenceId);
 }
 
 class ErrorPacket extends GenericResponsePacket {
-  int _errorCode;
-  String _sqlStateMarker;
-  String _sqlState;
-  String _errorMessage;
+  int? _errorCode;
+  String? _sqlStateMarker;
+  String? _sqlState;
+  String? _errorMessage;
 
-  ErrorPacket(int payloadLength, int sequenceId)
+  ErrorPacket(int? payloadLength, int? sequenceId)
       : super(payloadLength, sequenceId);
 
-  int get errorCode => _errorCode;
-  String get sqlStateMarker => _sqlStateMarker;
-  String get sqlState => _sqlState;
-  String get errorMessage => _errorMessage;
+  int? get errorCode => _errorCode;
+  String? get sqlStateMarker => _sqlStateMarker;
+  String? get sqlState => _sqlState;
+  String? get errorMessage => _errorMessage;
 }

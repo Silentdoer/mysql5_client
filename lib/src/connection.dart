@@ -51,13 +51,14 @@ class ColumnDefinition {
 
 abstract class ConnectionPool {
   factory ConnectionPool(
-          {host,
-          int port,
-          String userName,
-          String password,
-          String database,
-          int maxConnections,
-          Duration connectionTimeout}) =>
+          {
+          required String host,
+          required int port,
+          required String userName,
+          required String password,
+          required String database,
+          int maxConnections = 10,
+          Duration? connectionTimeout}) =>
       new ConnectionPoolImpl(
           host: host,
           port: port,
@@ -79,8 +80,8 @@ abstract class ConnectionFactory {
     return new ConnectionFactoryImpl();
   }
 
-  Future<Connection> connect(host, int port, String userName, String password,
-      [String database]);
+  Future<Connection> connect(String host, int port, String userName, String password,
+      [String? database]);
 }
 
 abstract class Connection {
@@ -94,13 +95,13 @@ abstract class Connection {
 }
 
 abstract class QueryResult implements CommandResult, RowIterator {
-  int get affectedRows;
+  int? get affectedRows;
 
-  int get lastInsertId;
+  int? get lastInsertId;
 
-  int get columnCount;
+  int? get columnCount;
 
-  List<ColumnDefinition> get columns;
+  List<ColumnDefinition>? get columns;
 
   // TODO aggiungere skip e limit
   // TODO aggiungere hint tipo sql per il recupero
@@ -139,15 +140,15 @@ abstract class DataIterator {
   Future<bool> next();
 
   // TODO qui si potrebbe utilizzare il FutureWrapper
-  rawNext();
+  dynamic rawNext();
 
   Future close();
 }
 
 abstract class RowIterator implements DataIterator {
-  String getStringValue(int index);
+  String? getStringValue(int index);
 
-  num getNumValue(int index);
+  num? getNumValue(int index);
 
-  bool getBoolValue(int index);
+  bool? getBoolValue(int index);
 }

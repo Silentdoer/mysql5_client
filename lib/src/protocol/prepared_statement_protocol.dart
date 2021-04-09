@@ -19,11 +19,11 @@ enum DataType {
 }
 
 class PreparedStatementProtocol extends ProtocolDelegate {
-  PreparedResultSetRowPacket _reusableRowPacket;
+  PreparedResultSetRowPacket? _reusableRowPacket;
 
   PreparedStatementProtocol(Protocol protocol) : super(protocol);
 
-  PreparedResultSetRowPacket get reusableRowPacket => _reusableRowPacket;
+  PreparedResultSetRowPacket? get reusableRowPacket => _reusableRowPacket;
 
   void free() {
     super.free();
@@ -33,7 +33,7 @@ class PreparedStatementProtocol extends ProtocolDelegate {
     _reusableRowPacket?._free();
   }
 
-  int getSqlTypeFromValue(value) {
+  int? getSqlTypeFromValue(dynamic value) {
     if (value == null) {
       return null;
     } else if (value is String) {
@@ -158,7 +158,7 @@ class PreparedStatementProtocol extends ProtocolDelegate {
     var value2 = value is Future
         ? value.then((_) => _readCommandStatementPrepareResponsePacket())
         : _readCommandStatementPrepareResponsePacket();
-    return value2 is Future ? value2 : new Future.value(value2);
+    return value2 is Future<Packet> ? value2 : new Future.value(value2 as Packet);
   }
 
   Future<Packet> readCommandStatementExecuteResponse() {
@@ -166,7 +166,7 @@ class PreparedStatementProtocol extends ProtocolDelegate {
     var value2 = value is Future
         ? value.then((_) => _readCommandStatementExecuteResponsePacket())
         : _readCommandStatementExecuteResponsePacket();
-    return value2 is Future ? value2 : new Future.value(value2);
+    return value2 is Future<Packet> ? value2 : new Future.value(value2 as Packet);
   }
 
   skipResultSetRowResponse() {
@@ -253,13 +253,13 @@ class PreparedStatementProtocol extends ProtocolDelegate {
     packet._columnCount = _readByte();
 
     _reusableRowPacket =
-        new PreparedResultSetRowPacket.reusable(_protocol, packet._columnCount);
+        new PreparedResultSetRowPacket.reusable(_protocol, packet._columnCount!);
 
     return packet;
   }
 
   PreparedResultSetRowPacket _skipResultSetRowPacket() {
-    var packet = _reusableRowPacket.reuse(_payloadLength, _sequenceId);
+    var packet = _reusableRowPacket!.reuse(_payloadLength, _sequenceId);
 
     _skipBytes(_payloadLength);
 
@@ -267,21 +267,21 @@ class PreparedStatementProtocol extends ProtocolDelegate {
   }
 
   PreparedResultSetRowPacket _readResultSetRowPacket(List<int> columnTypes) {
-    var packet = _reusableRowPacket.reuse(_payloadLength, _sequenceId);
+    var packet = _reusableRowPacket!.reuse(_payloadLength, _sequenceId);
 
     // header
     _skipByte();
 
     var offset = 2;
     var nullBitmap =
-        _readFixedLengthString((columnTypes.length + 7 + offset) ~/ 8)
+        _readFixedLengthString((columnTypes.length + 7 + offset) ~/ 8)!
             .codeUnits;
 
     var l = offset ~/ 8;
     var n = offset % 8;
     var mask = 1 << n;
     for (var i = 0; i < columnTypes.length; i++) {
-      var reusableRange = _reusableRowPacket._getReusableDataRange(i);
+      var reusableRange = _reusableRowPacket!._getReusableDataRange(i);
       if ((nullBitmap[l] & mask) == 0) {
         var dataType = _getDataTypeFromSqlType(columnTypes[i]);
         switch (dataType) {
@@ -318,7 +318,7 @@ class PreparedStatementProtocol extends ProtocolDelegate {
     return packet;
   }
 
-  DataType _getDataTypeFromSqlType(int sqlType) {
+  DataType? _getDataTypeFromSqlType(int? sqlType) {
     if (sqlType == null) {
       return null;
     } else {
@@ -370,26 +370,26 @@ class PreparedStatementProtocol extends ProtocolDelegate {
 }
 
 class CommandStatementPrepareOkResponsePacket extends Packet {
-  int _status;
-  int _statementId;
-  int _numColumns;
-  int _numParams;
-  int _warningCount;
+  int? _status;
+  int? _statementId;
+  int? _numColumns;
+  int? _numParams;
+  int? _warningCount;
 
-  CommandStatementPrepareOkResponsePacket(int payloadLength, int sequenceId)
+  CommandStatementPrepareOkResponsePacket(int? payloadLength, int? sequenceId)
       : super(payloadLength, sequenceId);
 
-  int get status => _status;
-  int get statementId => _statementId;
-  int get numColumns => _numColumns;
-  int get numParams => _numParams;
-  int get warningCount => _warningCount;
+  int? get status => _status;
+  int? get statementId => _statementId;
+  int? get numColumns => _numColumns;
+  int? get numParams => _numParams;
+  int? get warningCount => _warningCount;
 }
 
 class PreparedResultSetRowPacket extends ReusablePacket {
   PreparedResultSetRowPacket.reusable(Protocol protocol, int columnCount)
       : super.reusable(protocol, columnCount);
 
-  PreparedResultSetRowPacket reuse(int payloadLength, int sequenceId) =>
-      _reuse(payloadLength, sequenceId);
+  PreparedResultSetRowPacket reuse(int? payloadLength, int? sequenceId) =>
+      _reuse(payloadLength, sequenceId) as PreparedResultSetRowPacket;
 }

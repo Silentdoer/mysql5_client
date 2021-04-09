@@ -52,6 +52,7 @@ abstract class SpeedTest {
       // 说明每次insert完是没有释放连接的，有bug
       await executeQuery(
           "insert into prova (name) values ('$i-OK')");
+          print('inserted: ${i + 1}');
     }
     logTime("simple insertions", sw);
   }
@@ -78,7 +79,7 @@ abstract class SpeedTest {
 }
 
 class MySqlClientSpeedTest extends SpeedTest {
-  Connection connection;
+  Connection? connection;
 
   Future run() async {
     var factory2 = new ConnectionFactory();
@@ -87,10 +88,10 @@ class MySqlClientSpeedTest extends SpeedTest {
 
     await super.run();
 
-    await connection.close();
+    await connection?.close();
   }
 
   Future<QueryResult> executeQuery(String sql) {
-    return connection.executeQuery(sql);
+    return connection!.executeQuery(sql);
   }
 }

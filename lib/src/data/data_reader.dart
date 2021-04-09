@@ -6,7 +6,7 @@ part of mysql_client.data;
 class DataReader {
 
   // TODO questo valore si potrebbe modificare a runtime
-  final int maxChunkSize;
+  final int? maxChunkSize;
 
   final ReaderBuffer _reusableBuffer = new ReaderBuffer.reusable();
 
@@ -14,9 +14,9 @@ class DataReader {
 
   final RawSocket _socket;
 
-  Completer _dataRequestCompleter;
+  Completer? _dataRequestCompleter;
 
-  StreamSubscription<RawSocketEvent> _subscription;
+  late StreamSubscription<RawSocketEvent> _subscription;
 
   DataReader(this._socket, {this.maxChunkSize}) {
     _subscription = this._socket.listen(_onData);
@@ -30,7 +30,7 @@ class DataReader {
       _dataRequestCompleter = new Completer();
       _subscription.resume();
 
-      return _dataRequestCompleter.future.then((readLength) {
+      return _dataRequestCompleter!.future.then((readLength) {
         _subscription.pause();
         _dataRequestCompleter = null;
 
@@ -49,7 +49,7 @@ class DataReader {
     var reusableChunk = _reusableBuffer.getReusableChunk(reusableChunksCount);
     reusableChunksCount++;
     var bufferChunk = chunk.extractDataChunk(leftLength, reusableChunk);
-    leftLength -= bufferChunk.length;
+    leftLength -= bufferChunk.length!;
 
     if (chunk.isEmpty) {
       _chunks.removeFirst();
@@ -61,10 +61,10 @@ class DataReader {
   }
 
   void _onData(RawSocketEvent event) {
-    if (event == RawSocketEvent.READ && _dataRequestCompleter != null) {
-      _chunks.add(new DataChunk(_socket.read(maxChunkSize)));
+    if (event == RawSocketEvent.read && _dataRequestCompleter != null) {
+      _chunks.add(new DataChunk(_socket.read(maxChunkSize)!));
 
-      _dataRequestCompleter.complete();
+      _dataRequestCompleter!.complete();
     }
   }
 }

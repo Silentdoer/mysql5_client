@@ -14,12 +14,13 @@ class ConnectionProtocol extends ProtocolDelegate {
 
   // TODO passare clientCapabilityFlags, clientConnectAttributes, characterSet e maxPacketSize come parametri
   void writeHandshakeResponsePacket(String userName, String password,
-      String database, String authPluginData, String authPluginName) {
+      String? database, String authPluginData, String authPluginName) {
     _createWriterBuffer();
 
     // TODO rivedere utilizzo capability flags
     if (_clientCapabilityFlags & CLIENT_CONNECT_WITH_DB != 0) {
       if (database == null) {
+        // 上面的if表示两个变量存在某位都是1的情况，而这里则是将都是1的在左侧变量里变成了0，因此它们再按位与会是0
         _clientCapabilityFlags ^= CLIENT_CONNECT_WITH_DB;
       }
     } else if (database != null) {
@@ -57,9 +58,10 @@ class ConnectionProtocol extends ProtocolDelegate {
       throw new UnsupportedError("TODO to implement");
     }
     // if capabilities & CLIENT_CONNECT_WITH_DB {
+    // 这个时候认定database不为null
     if (_clientCapabilityFlags & CLIENT_CONNECT_WITH_DB != 0) {
       // string[NUL]    database
-      _writeNulTerminatedUTF8String(database);
+      _writeNulTerminatedUTF8String(database!);
     }
     // if capabilities & CLIENT_PLUGIN_AUTH {
     if (_serverCapabilityFlags & CLIENT_PLUGIN_AUTH != 0) {
@@ -92,7 +94,7 @@ class ConnectionProtocol extends ProtocolDelegate {
     var value2 = value is Future
         ? value.then((_) => _readInitialHandshakeResponsePacket())
         : _readInitialHandshakeResponsePacket();
-    return value2 is Future ? value2 : new Future.value(value2);
+    return value2 is Future<Packet> ? value2 : new Future.value(value2 as Packet);
   }
 
   Packet _readInitialHandshakeResponsePacket() {
@@ -132,9 +134,9 @@ class ConnectionProtocol extends ProtocolDelegate {
       // 2              capability flags (upper 2 bytes)
       packet._capabilityFlags2 = _readFixedLengthInteger(2);
       packet._serverCapabilityFlags =
-          packet.capabilityFlags1 | (packet.capabilityFlags2 << 16);
+          packet.capabilityFlags1! | (packet.capabilityFlags2! << 16);
       // if capabilities & CLIENT_PLUGIN_AUTH {
-      if (packet._serverCapabilityFlags & CLIENT_PLUGIN_AUTH != 0) {
+      if (packet._serverCapabilityFlags! & CLIENT_PLUGIN_AUTH != 0) {
         // 1              length of auth-plugin-data
         packet._authPluginDataLength = _readByte();
       } else {
@@ -145,24 +147,24 @@ class ConnectionProtocol extends ProtocolDelegate {
       // string[10]     reserved (all [00])
       _skipBytes(10);
       // if capabilities & CLIENT_SECURE_CONNECTION {
-      if (packet._serverCapabilityFlags & CLIENT_SECURE_CONNECTION != 0) {
+      if (packet._serverCapabilityFlags! & CLIENT_SECURE_CONNECTION != 0) {
         // string[$len]   auth-plugin-data-part-2 ($len=MAX(13, length of auth-plugin-data - 8))
-        var len = max(packet._authPluginDataLength - 8, 13);
+        var len = max(packet._authPluginDataLength! - 8, 13);
         packet._authPluginDataPart2 = _readFixedLengthString(len);
       } else {
         packet.authPluginDataPart2 = "";
       }
       packet._authPluginData =
           "${packet._authPluginDataPart1}${packet._authPluginDataPart2}"
-              .substring(0, packet._authPluginDataLength - 1);
+              .substring(0, packet._authPluginDataLength! - 1);
       // if capabilities & CLIENT_PLUGIN_AUTH {
-      if (packet._serverCapabilityFlags & CLIENT_PLUGIN_AUTH != 0) {
+      if (packet._serverCapabilityFlags! & CLIENT_PLUGIN_AUTH != 0) {
         // string[NUL]    auth-plugin name
         packet._authPluginName = _readNulTerminatedString();
       }
     }
 
-    _serverCapabilityFlags = packet._serverCapabilityFlags;
+    _serverCapabilityFlags = packet._serverCapabilityFlags!;
 
     return packet;
   }
@@ -193,8 +195,8 @@ class ConnectionProtocol extends ProtocolDelegate {
       var hash = output.events.single.bytes;
 
       var buffer = new StringBuffer();
-      var generatedHash = new List<int>(hash.length);
-      for (var i = 0; i < generatedHash.length; i++) {
+      //var generatedHash = List.filled(hash.length, 0);
+      for (var i = 0; i < hash.length; i++) {
         buffer.writeCharCode(hash[i] ^ passwordSha1[i]);
       }
       response = buffer.toString();
@@ -210,49 +212,50 @@ class ConnectionProtocol extends ProtocolDelegate {
   }
 }
 
+// FIXME
 class InitialHandshakePacket extends Packet {
-  int _protocolVersion;
-  String _serverVersion;
-  int _connectionId;
-  String _authPluginDataPart1;
-  int _capabilityFlags1;
-  int _characterSet;
-  int _statusFlags;
-  int _capabilityFlags2;
-  int _serverCapabilityFlags;
-  int _authPluginDataLength;
-  String _authPluginDataPart2;
-  String _authPluginData;
-  String _authPluginName;
+  int? _protocolVersion;
+  String? _serverVersion;
+  int? _connectionId;
+  String? _authPluginDataPart1;
+  int? _capabilityFlags1;
+  int? _characterSet;
+  int? _statusFlags;
+  int? _capabilityFlags2;
+  int? _serverCapabilityFlags;
+  int? _authPluginDataLength;
+  String? _authPluginDataPart2;
+  String? _authPluginData;
+  String? _authPluginName;
 
-  InitialHandshakePacket(int payloadLength, int sequenceId)
+  InitialHandshakePacket(int? payloadLength, int? sequenceId)
       : super(payloadLength, sequenceId);
 
-  int get protocolVersion => _protocolVersion;
+  int? get protocolVersion => _protocolVersion;
 
-  String get serverVersion => _serverVersion;
+  String? get serverVersion => _serverVersion;
 
-  int get connectionId => _connectionId;
+  int? get connectionId => _connectionId;
 
-  String get authPluginDataPart1 => _authPluginDataPart1;
+  String? get authPluginDataPart1 => _authPluginDataPart1;
 
-  int get capabilityFlags1 => _capabilityFlags1;
+  int? get capabilityFlags1 => _capabilityFlags1;
 
-  int get characterSet => _characterSet;
+  int? get characterSet => _characterSet;
 
-  int get statusFlags => _statusFlags;
+  int? get statusFlags => _statusFlags;
 
-  int get capabilityFlags2 => _capabilityFlags2;
+  int? get capabilityFlags2 => _capabilityFlags2;
 
-  int get serverCapabilityFlags => _serverCapabilityFlags;
+  int? get serverCapabilityFlags => _serverCapabilityFlags;
 
-  int get authPluginDataLength => _authPluginDataLength;
+  int? get authPluginDataLength => _authPluginDataLength;
 
-  String get authPluginDataPart2 => _authPluginDataPart2;
+  String? get authPluginDataPart2 => _authPluginDataPart2;
 
   void set authPluginDataPart2(dataPart2) => _authPluginDataPart2 = dataPart2;
 
-  String get authPluginData => _authPluginData;
+  String? get authPluginData => _authPluginData;
 
-  String get authPluginName => _authPluginName;
+  String? get authPluginName => _authPluginName;
 }

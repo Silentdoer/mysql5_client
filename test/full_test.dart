@@ -7,8 +7,8 @@ import "dart:async";
 
 import '../lib/mysql5_client.dart';
 
-const SIMPLE_INSERTS = 1000;
-const SIMPLE_SELECTS = 1000;
+const SIMPLE_INSERTS = 300;
+const SIMPLE_SELECTS = 300;
 
 // sudo ngrep -x -q -d lo0 '' 'port 3306'
 
@@ -68,6 +68,7 @@ abstract class SpeedTest {
     for (var i = 0; i < SIMPLE_INSERTS; i++) {
       await executeQuery(
           "insert into people (name, age) values ('person$i', $i)");
+          print('inserted ${i + 1}');
     }
     logTime("simple insertions", sw);
   }
@@ -99,19 +100,19 @@ abstract class SpeedTest {
 class MySqlClientSpeedTest extends SpeedTest {
   final ConnectionFactory factory2 = new ConnectionFactory();
 
-  Connection connection;
+  Connection? connection;
 
   Future run() async {
     connection = await factory2.connect("localhost", 3306, "root", "wyzpass", "db_test");
 
     await super.run();
 
-    await connection.close();
+    await connection?.close();
 
     connection = null;
   }
 
   Future<QueryResult> executeQuery(String sql) {
-    return connection.executeQuery(sql);
+    return connection!.executeQuery(sql);
   }
 }

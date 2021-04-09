@@ -4,14 +4,14 @@
 part of mysql_client.data;
 
 class DataRange {
-  bool _isPending;
-  List<int> _data;
-  int _start;
-  int _length;
-  List<DataRange> _extraRanges;
-  int _mergeLength;
+  bool? _isPending;
+  List<int>? _data;
+  int? _start;
+  int? _length;
+  List<DataRange>? _extraRanges;
+  int? _mergeLength;
 
-  DataRange(List<int> data, [int start = 0, int length]) {
+  DataRange(List<int> data, [int start = 0, int? length]) {
     reuse(data, start, length);
   }
 
@@ -29,11 +29,11 @@ class DataRange {
 
   DataRange.reusable();
 
-  DataRange reuse(List<int> data, [int start = 0, int length]) {
+  DataRange reuse(List<int> data, [int start = 0, int? length]) {
     _isPending = false;
     _data = data;
     _start = start;
-    _length = length ?? _data.length - _start;
+    _length = length ?? _data!.length - _start!;
     _extraRanges = null;
     _mergeLength = null;
     return this;
@@ -43,7 +43,7 @@ class DataRange {
     _isPending = true;
     _data = data;
     _start = start;
-    _length = _data.length - _start;
+    _length = _data!.length - _start!;
     _extraRanges = null;
     _mergeLength = null;
     return this;
@@ -78,36 +78,36 @@ class DataRange {
     _mergeLength = null;
   }
 
-  bool get isPending => _isPending;
+  bool? get isPending => _isPending;
   bool get isNil => _data == null;
   bool get isByte => _data == null;
-  int get byteValue => _length;
-  int get start => _start;
-  int get length => _length;
-  int get end => _start + _length;
-  List<int> get data => _data;
+  int? get byteValue => _length;
+  int? get start => _start;
+  int? get length => _length;
+  int get end => _start! + _length!;
+  List<int>? get data => _data;
 
   void addExtraRange(DataRange extraRange) {
     if (_extraRanges == null) {
-      _extraRanges = new List<DataRange>();
+      _extraRanges = List.empty(growable: true);
       _mergeLength = _length;
     }
-    _extraRanges.add(extraRange);
-    _mergeLength += extraRange._length;
+    _extraRanges!.add(extraRange);
+    _mergeLength = _mergeLength! + extraRange._length!;
   }
 
   void mergeExtraRanges() {
     if (_extraRanges != null) {
       var range = this;
       var start = 0;
-      var end = range.length;
-      var newData = new List(_mergeLength);
-      newData.setRange(start, end, range._data, range._start);
+      var end = range.length!;
+      var newData = List.filled(_mergeLength!, 0);
+      newData.setRange(start, end, range._data!, range._start!);
       start = end;
 
-      for (range in _extraRanges) {
-        end = start + range.length;
-        newData.setRange(start, end, range._data, range._start);
+      for (range in _extraRanges!) {
+        end = start + range.length!;
+        newData.setRange(start, end, range._data!, range._start!);
         start = end;
       }
 

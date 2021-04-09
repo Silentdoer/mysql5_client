@@ -1,11 +1,11 @@
 part of mysql_client.protocol;
 
 class _PacketBuffer {
-  int _sequenceId;
+  int? _sequenceId;
 
-  int _header;
+  late int _header;
 
-  ReaderBuffer _payload;
+  late ReaderBuffer _payload;
 
   _PacketBuffer(int sequenceId, int header, ReaderBuffer payload) {
     reuse(sequenceId, header, payload);
@@ -27,11 +27,11 @@ class _PacketBuffer {
     _sequenceId = null;
   }
 
-  int get sequenceId => _sequenceId;
+  int? get sequenceId => _sequenceId;
 
   ReaderBuffer get payload => _payload;
 
   int get header => _header;
 
-  int get payloadLength => _payload.dataLength;
+  int get payloadLength => _payload.dataLength!;
 }

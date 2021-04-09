@@ -14,7 +14,7 @@ const int MYSQL_TYPE_VAR_STRING = 0xfd;
 class QueryCommandTextProtocol extends ProtocolDelegate {
   final ResultSetColumnDefinitionPacket _reusableColumnPacket;
 
-  ResultSetRowPacket _reusableRowPacket;
+  ResultSetRowPacket? _reusableRowPacket;
 
   QueryCommandTextProtocol(Protocol protocol)
       : _reusableColumnPacket =
@@ -24,7 +24,7 @@ class QueryCommandTextProtocol extends ProtocolDelegate {
   ResultSetColumnDefinitionPacket get reusableColumnPacket =>
       _reusableColumnPacket;
 
-  ResultSetRowPacket get reusableRowPacket => _reusableRowPacket;
+  ResultSetRowPacket? get reusableRowPacket => _reusableRowPacket;
 
   void free() {
     super.free();
@@ -47,11 +47,26 @@ class QueryCommandTextProtocol extends ProtocolDelegate {
   }
 
   Future<Packet> readCommandQueryResponse() {
+    print('333-1');
     var value = _readPacketBuffer();
+    print((value is Future).toString() + '  ' + value.runtimeType.toString() + '333-2' + (value is Future<Packet>).toString());
+    
+    // value 是 Future一般，但是却不是Future<Packet>而是Future<dynamic>
     var value2 = value is Future
         ? value.then((_) => _readCommandQueryResponsePacket())
         : _readCommandQueryResponsePacket();
-    return value2 is Future ? value2 : new Future.value(value2);
+    // 这个是Future<Packet>因为上面的then进行了转换
+    print('333-3 value2 is:${value2.runtimeType}');
+    // 似乎是：_readCommandQueryResponsePacket卡主了
+    // then只会返回另一种Future，而要获得Future的执行后的值必须await
+    // 如Future<A>可以通过then转换为Future<B>，但是获取B类型的返回值必须await
+    // 所以外部对result进行await其实是开始去执行_readCommandQueryResponsePacket里
+    // 的请求具体值的代码；
+    var result = value2 is Future<Packet>
+        ? value2
+        : new Future.value(value2 as Packet);
+    //print('333-3');
+    return result;
   }
 
   skipResultSetColumnDefinitionResponse() {
@@ -83,13 +98,18 @@ class QueryCommandTextProtocol extends ProtocolDelegate {
   }
 
   Packet _readCommandQueryResponsePacket() {
+    print('333-5');
     if (_isOkPacket()) {
+      print('333-6');
       return _readOkPacket();
     } else if (_isErrorPacket()) {
+      print('333-7');
       return _readErrorPacket();
     } else if (_isLocalInFilePacket()) {
+      print('333-8');
       throw new UnsupportedError("Protocol::LOCAL_INFILE_Data");
     } else {
+      print('333-9');
       return _readResultSetColumnCountPacket();
     }
   }
@@ -141,7 +161,7 @@ class QueryCommandTextProtocol extends ProtocolDelegate {
     packet._columnCount = _readLengthEncodedInteger();
 
     _reusableRowPacket =
-        new ResultSetRowPacket.reusable(_protocol, packet._columnCount);
+        new ResultSetRowPacket.reusable(_protocol, packet._columnCount!);
 
     return packet;
   }
@@ -203,7 +223,7 @@ class QueryCommandTextProtocol extends ProtocolDelegate {
   }
 
   ResultSetRowPacket _skipResultSetRowPacket() {
-    var packet = _reusableRowPacket.reuse(_payloadLength, _sequenceId);
+    var packet = _reusableRowPacket!.reuse(_payloadLength, _sequenceId);
 
     _skipBytes(_payloadLength);
 
@@ -211,11 +231,11 @@ class QueryCommandTextProtocol extends ProtocolDelegate {
   }
 
   ResultSetRowPacket _readResultSetRowPacket() {
-    var packet = _reusableRowPacket.reuse(_payloadLength, _sequenceId);
+    var packet = _reusableRowPacket!.reuse(_payloadLength, _sequenceId);
 
     var i = 0;
     while (!_isAllRead) {
-      var reusableRange = _reusableRowPacket._getReusableDataRange(i++);
+      var reusableRange = _reusableRowPacket!._getReusableDataRange(i++);
       if (_checkByte() != PREFIX_NULL) {
         _readFixedLengthDataRange(_readLengthEncodedInteger(), reusableRange);
       } else {
@@ -231,27 +251,27 @@ class QueryCommandTextProtocol extends ProtocolDelegate {
 }
 
 class ResultSetColumnCountPacket extends Packet {
-  int _columnCount;
+  int? _columnCount;
 
-  ResultSetColumnCountPacket(int payloadLength, int sequenceId)
+  ResultSetColumnCountPacket(int? payloadLength, int? sequenceId)
       : super(payloadLength, sequenceId);
 
-  int get columnCount => _columnCount;
+  int? get columnCount => _columnCount;
 }
 
 class ResultSetColumnDefinitionPacket extends ReusablePacket {
   ResultSetColumnDefinitionPacket.reusable(Protocol protocol)
       : super.reusable(protocol, 13);
 
-  ResultSetColumnDefinitionPacket reuse(int payloadLength, int sequenceId) =>
-      _reuse(payloadLength, sequenceId);
+  ResultSetColumnDefinitionPacket reuse(int? payloadLength, int? sequenceId) =>
+      _reuse(payloadLength, sequenceId) as ResultSetColumnDefinitionPacket;
 
-  String get catalog => getString(0);
-  String get schema => getString(1);
-  String get table => getString(2);
-  String get orgTable => getString(3);
-  String get name => getString(4);
-  String get orgName => getString(5);
+  String? get catalog => getString(0);
+  String? get schema => getString(1);
+  String? get table => getString(2);
+  String? get orgTable => getString(3);
+  String? get name => getString(4);
+  String? get orgName => getString(5);
   int get fieldsLength => getInteger(6);
   int get characterSet => getInteger(7);
   int get columnLength => getInteger(8);
@@ -264,6 +284,6 @@ class ResultSetRowPacket extends ReusablePacket {
   ResultSetRowPacket.reusable(Protocol protocol, int columnCount)
       : super.reusable(protocol, columnCount);
 
-  ResultSetRowPacket reuse(int payloadLength, int sequenceId) =>
-      _reuse(payloadLength, sequenceId);
+  ResultSetRowPacket reuse(int? payloadLength, int? sequenceId) =>
+      _reuse(payloadLength, sequenceId) as ResultSetRowPacket;
 }

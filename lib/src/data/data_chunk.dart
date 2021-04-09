@@ -4,20 +4,20 @@
 part of mysql_client.data;
 
 class DataChunk {
-  List<int> _data;
-  int _start;
-  int _length;
+  List<int>? _data;
+  int? _start;
+  int? _length;
 
-  DataChunk(List<int> data, [int start = 0, int length]) {
+  DataChunk(List<int> data, [int start = 0, int? length]) {
     reuse(data, start, length);
   }
 
   DataChunk.reusable();
 
-  DataChunk reuse(List<int> data, [int start = 0, int length]) {
+  DataChunk reuse(List<int> data, [int start = 0, int? length]) {
     _data = data;
     _start = start;
-    _length = length ?? _data.length - _start;
+    _length = length ?? _data!.length - _start!;
     return this;
   }
 
@@ -28,52 +28,52 @@ class DataChunk {
   }
 
   bool get isEmpty => _length == 0;
-  int get length => _length;
+  int? get length => _length;
 
   DataChunk extractDataChunk(int length, DataChunk reusableChunk) {
-    length = min(_length, length);
-    var chunk = reusableChunk.reuse(_data, _start, length);
-    _start += length;
-    _length -= length;
+    length = min(_length!, length);
+    var chunk = reusableChunk.reuse(_data!, _start!, length);
+    _start = _start! + length;
+    _length = _length! - length;
     return chunk;
   }
 
-  int checkOneByte() => _data[_start];
+  int checkOneByte() => _data![_start!];
 
   int extractOneByte() {
-    var value = _data[_start];
-    _start++;
-    _length--;
+    var value = _data![_start!];
+    _start = _start! + 1;
+    _length = _length! - 1;
     return value;
   }
 
   DataRange extractFixedLengthDataRange(int length, DataRange reusableRange) {
     DataRange range;
-    if (length <= _length) {
-      range = reusableRange.reuse(_data, _start, length);
-      _start += length;
-      _length -= length;
+    if (length <= _length!) {
+      range = reusableRange.reuse(_data!, _start!, length);
+      _start = _start! + length;
+      _length = _length! - length;
     } else {
-      range = reusableRange.reusePending(_data, _start);
-      _start += range.length;
-      _length -= range.length;
+      range = reusableRange.reusePending(_data!, _start!);
+      _start = _start! + range.length!;
+      _length = _length! - range.length!;
     }
     return range;
   }
 
   DataRange extractUpToDataRange(int terminator, DataRange reusableRange) {
     DataRange range;
-    int i = _data.indexOf(terminator, _start);
+    int i = _data!.indexOf(terminator, _start!);
     if (i != -1) {
-      var length = i - _start;
-      range = reusableRange.reuse(_data, _start, length);
+      var length = i - _start!;
+      range = reusableRange.reuse(_data!, _start!, length);
       // skip the terminator
-      _start += length + 1;
-      _length -= length + 1;
+      _start = _start! + length + 1;
+      _length = _length! - length - 1;
     } else {
-      range = reusableRange.reusePending(_data, _start);
-      _start += range.length;
-      _length -= range.length;
+      range = reusableRange.reusePending(_data!, _start!);
+      _start = _start! + range.length!;
+      _length = _length! - range.length!;
     }
     return range;
   }

@@ -3,15 +3,15 @@
   "packages": [
     {
       "name": "_fe_analyzer_shared",
-      "rootUri": "file:///C:/Users/Silentdoer/AppData/Local/Pub/Cache/hosted/pub.dartlang.org/_fe_analyzer_shared-14.0.0",
+      "rootUri": "file:///C:/Users/Silentdoer/AppData/Local/Pub/Cache/hosted/pub.dartlang.org/_fe_analyzer_shared-20.0.0",
       "packageUri": "lib/",
-      "languageVersion": "2.2"
+      "languageVersion": "2.12"
     },
     {
       "name": "analyzer",
-      "rootUri": "file:///C:/Users/Silentdoer/AppData/Local/Pub/Cache/hosted/pub.dartlang.org/analyzer-0.41.2",
+      "rootUri": "file:///C:/Users/Silentdoer/AppData/Local/Pub/Cache/hosted/pub.dartlang.org/analyzer-1.4.0",
       "packageUri": "lib/",
-      "languageVersion": "2.7"
+      "languageVersion": "2.12"
     },
     {
       "name": "args",
@@ -51,21 +51,21 @@
     },
     {
       "name": "convert",
-      "rootUri": "file:///C:/Users/Silentdoer/AppData/Local/Pub/Cache/hosted/pub.dartlang.org/convert-2.1.1",
+      "rootUri": "file:///C:/Users/Silentdoer/AppData/Local/Pub/Cache/hosted/pub.dartlang.org/convert-3.0.0",
       "packageUri": "lib/",
-      "languageVersion": "1.17"
+      "languageVersion": "2.12"
     },
     {
       "name": "coverage",
-      "rootUri": "file:///C:/Users/Silentdoer/AppData/Local/Pub/Cache/hosted/pub.dartlang.org/coverage-0.15.2",
+      "rootUri": "file:///C:/Users/Silentdoer/AppData/Local/Pub/Cache/hosted/pub.dartlang.org/coverage-1.0.2",
       "packageUri": "lib/",
-      "languageVersion": "2.7"
+      "languageVersion": "2.12"
     },
     {
       "name": "crypto",
-      "rootUri": "file:///C:/Users/Silentdoer/AppData/Local/Pub/Cache/hosted/pub.dartlang.org/crypto-2.1.5",
+      "rootUri": "file:///C:/Users/Silentdoer/AppData/Local/Pub/Cache/hosted/pub.dartlang.org/crypto-3.0.1",
       "packageUri": "lib/",
-      "languageVersion": "2.3"
+      "languageVersion": "2.12"
     },
     {
       "name": "file",
@@ -129,15 +129,15 @@
     },
     {
       "name": "node_preamble",
-      "rootUri": "file:///C:/Users/Silentdoer/AppData/Local/Pub/Cache/hosted/pub.dartlang.org/node_preamble-1.4.13",
+      "rootUri": "file:///C:/Users/Silentdoer/AppData/Local/Pub/Cache/hosted/pub.dartlang.org/node_preamble-2.0.0",
       "packageUri": "lib/",
-      "languageVersion": "1.24"
+      "languageVersion": "2.12"
     },
     {
       "name": "package_config",
-      "rootUri": "file:///C:/Users/Silentdoer/AppData/Local/Pub/Cache/hosted/pub.dartlang.org/package_config-1.9.3",
+      "rootUri": "file:///C:/Users/Silentdoer/AppData/Local/Pub/Cache/hosted/pub.dartlang.org/package_config-2.0.0",
       "packageUri": "lib/",
-      "languageVersion": "2.7"
+      "languageVersion": "2.12"
     },
     {
       "name": "path",
@@ -171,21 +171,21 @@
     },
     {
       "name": "shelf_packages_handler",
-      "rootUri": "file:///C:/Users/Silentdoer/AppData/Local/Pub/Cache/hosted/pub.dartlang.org/shelf_packages_handler-2.0.1",
+      "rootUri": "file:///C:/Users/Silentdoer/AppData/Local/Pub/Cache/hosted/pub.dartlang.org/shelf_packages_handler-3.0.0",
       "packageUri": "lib/",
-      "languageVersion": "2.8"
+      "languageVersion": "2.12"
     },
     {
       "name": "shelf_static",
-      "rootUri": "file:///C:/Users/Silentdoer/AppData/Local/Pub/Cache/hosted/pub.dartlang.org/shelf_static-0.2.9+2",
+      "rootUri": "file:///C:/Users/Silentdoer/AppData/Local/Pub/Cache/hosted/pub.dartlang.org/shelf_static-1.0.0",
       "packageUri": "lib/",
-      "languageVersion": "2.3"
+      "languageVersion": "2.12"
     },
     {
       "name": "shelf_web_socket",
-      "rootUri": "file:///C:/Users/Silentdoer/AppData/Local/Pub/Cache/hosted/pub.dartlang.org/shelf_web_socket-0.2.4+1",
+      "rootUri": "file:///C:/Users/Silentdoer/AppData/Local/Pub/Cache/hosted/pub.dartlang.org/shelf_web_socket-1.0.1",
       "packageUri": "lib/",
-      "languageVersion": "2.1"
+      "languageVersion": "2.12"
     },
     {
       "name": "source_map_stack_trace",
@@ -231,19 +231,19 @@
     },
     {
       "name": "test",
-      "rootUri": "file:///C:/Users/Silentdoer/AppData/Local/Pub/Cache/hosted/pub.dartlang.org/test-1.16.5",
+      "rootUri": "file:///C:/Users/Silentdoer/AppData/Local/Pub/Cache/hosted/pub.dartlang.org/test-1.16.8",
       "packageUri": "lib/",
       "languageVersion": "2.12"
     },
     {
       "name": "test_api",
-      "rootUri": "file:///C:/Users/Silentdoer/AppData/Local/Pub/Cache/hosted/pub.dartlang.org/test_api-0.2.19",
+      "rootUri": "file:///C:/Users/Silentdoer/AppData/Local/Pub/Cache/hosted/pub.dartlang.org/test_api-0.3.0",
       "packageUri": "lib/",
       "languageVersion": "2.12"
     },
     {
       "name": "test_core",
-      "rootUri": "file:///C:/Users/Silentdoer/AppData/Local/Pub/Cache/hosted/pub.dartlang.org/test_core-0.3.15",
+      "rootUri": "file:///C:/Users/Silentdoer/AppData/Local/Pub/Cache/hosted/pub.dartlang.org/test_core-0.3.19",
       "packageUri": "lib/",
       "languageVersion": "2.12"
     },
@@ -267,9 +267,9 @@
     },
     {
       "name": "web_socket_channel",
-      "rootUri": "file:///C:/Users/Silentdoer/AppData/Local/Pub/Cache/hosted/pub.dartlang.org/web_socket_channel-1.2.0",
+      "rootUri": "file:///C:/Users/Silentdoer/AppData/Local/Pub/Cache/hosted/pub.dartlang.org/web_socket_channel-2.0.0",
       "packageUri": "lib/",
-      "languageVersion": "2.10"
+      "languageVersion": "2.12"
     },
     {
       "name": "webkit_inspection_protocol",
@@ -287,10 +287,10 @@
       "name": "mysql5_client",
       "rootUri": "../",
       "packageUri": "lib/",
-      "languageVersion": "2.10"
+      "languageVersion": "2.12"
     }
   ],
-  "generated": "2021-04-09T02:39:42.900920Z",
+  "generated": "2021-04-09T04:50:35.353026Z",
   "generator": "pub",
   "generatorVersion": "2.12.0"
 }

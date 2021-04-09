@@ -1,7 +1,7 @@
 import '../lib/mysql5_client.dart';
 
 void main() async {
-  Connection connection;
+  Connection? connection;
 
   try {
     connection = await new ConnectionFactory()
@@ -39,6 +39,6 @@ void main() async {
       print("${queryResult.getNumValue(0)} : ${queryResult.getStringValue(1)}}");
     }
   } finally {
-    await connection.close();
+    await connection?.close();
   }
 }

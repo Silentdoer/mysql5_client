@@ -9,6 +9,22 @@ class DataWriter {
   DataWriter(this._socket);
 
   void writeBuffer(List<int> buffer) {
-    _socket.write(buffer);
+    var writeCount = 0;
+    var successCount = _socket.write(buffer);
+    if (successCount != buffer.length) {
+      print('写入数据：${successCount}  ${buffer.length}  ${this._socket.available()}');
+      writeCount++;
+      while(true) {
+        successCount = _socket.write(buffer);
+        writeCount++;
+        if (successCount == buffer.length) {
+          print('success retry write: ${writeCount} times ${successCount} ${buffer.length}');
+          break;
+        }
+        if (successCount > 0 && successCount != buffer.length) {
+          print('WARN: ${successCount} ${buffer.length} ${this._socket.available()}');
+        }
+      }
+    }
   }
 }

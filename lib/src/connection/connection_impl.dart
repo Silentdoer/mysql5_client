@@ -127,6 +127,8 @@ class ConnectionFactoryImpl implements ConnectionFactory {
       [String? database]) async {
     var socket = await RawSocket.connect(host, port);
     socket.setOption(SocketOption.tcpNoDelay, true);
+    // 这里为啥把它关了呢？这里遇到了蛮多次写入失败
+    // 用这个应该可以重试把？
     socket.writeEventsEnabled = false;
 
     var protocol = new Protocol(socket);
@@ -232,6 +234,7 @@ class ConnectionImpl implements Connection {
       var fut = _protocol!.queryCommandTextProtocol.readCommandQueryResponse();
       print('333-n');
       // 好像就是这句代码阻塞了
+      // 这句代码使得future强制先排上队让main线程去调用
       var response = await fut;
       print('444');
       if (response is OkPacket) {

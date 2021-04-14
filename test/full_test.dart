@@ -77,7 +77,7 @@ abstract class SpeedTest {
     print("selecting simple data");
     var sw = new Stopwatch()..start();
     for (var i = 0; i < SIMPLE_SELECTS; i++) {
-      var queryResult = await executeQuery("select * from people");
+      var queryResult = await executeQuery("select * from people limit 100");
 
       // rows
       var hasRow = true;

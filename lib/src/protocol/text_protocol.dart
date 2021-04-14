@@ -34,6 +34,8 @@ class QueryCommandTextProtocol extends ProtocolDelegate {
   }
 
   void writeCommandQueryPacket(String query) {
+    // 所以是不是也可能是这里有bug，
+    // 即某次发送query有问题导致服务端不响应？
     _resetSequenceId();
 
     _createWriterBuffer();
@@ -49,11 +51,27 @@ class QueryCommandTextProtocol extends ProtocolDelegate {
   Future<Packet> readCommandQueryResponse() {
     print('333-1');
     var value = _readPacketBuffer();
+    // 注意，这个future应该是一个异步执行的
+    // 所以它已经在等待执行了
+    // 不过根据之前测试的，如果它没有用到isolate
+    // 那么它其实是在等待main线程来执行，所以其实
+    // 会在await的时候才排上队。。
     print((value is Future).toString() + '  ' + value.runtimeType.toString() + '333-2' + (value is Future<Packet>).toString());
     
     // value 是 Future一般，但是却不是Future<Packet>而是Future<dynamic>
+    // 这里是先333-n后333-m，
+    // 似乎要这么理解，then只是往第一个future里添加了一个转换
+    // 方法，但是其实await还是执行的第一个future；
+    // 因此这里其实可以理解是第一个future就已经卡主了
+    // 因此then里面的一直没有执行；
+    // 即_readPacketBuffer()就卡主了？
     var value2 = value is Future
-        ? value.then((_) => _readCommandQueryResponsePacket())
+        ? value.then((_) {
+          // 注意，没有输出333-m，说明value其实没有执行完毕
+          // 或者说都还没排上队
+          print('333-m');
+          return _readCommandQueryResponsePacket();
+        })
         : _readCommandQueryResponsePacket();
     // 这个是Future<Packet>因为上面的then进行了转换
     print('333-3 value2 is:${value2.runtimeType}');

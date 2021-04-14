@@ -7,7 +7,7 @@ import "dart:async";
 
 import '../lib/mysql5_client.dart';
 
-const SIMPLE_INSERTS = 1000;
+const SIMPLE_INSERTS = 5000;
 const SIMPLE_SELECTS = 1;
 
 // sudo ngrep -x -q -d lo0 '' 'port 3306'
@@ -63,8 +63,13 @@ abstract class SpeedTest {
     for (var i = 0; i < SIMPLE_SELECTS; i++) {
       var queryResult = await executeQuery("select * from prova LIMIT 10");
 
-      // rows
+      // rows，必须得先next()否则用不了
+      // 和java里的先用然后判断hasNext()不一样
+      // 而且这样更合理，否则万一一条数据都没有直接用就挂了
       while (await queryResult.next()) {
+        // queryResult是指向某一行的行标，取当前行第二列的值作为String
+        var rows = queryResult.getStringValue(1);
+        print('select result: ${rows}');
         await new Future.delayed(new Duration(milliseconds: 100));
       }
     }

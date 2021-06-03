@@ -49,14 +49,14 @@ class QueryCommandTextProtocol extends ProtocolDelegate {
   }
 
   Future<Packet> readCommandQueryResponse() {
-    print('333-1');
+    //print('333-1');
     var value = _readPacketBuffer();
     // 注意，这个future应该是一个异步执行的
     // 所以它已经在等待执行了
     // 不过根据之前测试的，如果它没有用到isolate
     // 那么它其实是在等待main线程来执行，所以其实
     // 会在await的时候才排上队。。
-    print((value is Future).toString() + '  ' + value.runtimeType.toString() + '333-2' + (value is Future<Packet>).toString());
+    //print((value is Future).toString() + '  ' + value.runtimeType.toString() + '333-2' + (value is Future<Packet>).toString());
     
     // value 是 Future一般，但是却不是Future<Packet>而是Future<dynamic>
     // 这里是先333-n后333-m，
@@ -69,12 +69,12 @@ class QueryCommandTextProtocol extends ProtocolDelegate {
         ? value.then((_) {
           // 注意，没有输出333-m，说明value其实没有执行完毕
           // 或者说都还没排上队
-          print('333-m');
+          //print('333-m');
           return _readCommandQueryResponsePacket();
         })
         : _readCommandQueryResponsePacket();
     // 这个是Future<Packet>因为上面的then进行了转换
-    print('333-3 value2 is:${value2.runtimeType}');
+    //print('333-3 value2 is:${value2.runtimeType}');
     // 似乎是：_readCommandQueryResponsePacket卡主了
     // then只会返回另一种Future，而要获得Future的执行后的值必须await
     // 如Future<A>可以通过then转换为Future<B>，但是获取B类型的返回值必须await
@@ -116,18 +116,18 @@ class QueryCommandTextProtocol extends ProtocolDelegate {
   }
 
   Packet _readCommandQueryResponsePacket() {
-    print('333-5');
+    //print('333-5');
     if (_isOkPacket()) {
-      print('333-6');
+      //print('333-6');
       return _readOkPacket();
     } else if (_isErrorPacket()) {
-      print('333-7');
+      //print('333-7');
       return _readErrorPacket();
     } else if (_isLocalInFilePacket()) {
-      print('333-8');
+      //print('333-8');
       throw new UnsupportedError("Protocol::LOCAL_INFILE_Data");
     } else {
-      print('333-9');
+      //print('333-9');
       return _readResultSetColumnCountPacket();
     }
   }

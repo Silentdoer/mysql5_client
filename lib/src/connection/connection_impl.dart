@@ -230,13 +230,13 @@ class ConnectionImpl implements Connection {
     try {
       _protocol!.queryCommandTextProtocol.writeCommandQueryPacket(query);
       // 似乎也不会阻塞
-      print('333');
+      //print('333');
       var fut = _protocol!.queryCommandTextProtocol.readCommandQueryResponse();
-      print('333-n');
+      //print('333-n');
       // 好像就是这句代码阻塞了
       // 这句代码使得future强制先排上队让main线程去调用
       var response = await fut;
-      print('444');
+      //print('444');
       if (response is OkPacket) {
         return new CommandQueryResultImpl.ok(
             response.affectedRows!, response.lastInsertId!, this);

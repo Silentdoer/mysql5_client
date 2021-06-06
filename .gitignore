@@ -24,3 +24,4 @@ doc/api/
 *.iws
 *.snapshot
 .idea
+/.dart_tool/test/*

@@ -6,7 +6,7 @@ A library for Dart developers. It is awesome.
 
 A simple usage example:
 
-    import 'package:mysql_client/mysql_client.dart';
+    import 'package:mysql5_client/mysql5_client.dart';
 
     main() {
       var awesome = new Awesome();

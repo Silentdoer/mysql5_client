@@ -836,21 +836,9 @@ class PreparedQueryRowIteratorImpl extends BaseQueryRowIteratorImpl {
       case MYSQL_TYPE_TINY:
       case MYSQL_TYPE_LONG:
       case MYSQL_TYPE_LONGLONG:
-        return (_result as PreparedQueryResultImpl)
-            ._statement
-            ?.connection
-            ._protocol
-            ?.preparedStatementProtocol
-            .reusableRowPacket
-            ?.getInteger(index);
+        return this.getIntegerValue(index);
       case MYSQL_TYPE_DOUBLE:
-        return (_result as PreparedQueryResultImpl)
-            ._statement
-            ?.connection
-            ._protocol
-            ?.preparedStatementProtocol
-            .reusableRowPacket
-            ?.getDouble(index);
+        return this.getDoubleValue(index);
       default:
         throw new UnsupportedError("Sql type not supported ${column?.type}");
     }

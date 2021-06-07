@@ -17,9 +17,10 @@ void main() {
 void test1() {
   try {
     throw new ArgumentError("error");
+    print("OK 1");
   } finally {
     try {
-      throw new ArgumentError("error 2");
+      throw new ArgumentError("error 1");
     } catch (e) {
       print("error 1 catched");
     }

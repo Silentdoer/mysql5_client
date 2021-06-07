@@ -233,7 +233,9 @@ class Protocol {
     var value2 = value is Future
         ? value.then((_) => __readCommandResponsePacket())
         : __readCommandResponsePacket();
-    return value2 is Future<Packet>? value2 : new Future.value(value2 as Packet);
+    return value2 is Future<Packet>
+        ? value2
+        : new Future.value(value2 as Packet);
   }
 
   void _free() {
@@ -266,8 +268,9 @@ class Protocol {
 
   bool _isErrorPacket() => _header == 0xff;
 
-  OkPacket _readOkPacket() => __completeSuccessResponsePacket(
-      new OkPacket(_payloadLength, _sequenceId)) as OkPacket;
+  OkPacket _readOkPacket() =>
+      __completeSuccessResponsePacket(new OkPacket(_payloadLength, _sequenceId))
+          as OkPacket;
 
   EOFPacket _readEOFPacket() {
     // TODO check CLIENT_DEPRECATE_EOF flag
@@ -373,7 +376,8 @@ class Protocol {
 
     if (!range.isNil) {
       // TODO verificare se esistono conversioni più snelle del double
-      return new Uint8List.fromList(range.data!.sublist(range.start!, range.end))
+      return new Uint8List.fromList(
+              range.data!.sublist(range.start!, range.end))
           .buffer
           .asFloat64List()[0];
     } else {
@@ -418,14 +422,16 @@ class Protocol {
 
   int _readByte() => __reusablePacketBuffer.payload.readByte();
 
-  int _readFixedLengthInteger(int length) => _getInteger(__reusablePacketBuffer
-      .payload.readFixedLengthDataRange(length, __reusableDataRange));
+  int _readFixedLengthInteger(int length) =>
+      _getInteger(__reusablePacketBuffer.payload
+          .readFixedLengthDataRange(length, __reusableDataRange));
 
   int _readLengthEncodedInteger() =>
       _getInteger(_readLengthEncodedDataRange(__reusableDataRange));
 
-  String? _readFixedLengthString(int length) => _getString(__reusablePacketBuffer
-      .payload.readFixedLengthDataRange(length, __reusableDataRange));
+  String? _readFixedLengthString(int length) =>
+      _getString(__reusablePacketBuffer.payload
+          .readFixedLengthDataRange(length, __reusableDataRange));
 
   String? _readFixedLengthUTF8String(int length) =>
       _getUTF8String(__reusablePacketBuffer.payload
@@ -437,11 +443,13 @@ class Protocol {
   String? _readLengthEncodedUTF8String() =>
       _getUTF8String(_readLengthEncodedDataRange(__reusableDataRange));
 
-  String? _readNulTerminatedString() => _getString(__reusablePacketBuffer.payload
-      .readUpToDataRange(NULL_TERMINATOR, __reusableDataRange));
+  String? _readNulTerminatedString() =>
+      _getString(__reusablePacketBuffer.payload
+          .readUpToDataRange(NULL_TERMINATOR, __reusableDataRange));
 
-  String? _readNulTerminatedUTF8String() => _getUTF8String(__reusablePacketBuffer
-      .payload.readUpToDataRange(NULL_TERMINATOR, __reusableDataRange));
+  String? _readNulTerminatedUTF8String() =>
+      _getUTF8String(__reusablePacketBuffer.payload
+          .readUpToDataRange(NULL_TERMINATOR, __reusableDataRange));
 
   String? _readRestOfPacketString() =>
       _getString(_readRestOfPacketDataRange(__reusableDataRange));

@@ -67,63 +67,67 @@ class PreparedStatementProtocol extends ProtocolDelegate {
       for (int i = 0; i < parameterTypes.length; i++) {
         var value = parameterValues[i];
         //if (value != null) {
-          var sqlType = getSqlTypeFromMysqlType(parameterTypes[i]);
-          //print('####${sqlType}');
-          // 这里可以正确识别NULL类型和DateTime等类型；
-          switch (sqlType) {
-            case SqlType.NULL:
-              _writeLengthEncodedUTF8String('NULL');
-              break;
-            case SqlType.TINY:
-              // value (1) -- integer
-              _writeFixedLengthInteger(value ? 1 : 0, 1);
-              break;
-            case SqlType.DECIMAL:
-              print('not exe decimal');
-              _writeLengthEncodedUTF8String((value as Decimal).toString());
-              break;
-            case SqlType.DOUBLE:
-              // value (string.fix_len) -- (len=8) double
-              _writeDouble(value);
-              break;
-            case SqlType.LONG:
-              // value (8) -- integer
-              _writeFixedLengthInteger(value, 4);
-              break;
-            case SqlType.LONGLONG:
-              // value (8) -- integer
-              _writeFixedLengthInteger(value, 8);
-              break;
-            case SqlType.DATETIME:
-              print('not exec datetime');
-              final dt = value as DateTime;
-              var month = dt.month.toString().length == 1 ? '0${dt.month}' : dt.month;
-              var day = dt.day.toString().length == 1 ? '0${dt.day}' : dt.day;
-              var hour = dt.hour.toString().length == 1 ? '0${dt.hour}' : dt.hour;
-              var minute = dt.minute.toString().length == 1 ? '0${dt.minute}' : dt.minute;
-              var second = dt.second.toString().length == 1 ? '0${dt.second}' : dt.second;
-              var formatted = '${dt.year}-${month}-${day} ${hour}:${minute}:${second}.${dt.millisecond}';
-              //print(formatted);
-              // 成功执行
-              _writeLengthEncodedUTF8String(formatted);
-              break;
-              //throw new UnsupportedError("DateTime not supported yet");
-            case SqlType.VAR_STRING:
-              var formattedVal = '';
-              if (value is String) {
-                formattedVal = value;
-              } else if (value is DateTime) {
-                // FLAG 如果要格式化特定的时间格式这里改
-                formattedVal = value.toString();
-              } else if (value is Decimal) {
-                formattedVal = value.toString();
-              }
-              // value (lenenc_str) -- string
-              _writeLengthEncodedUTF8String(formattedVal);
-              break;
-            default:
-              throw new UnsupportedError("sql type not full supported $sqlType");
-          }
+        var sqlType = getSqlTypeFromMysqlType(parameterTypes[i]);
+        //print('####${sqlType}');
+        // 这里可以正确识别NULL类型和DateTime等类型；
+        switch (sqlType) {
+          case SqlType.NULL:
+            _writeLengthEncodedUTF8String('NULL');
+            break;
+          case SqlType.TINY:
+            // value (1) -- integer
+            _writeFixedLengthInteger(value ? 1 : 0, 1);
+            break;
+          case SqlType.DECIMAL:
+            print('not exe decimal');
+            _writeLengthEncodedUTF8String((value as Decimal).toString());
+            break;
+          case SqlType.DOUBLE:
+            // value (string.fix_len) -- (len=8) double
+            _writeDouble(value);
+            break;
+          case SqlType.LONG:
+            // value (8) -- integer
+            _writeFixedLengthInteger(value, 4);
+            break;
+          case SqlType.LONGLONG:
+            // value (8) -- integer
+            _writeFixedLengthInteger(value, 8);
+            break;
+          case SqlType.DATETIME:
+            print('not exec datetime');
+            final dt = value as DateTime;
+            var month =
+                dt.month.toString().length == 1 ? '0${dt.month}' : dt.month;
+            var day = dt.day.toString().length == 1 ? '0${dt.day}' : dt.day;
+            var hour = dt.hour.toString().length == 1 ? '0${dt.hour}' : dt.hour;
+            var minute =
+                dt.minute.toString().length == 1 ? '0${dt.minute}' : dt.minute;
+            var second =
+                dt.second.toString().length == 1 ? '0${dt.second}' : dt.second;
+            var formatted =
+                '${dt.year}-${month}-${day} ${hour}:${minute}:${second}.${dt.millisecond}';
+            //print(formatted);
+            // 成功执行
+            _writeLengthEncodedUTF8String(formatted);
+            break;
+          //throw new UnsupportedError("DateTime not supported yet");
+          case SqlType.VAR_STRING:
+            var formattedVal = '';
+            if (value is String) {
+              formattedVal = value;
+            } else if (value is DateTime) {
+              // FLAG 如果要格式化特定的时间格式这里改
+              formattedVal = value.toString();
+            } else if (value is Decimal) {
+              formattedVal = value.toString();
+            }
+            // value (lenenc_str) -- string
+            _writeLengthEncodedUTF8String(formattedVal);
+            break;
+          default:
+            throw new UnsupportedError("sql type not full supported $sqlType");
+        }
         //}
       }
     }
@@ -162,7 +166,9 @@ class PreparedStatementProtocol extends ProtocolDelegate {
     var value2 = value is Future
         ? value.then((_) => _readCommandStatementPrepareResponsePacket())
         : _readCommandStatementPrepareResponsePacket();
-    return value2 is Future<Packet> ? value2 : new Future.value(value2 as Packet);
+    return value2 is Future<Packet>
+        ? value2
+        : new Future.value(value2 as Packet);
   }
 
   Future<Packet> readCommandStatementExecuteResponse() {
@@ -170,7 +176,9 @@ class PreparedStatementProtocol extends ProtocolDelegate {
     var value2 = value is Future
         ? value.then((_) => _readCommandStatementExecuteResponsePacket())
         : _readCommandStatementExecuteResponsePacket();
-    return value2 is Future<Packet> ? value2 : new Future.value(value2 as Packet);
+    return value2 is Future<Packet>
+        ? value2
+        : new Future.value(value2 as Packet);
   }
 
   skipResultSetRowResponse() {
@@ -225,7 +233,8 @@ class PreparedStatementProtocol extends ProtocolDelegate {
     }
   }
 
-  CommandStatementPrepareOkResponsePacket _readCommandStatementPrepareOkResponsePacket() {
+  CommandStatementPrepareOkResponsePacket
+      _readCommandStatementPrepareOkResponsePacket() {
     var packet = new CommandStatementPrepareOkResponsePacket(
         _payloadLength, _sequenceId);
 
@@ -256,8 +265,8 @@ class PreparedStatementProtocol extends ProtocolDelegate {
     // A packet containing a Protocol::LengthEncodedInteger column_count
     packet._columnCount = _readByte();
 
-    _reusableRowPacket =
-        new PreparedResultSetRowPacket.reusable(_protocol, packet._columnCount!);
+    _reusableRowPacket = new PreparedResultSetRowPacket.reusable(
+        _protocol, packet._columnCount!);
 
     return packet;
   }

@@ -50,9 +50,8 @@ abstract class SpeedTest {
     for (var i = 0; i < SIMPLE_INSERTS; i++) {
       // 当一次性执行多条insert请求时，这里会卡主，应该是连接数问题？
       // 说明每次insert完是没有释放连接的，有bug
-      await executeQuery(
-          "insert into prova (name) values ('$i-OK')");
-          print('inserted: ${i + 1}');
+      await executeQuery("insert into prova (name) values ('$i-OK')");
+      print('inserted: ${i + 1}');
     }
     logTime("simple insertions", sw);
   }
@@ -89,7 +88,8 @@ class MySqlClientSpeedTest extends SpeedTest {
   Future run() async {
     var factory2 = new ConnectionFactory();
 
-    connection = await factory2.connect("localhost", 3306, "root", "wyzpass", "db_test");
+    connection =
+        await factory2.connect("localhost", 3306, "root", "wyzpass", "db_test");
 
     await super.run();
 

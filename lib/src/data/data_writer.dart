@@ -14,7 +14,7 @@ class DataWriter {
     if (successCount != buffer.length) {
       //print('写入数据：${successCount}  ${buffer.length}  ${this._socket.available()}');
       //writeCount++;
-      while(true) {
+      while (true) {
         successCount = _socket.write(buffer);
         //writeCount++;
         if (successCount == buffer.length) {

@@ -77,11 +77,16 @@ void main() async {
 
       print("${queryResult.getNumValue(0)} : ${queryResult.getStringValue(1)}");
       // num也可以用String类型来读取
-      print("${queryResult.getStringValue(2)} : ${queryResult.getStringValue(3)}");
-      print("${queryResult.getStringValue(4)} : ${queryResult.getStringValue(5)}");
-      print("${queryResult.getStringValue(6)} : ${queryResult.getStringValue(6)}");
-      print("${queryResult.getDateTimeValue(4)} : ${queryResult.getDecimalValue(5)}");
-      print("${queryResult.getIntegerValue(0)} : ${queryResult.getDoubleValue(6)}");
+      print(
+          "${queryResult.getStringValue(2)} : ${queryResult.getStringValue(3)}");
+      print(
+          "${queryResult.getStringValue(4)} : ${queryResult.getStringValue(5)}");
+      print(
+          "${queryResult.getStringValue(6)} : ${queryResult.getStringValue(6)}");
+      print(
+          "${queryResult.getDateTimeValue(4)} : ${queryResult.getDecimalValue(5)}");
+      print(
+          "${queryResult.getIntegerValue(0)} : ${queryResult.getDoubleValue(6)}");
     }
   } finally {
     await connection?.close();

@@ -15,7 +15,7 @@ class ReaderBuffer {
     reuse(reusableChunks, dataLength);
   }
 
-  ReaderBuffer.reusable() : this._chunks =  List.empty(growable: true);
+  ReaderBuffer.reusable() : this._chunks = List.empty(growable: true);
 
   ReaderBuffer reuse(int reusableChunks, int dataLength) {
     _dataLength = dataLength;

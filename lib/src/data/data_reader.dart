@@ -4,7 +4,6 @@
 part of mysql_client.data;
 
 class DataReader {
-
   // TODO questo valore si potrebbe modificare a runtime
   final int? maxChunkSize;
 

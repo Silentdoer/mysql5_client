@@ -43,8 +43,7 @@ class ColumnDefinition {
 
 abstract class ConnectionPool {
   factory ConnectionPool(
-          {
-          required String host,
+          {required String host,
           required int port,
           required String userName,
           required String password,
@@ -72,7 +71,8 @@ abstract class ConnectionFactory {
     return new ConnectionFactoryImpl();
   }
 
-  Future<Connection> connect(String host, int port, String userName, String password,
+  Future<Connection> connect(
+      String host, int port, String userName, String password,
       [String? database]);
 }
 

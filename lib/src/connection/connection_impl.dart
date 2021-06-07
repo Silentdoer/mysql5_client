@@ -26,8 +26,7 @@ class ConnectionPoolImpl implements ConnectionPool {
       new Map();
 
   ConnectionPoolImpl(
-      {
-      required String host,
+      {required String host,
       required int port,
       required String userName,
       required String password,
@@ -68,7 +67,8 @@ class ConnectionPoolImpl implements ConnectionPool {
       }
     }
 
-    var pooledConnection = new PooledConnectionImpl(connection as ConnectionImpl, this);
+    var pooledConnection =
+        new PooledConnectionImpl(connection as ConnectionImpl, this);
 
     _assignedConnections[pooledConnection] = connection;
     _assignedResources[pooledConnection] = resource;
@@ -102,7 +102,8 @@ class ConnectionPoolImpl implements ConnectionPool {
 
 class ConnectionFactoryImpl implements ConnectionFactory {
   @override
-  Future<Connection> connect(String host, int port, String userName, String password,
+  Future<Connection> connect(
+      String host, int port, String userName, String password,
       [String? database]) async {
     var socket = await RawSocket.connect(host, port);
     socket.setOption(SocketOption.tcpNoDelay, true);
@@ -270,7 +271,7 @@ class ConnectionImpl implements Connection {
         }
       }
 
-      List<ColumnDefinition> parameters = 
+      List<ColumnDefinition> parameters =
           List.filled(response.numParams!, ColumnDefinition('', 0));
       var parameterIterator =
           new QueryColumnIteratorImpl(parameters.length, this);
@@ -284,7 +285,7 @@ class ConnectionImpl implements Connection {
         }
       }
 
-      List<ColumnDefinition> columns = 
+      List<ColumnDefinition> columns =
           List.filled(response.numColumns!, ColumnDefinition('', 0));
       var columnIterator = new QueryColumnIteratorImpl(columns.length, this);
       var hasColumn = columns.length > 0;
@@ -298,10 +299,7 @@ class ConnectionImpl implements Connection {
       }
 
       _lastProtocolResult = new PreparedStatementImpl(
-          response.statementId!,
-          parameters,
-          columns,
-          this);
+          response.statementId!, parameters, columns, this);
 
       // TODO raccogliere gli statement aperti
 
@@ -390,7 +388,8 @@ abstract class BaseQueryResultImpl implements QueryResult {
   bool? getBoolValue(int index) => _rowIterator!.getBoolValue(index);
 
   @override
-  DateTime? getDateTimeValue(int index) => _rowIterator!.getDateTimeValue(index);
+  DateTime? getDateTimeValue(int index) =>
+      _rowIterator!.getDateTimeValue(index);
 
   @override
   Decimal? getDecimalValue(int index) => _rowIterator!.getDecimalValue(index);
@@ -681,8 +680,8 @@ class QueryColumnIteratorImpl extends BaseDataIteratorImpl {
   String? get schema => _connection
       ._protocol?.queryCommandTextProtocol.reusableColumnPacket.schema;
 
-  String? get table =>
-      _connection._protocol?.queryCommandTextProtocol.reusableColumnPacket.table;
+  String? get table => _connection
+      ._protocol?.queryCommandTextProtocol.reusableColumnPacket.table;
 
   String? get orgTable => _connection
       ._protocol?.queryCommandTextProtocol.reusableColumnPacket.orgTable;
@@ -705,8 +704,8 @@ class QueryColumnIteratorImpl extends BaseDataIteratorImpl {
   int? get type =>
       _connection._protocol?.queryCommandTextProtocol.reusableColumnPacket.type;
 
-  int? get flags =>
-      _connection._protocol?.queryCommandTextProtocol.reusableColumnPacket.flags;
+  int? get flags => _connection
+      ._protocol?.queryCommandTextProtocol.reusableColumnPacket.flags;
 
   int? get decimals => _connection
       ._protocol?.queryCommandTextProtocol.reusableColumnPacket.decimals;
@@ -831,7 +830,8 @@ class PreparedQueryRowIteratorImpl extends BaseQueryRowIteratorImpl {
 
   @override
   num? getNumValue(int index) {
-    var column = (_result as PreparedQueryResultImpl)._statement?.columns[index];
+    var column =
+        (_result as PreparedQueryResultImpl)._statement?.columns[index];
     switch (column?.type) {
       case MYSQL_TYPE_TINY:
       case MYSQL_TYPE_LONG:

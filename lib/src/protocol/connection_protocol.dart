@@ -94,7 +94,9 @@ class ConnectionProtocol extends ProtocolDelegate {
     var value2 = value is Future
         ? value.then((_) => _readInitialHandshakeResponsePacket())
         : _readInitialHandshakeResponsePacket();
-    return value2 is Future<Packet> ? value2 : new Future.value(value2 as Packet);
+    return value2 is Future<Packet>
+        ? value2
+        : new Future.value(value2 as Packet);
   }
 
   Packet _readInitialHandshakeResponsePacket() {

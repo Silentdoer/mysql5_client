@@ -22,13 +22,12 @@ Future main() async {
   // });
 }
 
-Future test21() 
-async {
+Future test21() async {
   var connection;
 
   try {
-
-    connection = await new ConnectionFactory().connect("localhost", 3306, "root", "wyzpass", "db_test");
+    connection = await new ConnectionFactory()
+        .connect("localhost", 3306, "root", "wyzpass", "db_test");
 
     var queryResult;
     var statement;
@@ -39,7 +38,7 @@ async {
     statement.setParameter(0, 92);
 
     queryResult = await statement.executeQuery();
-    
+
     print(queryResult.affectedRows);
 
     statement.setParameter(0, 93);

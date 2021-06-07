@@ -75,7 +75,8 @@ SqlType getSqlTypeFromMysqlType(int mysqlTypeFlag) {
     case MYSQL_TYPE_NEWDECIMAL:
       return SqlType.DECIMAL;
     default:
-      throw new UnsupportedError("MySql type flag not supported $mysqlTypeFlag");
+      throw new UnsupportedError(
+          "MySql type flag not supported $mysqlTypeFlag");
   }
 }
 
@@ -97,7 +98,6 @@ int getSqlTypeFromValue(dynamic value) {
   } else if (value is DateTime) {
     return MYSQL_TYPE_VAR_STRING;
   } else {
-    throw new UnsupportedError(
-        "Value type not supported ${value.runtimeType}");
+    throw new UnsupportedError("Value type not supported ${value.runtimeType}");
   }
 }

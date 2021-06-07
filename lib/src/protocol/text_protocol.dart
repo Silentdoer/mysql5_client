@@ -48,7 +48,7 @@ class QueryCommandTextProtocol extends ProtocolDelegate {
     // 那么它其实是在等待main线程来执行，所以其实
     // 会在await的时候才排上队。。
     //print((value is Future).toString() + '  ' + value.runtimeType.toString() + '333-2' + (value is Future<Packet>).toString());
-    
+
     // value 是 Future一般，但是却不是Future<Packet>而是Future<dynamic>
     // 这里是先333-n后333-m，
     // 似乎要这么理解，then只是往第一个future里添加了一个转换
@@ -58,11 +58,11 @@ class QueryCommandTextProtocol extends ProtocolDelegate {
     // 即_readPacketBuffer()就卡主了？
     var value2 = value is Future
         ? value.then((_) {
-          // 注意，没有输出333-m，说明value其实没有执行完毕
-          // 或者说都还没排上队
-          //print('333-m');
-          return _readCommandQueryResponsePacket();
-        })
+            // 注意，没有输出333-m，说明value其实没有执行完毕
+            // 或者说都还没排上队
+            //print('333-m');
+            return _readCommandQueryResponsePacket();
+          })
         : _readCommandQueryResponsePacket();
     // 这个是Future<Packet>因为上面的then进行了转换
     //print('333-3 value2 is:${value2.runtimeType}');
@@ -71,9 +71,8 @@ class QueryCommandTextProtocol extends ProtocolDelegate {
     // 如Future<A>可以通过then转换为Future<B>，但是获取B类型的返回值必须await
     // 所以外部对result进行await其实是开始去执行_readCommandQueryResponsePacket里
     // 的请求具体值的代码；
-    var result = value2 is Future<Packet>
-        ? value2
-        : new Future.value(value2 as Packet);
+    var result =
+        value2 is Future<Packet> ? value2 : new Future.value(value2 as Packet);
     //print('333-3');
     return result;
   }

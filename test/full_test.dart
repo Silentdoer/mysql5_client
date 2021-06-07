@@ -68,7 +68,7 @@ abstract class SpeedTest {
     for (var i = 0; i < SIMPLE_INSERTS; i++) {
       await executeQuery(
           "insert into people (name, age) values ('person$i', $i)");
-          print('inserted ${i + 1}');
+      print('inserted ${i + 1}');
     }
     logTime("simple insertions", sw);
   }
@@ -103,7 +103,8 @@ class MySqlClientSpeedTest extends SpeedTest {
   Connection? connection;
 
   Future run() async {
-    connection = await factory2.connect("localhost", 3306, "root", "wyzpass", "db_test");
+    connection =
+        await factory2.connect("localhost", 3306, "root", "wyzpass", "db_test");
 
     await super.run();
 

@@ -6,7 +6,7 @@ A mysql5.x library for Dart developers.
 
 A simple usage example:
 
-    import '../lib/mysql5_client.dart';
+    import 'package:mysql5_client/mysql5_client.dart';
 
     void main() async {
       Connection? connection;

@@ -2,18 +2,10 @@ library mysql_client.connection;
 
 import 'dart:async';
 
-import "connection/connection_impl.dart";
+import 'package:decimal/decimal.dart';
 
-enum SqlType {
-  TINY,
-  LONG,
-  DOUBLE,
-  NULL,
-  TIMESTAMP,
-  LONGLONG,
-  DATETIME,
-  VAR_STRING
-}
+import "connection/connection_impl.dart";
+import 'type/sql_type.dart';
 
 class ConnectionError extends Error {
   final String message;
@@ -151,4 +143,12 @@ abstract class RowIterator implements DataIterator {
   num? getNumValue(int index);
 
   bool? getBoolValue(int index);
+
+  DateTime? getDateTimeValue(int index);
+
+  Decimal? getDecimalValue(int index);
+
+  double? getDoubleValue(int index);
+
+  int? getIntegerValue(int index);
 }

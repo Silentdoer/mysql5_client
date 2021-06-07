@@ -18,3 +18,6 @@
 
 ## 0.3.2
 - readme update, fix null type
+
+## 0.4.0
+- 支持DateTime和Decimal类型

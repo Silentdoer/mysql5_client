@@ -2,15 +2,6 @@ part of mysql_client.protocol;
 
 const int COM_QUERY = 0x03;
 
-const int MYSQL_TYPE_TINY = 0x01;
-const int MYSQL_TYPE_LONG = 0x03;
-const int MYSQL_TYPE_DOUBLE = 0x05;
-const int MYSQL_TYPE_NULL = 0x06;
-const int MYSQL_TYPE_TIMESTAMP = 0x07;
-const int MYSQL_TYPE_LONGLONG = 0x08;
-const int MYSQL_TYPE_DATETIME = 0x0c;
-const int MYSQL_TYPE_VAR_STRING = 0xfd;
-
 class QueryCommandTextProtocol extends ProtocolDelegate {
   final ResultSetColumnDefinitionPacket _reusableColumnPacket;
 

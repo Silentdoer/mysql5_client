@@ -5,32 +5,11 @@ import 'dart:collection';
 import 'dart:io';
 
 import 'package:pool/pool.dart';
+import 'package:decimal/decimal.dart';
 
 import '../connection.dart';
 import '../protocol.dart';
-
-int? _getSqlType(SqlType? sqlType) {
-  switch (sqlType) {
-    case SqlType.DATETIME:
-      return MYSQL_TYPE_DATETIME;
-    case SqlType.DOUBLE:
-      return MYSQL_TYPE_DOUBLE;
-    case SqlType.LONG:
-      return MYSQL_TYPE_LONG;
-    case SqlType.LONGLONG:
-      return MYSQL_TYPE_LONGLONG;
-    case SqlType.NULL:
-      return MYSQL_TYPE_NULL;
-    case SqlType.TIMESTAMP:
-      return MYSQL_TYPE_TIMESTAMP;
-    case SqlType.TINY:
-      return MYSQL_TYPE_TINY;
-    case SqlType.VAR_STRING:
-    // TODO 有新类型来了这里需要修改
-    default:
-      return null;
-  }
-}
+import '../type/sql_type.dart';
 
 class ConnectionPoolImpl implements ConnectionPool {
   final ConnectionFactory _factory;
@@ -411,6 +390,18 @@ abstract class BaseQueryResultImpl implements QueryResult {
   bool? getBoolValue(int index) => _rowIterator!.getBoolValue(index);
 
   @override
+  DateTime? getDateTimeValue(int index) => _rowIterator!.getDateTimeValue(index);
+
+  @override
+  Decimal? getDecimalValue(int index) => _rowIterator!.getDecimalValue(index);
+
+  @override
+  double? getDoubleValue(int index) => _rowIterator!.getDoubleValue(index);
+
+  @override
+  int? getIntegerValue(int index) => _rowIterator!.getIntegerValue(index);
+
+  @override
   Future<List<List>> getNextRows() {
     // TODO implementare getNextRows
     throw new UnimplementedError();
@@ -504,11 +495,12 @@ class PreparedStatementImpl implements PreparedStatement {
     if (index >= parameterCount) {
       throw new IndexError(index, _parameterValues);
     }
-
-    var type = _getSqlType(sqlType);
-
-    type ??= _connection._protocol!.preparedStatementProtocol
-        .getSqlTypeFromValue(value);
+    int type = -1;
+    if (sqlType == null) {
+      type = getSqlTypeFromValue(value);
+    } else {
+      type = getMysqlTypeFlagFromSqlType(sqlType);
+    }
 
     if (type != null && _parameterTypes[index] != type) {
       _parameterTypes[index] = type;
@@ -772,6 +764,37 @@ class CommandQueryRowIteratorImpl extends BaseQueryRowIteratorImpl {
   }
 
   @override
+  DateTime? getDateTimeValue(int index) {
+    var formatted = getStringValue(index);
+    return formatted == null ? null : DateTime.parse(formatted);
+  }
+
+  Decimal? getDecimalValue(int index) {
+    var formatted = getStringValue(index);
+    return formatted == null ? null : Decimal.parse(formatted);
+  }
+
+  double? getDoubleValue(int index) {
+    var formatted = (_result as CommandQueryResultImpl)
+        ._connection
+        ._protocol!
+        .queryCommandTextProtocol
+        .reusableRowPacket!
+        .getString(index);
+    return formatted != null ? double.parse(formatted) : null;
+  }
+
+  int? getIntegerValue(int index) {
+    var formatted = (_result as CommandQueryResultImpl)
+        ._connection
+        ._protocol!
+        .queryCommandTextProtocol
+        .reusableRowPacket!
+        .getString(index);
+    return formatted != null ? int.parse(formatted) : null;
+  }
+
+  @override
   bool _isDataPacket(Packet response) => response is ResultSetRowPacket;
 
   @override
@@ -837,6 +860,37 @@ class PreparedQueryRowIteratorImpl extends BaseQueryRowIteratorImpl {
   bool? getBoolValue(int index) {
     var formatted = getNumValue(index);
     return formatted != null ? formatted != 0 : null;
+  }
+
+  @override
+  DateTime? getDateTimeValue(int index) {
+    var formatted = getStringValue(index);
+    return formatted == null ? null : DateTime.parse(formatted);
+  }
+
+  Decimal? getDecimalValue(int index) {
+    var formatted = getStringValue(index);
+    return formatted == null ? null : Decimal.parse(formatted);
+  }
+
+  double? getDoubleValue(int index) {
+    return (_result as PreparedQueryResultImpl)
+        ._statement
+        ?.connection
+        ._protocol
+        ?.preparedStatementProtocol
+        .reusableRowPacket
+        ?.getDouble(index);
+  }
+
+  int? getIntegerValue(int index) {
+    return (_result as PreparedQueryResultImpl)
+        ._statement
+        ?.connection
+        ._protocol
+        ?.preparedStatementProtocol
+        .reusableRowPacket
+        ?.getInteger(index);
   }
 
   @override

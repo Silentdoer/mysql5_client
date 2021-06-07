@@ -7,17 +7,6 @@ const int COM_STMT_RESET = 0x1a;
 
 const int CURSOR_TYPE_NO_CURSOR = 0x00;
 
-enum DataType {
-  string,
-  integer8,
-  integer4,
-  integer2,
-  integer1,
-  double,
-  float,
-  dateTime
-}
-
 class PreparedStatementProtocol extends ProtocolDelegate {
   PreparedResultSetRowPacket? _reusableRowPacket;
 
@@ -31,25 +20,6 @@ class PreparedStatementProtocol extends ProtocolDelegate {
     _protocol.queryCommandTextProtocol.free();
 
     _reusableRowPacket?._free();
-  }
-
-  int? getSqlTypeFromValue(dynamic value) {
-    if (value == null) {
-      return null;
-    } else if (value is String) {
-      return MYSQL_TYPE_VAR_STRING;
-    } else if (value is int) {
-      return MYSQL_TYPE_LONGLONG;
-    } else if (value is double) {
-      return MYSQL_TYPE_DOUBLE;
-    } else if (value is bool) {
-      return MYSQL_TYPE_TINY;
-    } else if (value is DateTime) {
-      return MYSQL_TYPE_DATETIME;
-    } else {
-      throw new UnsupportedError(
-          "Value type not supported ${value.runtimeType}");
-    }
   }
 
   void writeCommandStatementPreparePacket(String query) {
@@ -96,31 +66,65 @@ class PreparedStatementProtocol extends ProtocolDelegate {
       //   n              value of each parameter
       for (int i = 0; i < parameterTypes.length; i++) {
         var value = parameterValues[i];
-        if (value != null) {
-          var dataType = _getDataTypeFromSqlType(parameterTypes[i]);
-          switch (dataType) {
-            case DataType.integer1:
+        //if (value != null) {
+          var sqlType = getSqlTypeFromMysqlType(parameterTypes[i]);
+          //print('####${sqlType}');
+          // 这里可以正确识别NULL类型和DateTime等类型；
+          switch (sqlType) {
+            case SqlType.NULL:
+              _writeLengthEncodedUTF8String('NULL');
+              break;
+            case SqlType.TINY:
               // value (1) -- integer
               _writeFixedLengthInteger(value ? 1 : 0, 1);
               break;
-            case DataType.double:
+            case SqlType.DECIMAL:
+              print('not exe decimal');
+              _writeLengthEncodedUTF8String((value as Decimal).toString());
+              break;
+            case SqlType.DOUBLE:
               // value (string.fix_len) -- (len=8) double
               _writeDouble(value);
               break;
-            case DataType.integer8:
+            case SqlType.LONG:
+              // value (8) -- integer
+              _writeFixedLengthInteger(value, 4);
+              break;
+            case SqlType.LONGLONG:
               // value (8) -- integer
               _writeFixedLengthInteger(value, 8);
               break;
-            case DataType.dateTime:
-              throw new UnsupportedError("DateTime not supported yet");
-            case DataType.string:
+            case SqlType.DATETIME:
+              print('not exec datetime');
+              final dt = value as DateTime;
+              var month = dt.month.toString().length == 1 ? '0${dt.month}' : dt.month;
+              var day = dt.day.toString().length == 1 ? '0${dt.day}' : dt.day;
+              var hour = dt.hour.toString().length == 1 ? '0${dt.hour}' : dt.hour;
+              var minute = dt.minute.toString().length == 1 ? '0${dt.minute}' : dt.minute;
+              var second = dt.second.toString().length == 1 ? '0${dt.second}' : dt.second;
+              var formatted = '${dt.year}-${month}-${day} ${hour}:${minute}:${second}.${dt.millisecond}';
+              //print(formatted);
+              // 成功执行
+              _writeLengthEncodedUTF8String(formatted);
+              break;
+              //throw new UnsupportedError("DateTime not supported yet");
+            case SqlType.VAR_STRING:
+              var formattedVal = '';
+              if (value is String) {
+                formattedVal = value;
+              } else if (value is DateTime) {
+                // FLAG 如果要格式化特定的时间格式这里改
+                formattedVal = value.toString();
+              } else if (value is Decimal) {
+                formattedVal = value.toString();
+              }
               // value (lenenc_str) -- string
-              _writeLengthEncodedUTF8String(value);
+              _writeLengthEncodedUTF8String(formattedVal);
               break;
             default:
-              throw new UnsupportedError("Data type not supported $dataType");
+              throw new UnsupportedError("sql type not full supported $sqlType");
           }
-        }
+        //}
       }
     }
 
@@ -283,23 +287,32 @@ class PreparedStatementProtocol extends ProtocolDelegate {
     for (var i = 0; i < columnTypes.length; i++) {
       var reusableRange = _reusableRowPacket!._getReusableDataRange(i);
       if ((nullBitmap[l] & mask) == 0) {
-        var dataType = _getDataTypeFromSqlType(columnTypes[i]);
-        switch (dataType) {
-          case DataType.string:
+        var sqlType = getSqlTypeFromMysqlType(columnTypes[i]);
+        switch (sqlType) {
+          case SqlType.VAR_STRING:
             _readFixedLengthDataRange(
                 _readLengthEncodedInteger(), reusableRange);
             break;
-          case DataType.double:
+          case SqlType.DOUBLE:
             _readFixedLengthDataRange(8, reusableRange);
             break;
-          case DataType.integer4:
+          case SqlType.LONG:
             _readFixedLengthDataRange(4, reusableRange);
             break;
-          case DataType.integer1:
+          case SqlType.TINY:
             _readFixedLengthDataRange(1, reusableRange);
             break;
+          //region 这些本质上其实都是没有实现的
+          case SqlType.LONGLONG:
+            _readFixedLengthDataRange(8, reusableRange);
+            //_readFixedLengthInteger(8);
+            break;
+          // null decimal 不知道怎么实现，因为不清楚要读取多少字节。。
+          // 但是可以通过上面的String实现，DateTime也不弄了用string实现
+          // 但是用string实现是有问题的，比如null，数据库字段VarString是null值，但是以Num类型获取不会报错
+          //endregion
           default:
-            throw new UnsupportedError("Data type not supported $dataType");
+            throw new UnsupportedError("sql type not full supported $sqlType");
         }
       } else {
         reusableRange.reuseNil();
@@ -316,31 +329,6 @@ class PreparedStatementProtocol extends ProtocolDelegate {
     }
 
     return packet;
-  }
-
-  DataType? _getDataTypeFromSqlType(int? sqlType) {
-    if (sqlType == null) {
-      return null;
-    } else {
-      switch (sqlType) {
-        case MYSQL_TYPE_VAR_STRING:
-          return DataType.string;
-        case MYSQL_TYPE_LONG:
-          return DataType.integer4;
-        case MYSQL_TYPE_LONGLONG:
-          return DataType.integer8;
-        case MYSQL_TYPE_DOUBLE:
-          return DataType.double;
-        case MYSQL_TYPE_TINY:
-          return DataType.integer1;
-        case MYSQL_TYPE_DATETIME:
-          return DataType.dateTime;
-        case MYSQL_TYPE_TIMESTAMP:
-          return DataType.dateTime;
-        default:
-          throw new UnsupportedError("Sql type not supported $sqlType");
-      }
-    }
   }
 
   List<int> _encodeNullBitmap(List parameters, [int offset = 0]) {

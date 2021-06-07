@@ -68,6 +68,12 @@
       "languageVersion": "2.12"
     },
     {
+      "name": "decimal",
+      "rootUri": "file:///O:/Apps/flutter/.pub-cache/hosted/pub.flutter-io.cn/decimal-1.2.0",
+      "packageUri": "lib/",
+      "languageVersion": "2.12"
+    },
+    {
       "name": "file",
       "rootUri": "file:///O:/Apps/flutter/.pub-cache/hosted/pub.flutter-io.cn/file-6.1.1",
       "packageUri": "lib/",
@@ -166,6 +172,12 @@
     {
       "name": "pub_semver",
       "rootUri": "file:///O:/Apps/flutter/.pub-cache/hosted/pub.flutter-io.cn/pub_semver-2.0.0",
+      "packageUri": "lib/",
+      "languageVersion": "2.12"
+    },
+    {
+      "name": "rational",
+      "rootUri": "file:///O:/Apps/flutter/.pub-cache/hosted/pub.flutter-io.cn/rational-1.2.1",
       "packageUri": "lib/",
       "languageVersion": "2.12"
     },
@@ -296,7 +308,7 @@
       "languageVersion": "2.13"
     }
   ],
-  "generated": "2021-06-07T06:55:27.434278Z",
+  "generated": "2021-06-07T08:00:45.828763Z",
   "generator": "pub",
   "generatorVersion": "2.13.1"
 }

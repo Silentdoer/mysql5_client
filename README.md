@@ -42,4 +42,4 @@ A simple usage example:
 
 Please file feature requests and bugs at the [issue tracker][tracker].
 
-[tracker]: https://github.com/Silentdoer/mysql5_client
+[tracker]: https://github.com/Silentdoer/mysql5_client/issues
